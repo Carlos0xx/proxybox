@@ -59,6 +59,9 @@ environment.
 ssh "$USER@$HOST" '
   if [ -d /opt/proxybox/.git ]; then
     cd /opt/proxybox && git pull --ff-only
+  elif [ -d /opt/proxybox ] && [ -n "$(ls -A /opt/proxybox 2>/dev/null)" ]; then
+    echo "[skip] /opt/proxybox exists but is not a git checkout — leaving it alone"
+    echo "       if you want a fresh start, ssh in and: rm -rf /opt/proxybox, then re-run"
   else
     git clone https://github.com/carlos0xx/proxybox /opt/proxybox
   fi
@@ -68,8 +71,19 @@ ssh "$USER@$HOST" '
 ### Step 3 — Run install.sh
 
 ```bash
-ssh "$USER@$HOST" 'cd /opt/proxybox && sudo bash deploy/install.sh'
+ssh "$USER@$HOST" '
+  cd /opt/proxybox
+  if [ "$(id -u)" = "0" ]; then
+    bash deploy/install.sh
+  else
+    sudo bash deploy/install.sh
+  fi
+'
 ```
+
+`install.sh` itself checks for root at the top; the wrapper above just picks
+the right invocation (`sudo` or not) without assuming `sudo` is installed
+(Debian minimal images don't ship it by default).
 
 This is idempotent — re-running it on an already-installed system does
 nothing destructive. Capture the output, but do **not** quote any line that
@@ -95,7 +109,7 @@ All four should be `active`. If any is not, fetch its `journalctl -u <svc> -n
 
 ```bash
 ssh "$USER@$HOST" '
-  python3 -c "
+  /opt/proxybox/.venv/bin/python -c "
 import yaml
 c = yaml.safe_load(open(\"/etc/proxybox/config.yaml\"))
 token = c[\"admin\"][\"token\"]
@@ -106,6 +120,10 @@ print(f\"TOKEN_PREFIX: {token[:8]}...\")
 "
 '
 ```
+
+Note: use the **venv python** (`/opt/proxybox/.venv/bin/python`), not
+system `python3`. Debian minimal does not ship `python3-yaml`; the venv
+installed by `install.sh` already has `pyyaml` as a ProxyBox dep.
 
 Report back **only** the prefix + URL with truncated token. Tell the user
 the full token is in `/etc/proxybox/config.yaml` on the VPS and they should
@@ -121,7 +139,7 @@ ssh "$USER@$HOST" "
 cat > /etc/proxybox/bot.env <<ENV
 BOT_TOKEN=$BOT_TOKEN
 TG_ALLOWED_USERS=$ALLOWED_USERS
-ADMIN_TOKEN=\$(python3 -c \"import yaml; print(yaml.safe_load(open('/etc/proxybox/config.yaml'))['admin']['token'])\")
+ADMIN_TOKEN=\$(/opt/proxybox/.venv/bin/python -c \"import yaml; print(yaml.safe_load(open('/etc/proxybox/config.yaml'))['admin']['token'])\")
 ENV
 chmod 600 /etc/proxybox/bot.env
 systemctl enable --now proxybox-bot
