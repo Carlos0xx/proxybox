@@ -58,7 +58,7 @@ sudo bash deploy/check-prereqs.sh --install  # also apt-install missing apt deps
 | 2 | **Directories**: `/etc/proxybox`, `/var/lib/proxybox`, `/var/log/proxybox`, `/var/www/proxybox-sub`, `/etc/sing-box`. |
 | 3 | **sing-box binary** — latest GitHub release for the host's arch (amd64 / arm64). |
 | 4 | **sing-box systemd unit** — `/etc/systemd/system/sing-box.service`. |
-| 5 | **Reality keypair** (X25519), **Hy2 self-signed cert**, random **SNI** from `{microsoft, apple, cloudflare, amazon}.com`, `experimental.clash_api` enabled. |
+| 5 | **Reality keypair** (X25519), **Hy2 self-signed cert**, random **SNI** picked per install, `experimental.clash_api` enabled. |
 | 6 | **Python venv** at `/opt/proxybox/.venv` + `pip install -e .`. |
 | 7 | **`/etc/proxybox/config.yaml`** — random `admin.token` (24 bytes), random `admin.password` (16 alnum), random `admin.login_path` (12 alnum), `server.public_host` auto-detected via `ifconfig.me` / `ipify.org`. Mode 0600, root-owned. |
 | 8 | **fail2ban `[manual]` jail** with `backend=systemd` (Debian 13 has no `/var/log/auth.log`). |

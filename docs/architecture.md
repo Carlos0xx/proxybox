@@ -219,7 +219,7 @@ CREATE TABLE passkey_credential (      -- opt-in
 | **5 subscription formats** | URI list + Clash + Merlin + Shadowrocket + .txt — generated on the fly | Avoid format mismatches with router firmware and edge-case clients. |
 | **Login form** | `/login/{12-char-suffix}`; bare `/login` 404s | Bots probing common paths can't even confirm a form exists. |
 | **Admin auth** | Cookie + URL-path token *both* required; bypass mode opt-in | A stolen cookie can't be replayed against an instance on a different host. |
-| **Reality cover-domain** | Random pick from `www.microsoft.com` / `apple.com` / `cloudflare.com` / `amazon.com` per install | No shared fingerprint across deployments. |
+| **Reality cover-domain** | Random pick from a small pool of well-known TLS-fronted sites per install | No shared fingerprint across deployments. |
 | **Host categorisation** | Suffix → app_group lookup (~120 entries, no DNS calls) | Privacy: no per-request DNS lookup; performance: O(1) per host. |
 | **HTTPS provisioning** | Caddy + Let's Encrypt, triggered from the SPA | One click instead of an SSH session for a non-technical user. |
 | **`install.sh` idempotency** | Every step gated by an existence check | Safe to re-run; partial failures resume cleanly. |

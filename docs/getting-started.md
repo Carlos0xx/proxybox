@@ -33,7 +33,7 @@ The installer is idempotent — safe to re-run mid-way. It performs:
 1. **Pre-flight validation** via `deploy/check-prereqs.sh` (9 categories: OS, arch, privilege, RAM, disk, network, systemd, ports, apt deps).
 2. **apt install** of runtime dependencies (`python3-venv`, `curl`, `sqlite3`, `openssl`, `fail2ban`).
 3. **sing-box** — pulls the latest stable binary from GitHub releases (auto-detects amd64 / arm64).
-4. **Crypto generation** — Reality keypair, Hy2 self-signed cert, random SNI from a public-domain pool (`www.microsoft.com` / `apple.com` / `cloudflare.com` / `amazon.com`).
+4. **Crypto generation** — Reality keypair, Hy2 self-signed cert, random SNI picked per install.
 5. **Config writes** — `/etc/sing-box/config.json` and `/etc/proxybox/config.yaml` (mode 0600, root-owned).
 6. **systemd units** — `sing-box`, `proxybox-admin`, `proxybox-traffic-worker`, `proxybox-bot` (bot stays disabled until configured).
 7. **Auto-create the first device** — default name `phone-1` (override with env var `PROXYBOX_FIRST_DEVICE=<name>`).
