@@ -62,8 +62,6 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_LOGIN_URL_LABEL="登录地址"
     M_LOGIN_USER_LABEL="用户名"
     M_LOGIN_PASS_LABEL="密  码"
-    M_SECTION_ADMIN_TITLE="🔑 后台管理 URL"
-    M_SECTION_ADMIN_HINT="含 token, 请妥善保存"
     M_SECTION_SUBS_TITLE="📲 订阅 URL"
     M_SECTION_SUBS_HINT="任挑一个粘进客户端的 \"添加订阅\""
     M_SUB_DEFAULT_TAG="[推荐]"
@@ -109,8 +107,6 @@ else
     M_LOGIN_URL_LABEL="login URL"
     M_LOGIN_USER_LABEL="username"
     M_LOGIN_PASS_LABEL="password"
-    M_SECTION_ADMIN_TITLE="🔑 admin URL"
-    M_SECTION_ADMIN_HINT="contains token, keep private"
     M_SECTION_SUBS_TITLE="📲 subscription URLs"
     M_SECTION_SUBS_HINT="paste any one into your client's \"Add Subscription\""
     M_SUB_DEFAULT_TAG="[pick this]"
@@ -426,7 +422,6 @@ sleep 3
 ADMIN_TOKEN=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin']['token'])")
 PUBLIC_HOST=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['server']['public_host'])")
 ADMIN_BASE="http://${PUBLIC_HOST:-<your-vps-ip>}:8080"
-ADMIN_URL="$ADMIN_BASE/admin/$ADMIN_TOKEN/"
 
 # ─── 13. auto-create first device (one-shot UX) ────────────────────
 # Wait for proxybox-admin to be reachable on localhost (sleep 3 above
