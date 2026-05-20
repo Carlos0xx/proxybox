@@ -259,6 +259,15 @@ handoff. v0.1.6+ exposes a lot in the panel:
   (v0.1.9 default-on).
 - **Re-print credentials:** if user lost the install summary, the SSH
   fetcher in Step 5 prints login URL + username + password.
+- **Switch panel language (v0.2.0):** small `中 / EN` toggle in the
+  topbar, next to the theme switcher. Click → page reloads in the other
+  language. Choice persists via `localStorage` + a `proxybox-lang`
+  cookie, so the login page picks up the same language on next visit.
+  Coverage is ~80% — uncovered phrases gracefully fall back to Chinese.
+  The login form itself also honours `?lang=en|zh` for the bare URL.
+  Note: `install.sh --lang en|zh` only affects the installer OUTPUT;
+  the running panel always starts in Chinese and respects the user's
+  in-panel toggle from there.
 
 ### Subscription URL formats
 
