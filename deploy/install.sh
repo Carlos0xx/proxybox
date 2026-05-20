@@ -3,12 +3,98 @@
 #
 # Usage:
 #   git clone https://github.com/carlos0xx/proxybox /opt/proxybox
-#   cd /opt/proxybox && sudo bash deploy/install.sh
+#   cd /opt/proxybox && bash deploy/install.sh                       # auto language
+#   cd /opt/proxybox && bash deploy/install.sh --lang en             # force English
+#   cd /opt/proxybox && bash deploy/install.sh --lang zh             # force Chinese
 #
 # Idempotent: re-running it on an existing install does nothing destructive,
 # only fills in missing pieces. Safe to run repeatedly.
 
 set -euo pipefail
+
+# ─── argv: --lang en|zh + pass-through to check-prereqs.sh ────────
+LANG_CHOICE="${PROXYBOX_LANG:-auto}"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --lang)        LANG_CHOICE="${2:-auto}"; shift 2 ;;
+        --lang=*)      LANG_CHOICE="${1#*=}"; shift ;;
+        -h|--help)     sed -n '2,11p' "$0"; exit 0 ;;
+        *)             echo "unknown arg: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [ "$LANG_CHOICE" = "auto" ]; then
+    case "${LANG:-}" in
+        zh*|ZH*) LANG_CHOICE=zh ;;
+        *)       LANG_CHOICE=en ;;
+    esac
+fi
+
+case "$LANG_CHOICE" in
+    en|zh) ;;
+    *) echo "unsupported --lang: $LANG_CHOICE (use 'en' or 'zh')" >&2; exit 2 ;;
+esac
+
+# ─── i18n strings ────────────────────────────────────────────────
+if [ "$LANG_CHOICE" = "zh" ]; then
+    M_NOT_PROXYBOX_DIR="错误: PROXYBOX_DIR=%s 不像 ProxyBox 源码目录"
+    M_EXPECT_PYPROJECT="       预期 \$PROXYBOX_DIR/ 下有 pyproject.toml"
+    M_PREFLIGHT_FAIL="错误: 环境检查失败, 修复上方问题后重跑."
+    M_PREFLIGHT_HINT="       (自动装缺失 apt 包请跑: sudo bash %s --install --lang %s)"
+    M_INSTALLER="==> ProxyBox 安装器"
+    M_INSTALLER_SRC="    源码:   %s"
+    M_INSTALLER_CFG="    配置:   %s"
+    M_APT_INSTALLING="==> 安装系统包..."
+    M_SINGBOX_DOWNLOAD="==> 下载 sing-box..."
+    M_SINGBOX_VERSION="    sing-box: %s"
+    M_GEN_KEYPAIR="==> 生成 Reality 密钥 + Hy2 证书 + 随机 SNI..."
+    M_VENV_CREATE="==> 创建 Python venv..."
+    M_INSTALL_DEPS="==> 安装 ProxyBox 依赖..."
+    M_GEN_CONFIG="==> 生成 ProxyBox config.yaml..."
+    M_START_SERVICES="==> 启动服务..."
+    M_DONE_HEADER="ProxyBox 已安装"
+    M_ADMIN_URL="  admin URL:    http://%s:8080/admin/%s.../"
+    M_FULL_TOKEN="  完整 token:   %s/config.yaml  (admin.token 字段)"
+    M_SERVICES_LABEL="  服务状态:"
+    M_NEXT_LABEL="  接下来:"
+    M_NEXT_1="    1. 从 %s/config.yaml 取 token, 离线保存"
+    M_NEXT_2="    2. 浏览器打开上方 admin URL (HTTP, 生产请套 Caddy + Let's Encrypt)"
+    M_NEXT_3="    3. 在 admin 面板点 '+ 添加设备' 创建第一个设备"
+    M_NEXT_4="    4. 把订阅 URL 粘进 sing-box 兼容客户端 (Shadowrocket / sing-box / Hiddify)"
+    M_OPTIONAL_LABEL="  可选功能:"
+    M_OPTIONAL_PASSKEY="    - passkey:  config.yaml 里 features.passkey=true + 填 passkey.rp_id/origin + 套 HTTPS"
+    M_OPTIONAL_BOT="    - TG bot:   编辑 /etc/proxybox/bot.env, 然后 'systemctl enable --now proxybox-bot'"
+    M_ERR_UNSUPPORTED_ARCH="错误: 不支持的架构 %s"
+else
+    M_NOT_PROXYBOX_DIR="ERROR: PROXYBOX_DIR=%s doesn't look like a ProxyBox checkout"
+    M_EXPECT_PYPROJECT="       expected pyproject.toml at \$PROXYBOX_DIR/"
+    M_PREFLIGHT_FAIL="ERROR: pre-flight check failed. fix the issues above and re-run."
+    M_PREFLIGHT_HINT="       (to install missing apt packages automatically: sudo bash %s --install --lang %s)"
+    M_INSTALLER="==> ProxyBox installer"
+    M_INSTALLER_SRC="    source:     %s"
+    M_INSTALLER_CFG="    config:     %s"
+    M_APT_INSTALLING="==> installing system packages..."
+    M_SINGBOX_DOWNLOAD="==> installing sing-box..."
+    M_SINGBOX_VERSION="    sing-box: %s"
+    M_GEN_KEYPAIR="==> generating Reality keypair + Hy2 cert + random SNI..."
+    M_VENV_CREATE="==> creating Python venv..."
+    M_INSTALL_DEPS="==> installing ProxyBox deps..."
+    M_GEN_CONFIG="==> generating ProxyBox config..."
+    M_START_SERVICES="==> starting services..."
+    M_DONE_HEADER="ProxyBox installed"
+    M_ADMIN_URL="  admin URL:  http://%s:8080/admin/%s.../"
+    M_FULL_TOKEN="  full token: %s/config.yaml  (admin.token field)"
+    M_SERVICES_LABEL="  services:"
+    M_NEXT_LABEL="  next:"
+    M_NEXT_1="    1. grep token in %s/config.yaml — save it offline"
+    M_NEXT_2="    2. open the admin URL above (HTTP for now; set up Caddy + Let's Encrypt for production)"
+    M_NEXT_3="    3. in the admin UI, click '+ Add device' to create your first device"
+    M_NEXT_4="    4. paste subscription URL into a sing-box-compatible client (Shadowrocket / sing-box / Hiddify)"
+    M_OPTIONAL_LABEL="  optional features:"
+    M_OPTIONAL_PASSKEY="    - passkey:  set features.passkey=true + passkey.rp_id/origin in config.yaml + Caddy/TLS"
+    M_OPTIONAL_BOT="    - TG bot:   fill /etc/proxybox/bot.env then 'systemctl enable --now proxybox-bot'"
+    M_ERR_UNSUPPORTED_ARCH="ERROR: unsupported arch %s"
+fi
 
 # ─── config (overridable via env) ──────────────────────────────────
 : "${PROXYBOX_DIR:=$(cd "$(dirname "$0")/.." && pwd)}"
@@ -20,34 +106,28 @@ set -euo pipefail
 
 # ─── sentinel: this looks like a ProxyBox checkout ─────────────────
 if [ ! -f "$PROXYBOX_DIR/pyproject.toml" ]; then
-    echo "ERROR: PROXYBOX_DIR=$PROXYBOX_DIR doesn't look like a ProxyBox checkout" >&2
-    echo "       expected pyproject.toml at \$PROXYBOX_DIR/" >&2
+    printf "$M_NOT_PROXYBOX_DIR\n" "$PROXYBOX_DIR" >&2
+    printf "$M_EXPECT_PYPROJECT\n" >&2
     exit 1
 fi
 
-# ─── pre-flight: defer to check-prereqs.sh (skippable for hot-paths) ──
-#
-# This validates OS / arch / privilege / RAM / disk / network / systemd /
-# ports / required apt packages BEFORE we touch anything destructive.
-# Skip with PROXYBOX_SKIP_PREREQ=1 only if you've just run check-prereqs.sh
-# yourself and know what you're doing.
+# ─── pre-flight: defer to check-prereqs.sh ─────────────────────────
 if [ "${PROXYBOX_SKIP_PREREQ:-0}" != "1" ]; then
-    if ! bash "$PROXYBOX_DIR/deploy/check-prereqs.sh"; then
+    if ! bash "$PROXYBOX_DIR/deploy/check-prereqs.sh" --lang "$LANG_CHOICE"; then
         echo ""
-        echo "ERROR: pre-flight check failed. fix the issues above and re-run." >&2
-        echo "       (to install missing apt packages automatically:" >&2
-        echo "         sudo bash $PROXYBOX_DIR/deploy/check-prereqs.sh --install)" >&2
+        printf "$M_PREFLIGHT_FAIL\n" >&2
+        printf "$M_PREFLIGHT_HINT\n" "$PROXYBOX_DIR/deploy/check-prereqs.sh" "$LANG_CHOICE" >&2
         exit 1
     fi
 fi
 
 echo ""
-echo "==> ProxyBox installer"
-echo "    source:     $PROXYBOX_DIR"
-echo "    config:     $CONFIG_DIR"
+echo "$M_INSTALLER"
+printf "$M_INSTALLER_SRC\n" "$PROXYBOX_DIR"
+printf "$M_INSTALLER_CFG\n" "$CONFIG_DIR"
 
 # ─── 1. system packages ────────────────────────────────────────────
-echo "==> installing system packages..."
+echo "$M_APT_INSTALLING"
 apt-get -y update >/dev/null
 apt-get -y install \
     python3 python3-venv python3-pip python3-systemd \
@@ -59,12 +139,12 @@ mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR" "$SUB_DIR" "$SINGBOX_DIR"
 
 # ─── 3. sing-box binary ────────────────────────────────────────────
 if ! command -v sing-box >/dev/null; then
-    echo "==> installing sing-box..."
+    echo "$M_SINGBOX_DOWNLOAD"
     ARCH=$(uname -m)
     case "$ARCH" in
         x86_64)         ARCH=amd64 ;;
         aarch64|arm64)  ARCH=arm64 ;;
-        *) echo "ERROR: unsupported arch $ARCH" >&2; exit 1 ;;
+        *) printf "$M_ERR_UNSUPPORTED_ARCH\n" "$ARCH" >&2; exit 1 ;;
     esac
     RESP=$(curl -fsSL "https://api.github.com/repos/SagerNet/sing-box/releases/latest")
     SBVER=$(printf '%s\n' "$RESP" | grep '"tag_name":' | head -1 | cut -d'"' -f4)
@@ -74,7 +154,7 @@ if ! command -v sing-box >/dev/null; then
     install -m 755 "sing-box-${SBVER#v}-linux-${ARCH}/sing-box" /usr/local/bin/sing-box
     rm -rf "/tmp/sing-box-${SBVER#v}"*
 fi
-echo "    sing-box: $(sing-box version | head -1)"
+printf "$M_SINGBOX_VERSION\n" "$(sing-box version | head -1)"
 
 # ─── 4. sing-box systemd unit ──────────────────────────────────────
 if [ ! -f /etc/systemd/system/sing-box.service ]; then
@@ -101,7 +181,7 @@ fi
 
 # ─── 5. sing-box config (only generate if missing) ────────────────
 if [ ! -f "$SINGBOX_DIR/config.json" ]; then
-    echo "==> generating Reality keypair + Hy2 cert + random SNI..."
+    echo "$M_GEN_KEYPAIR"
     KEYPAIR=$(sing-box generate reality-keypair)
     PRIVATE_KEY=$(printf '%s\n' "$KEYPAIR" | awk '/PrivateKey/{print $2}')
     SHORT_ID=$(openssl rand -hex 8)
@@ -165,16 +245,16 @@ fi
 # ─── 6. Python venv + deps ─────────────────────────────────────────
 cd "$PROXYBOX_DIR"
 if [ ! -d .venv ]; then
-    echo "==> creating Python venv..."
+    echo "$M_VENV_CREATE"
     python3 -m venv .venv
 fi
-echo "==> installing ProxyBox deps..."
+echo "$M_INSTALL_DEPS"
 .venv/bin/pip install --quiet --upgrade pip
 .venv/bin/pip install --quiet -e .
 
 # ─── 7. ProxyBox config.yaml ───────────────────────────────────────
 if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
-    echo "==> generating ProxyBox config..."
+    echo "$M_GEN_CONFIG"
     ADMIN_TOKEN=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(24))")
     PUBLIC_HOST=$(curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
                  || curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
@@ -268,7 +348,7 @@ for unit in proxybox-traffic-worker.service proxybox-bot.service; do
 done
 
 # ─── 11. enable + start core services ──────────────────────────────
-echo "==> starting services..."
+echo "$M_START_SERVICES"
 systemctl enable --now fail2ban  >/dev/null 2>&1 || true
 systemctl enable --now sing-box  >/dev/null 2>&1 || true
 systemctl enable --now proxybox-admin >/dev/null 2>&1 || true
@@ -282,12 +362,12 @@ TOKEN_PREFIX="${ADMIN_TOKEN:0:8}"
 
 echo ""
 echo "============================================================"
-echo "  ProxyBox installed"
+echo "  $M_DONE_HEADER"
 echo "============================================================"
-echo "  admin URL:  http://${PUBLIC_HOST:-<your-vps-ip>}:8080/admin/${TOKEN_PREFIX}.../"
-echo "  full token: $CONFIG_DIR/config.yaml  (admin.token field)"
+printf "$M_ADMIN_URL\n" "${PUBLIC_HOST:-<your-vps-ip>}" "$TOKEN_PREFIX"
+printf "$M_FULL_TOKEN\n" "$CONFIG_DIR"
 echo ""
-echo "  services:"
+echo "$M_SERVICES_LABEL"
 for svc in sing-box proxybox-admin proxybox-traffic-worker fail2ban; do
     state=$(systemctl is-active "$svc" 2>/dev/null || echo unknown)
     case "$state" in
@@ -298,13 +378,13 @@ for svc in sing-box proxybox-admin proxybox-traffic-worker fail2ban; do
     printf "    %s %-30s %s\n" "$mark" "$svc" "$state"
 done
 echo ""
-echo "  next:"
-echo "    1. grep token in $CONFIG_DIR/config.yaml — save it offline"
-echo "    2. open the admin URL above (HTTP for now; set up Caddy + Let's Encrypt for production)"
-echo "    3. in the admin UI, click '+ 添加设备' to create your first device"
-echo "    4. scan QR / copy subscription URL into a sing-box-compatible client"
+echo "$M_NEXT_LABEL"
+printf "$M_NEXT_1\n" "$CONFIG_DIR"
+echo "$M_NEXT_2"
+echo "$M_NEXT_3"
+echo "$M_NEXT_4"
 echo ""
-echo "  optional features:"
-echo "    - passkey:  set features.passkey=true + passkey.rp_id/origin in config.yaml + Caddy/TLS"
-echo "    - TG bot:   fill /etc/proxybox/bot.env then 'systemctl enable --now proxybox-bot'"
+echo "$M_OPTIONAL_LABEL"
+echo "$M_OPTIONAL_PASSKEY"
+echo "$M_OPTIONAL_BOT"
 echo "============================================================"
