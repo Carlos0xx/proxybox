@@ -3507,9 +3507,12 @@ async function loadDevicesMgmt() {
     const d = await api('/api/devices/list');
     const list = $('devices-list');
     const all = d.devices || [];
+    // Server semantics: paused_until=0 means NOT paused (DB default), paused_until>now means paused.
+    // The "indefinite pause" sentinel is a far-future ts (~year 2200, 7258118400 from server).
+    const _NOW_SEC = Math.floor(Date.now() / 1000);
     const revoked = all.filter(x => x.revoked);
-    const paused = all.filter(x => !x.revoked && x.paused_until !== null && x.paused_until !== undefined);
-    const active = all.filter(x => !x.revoked && (x.paused_until === null || x.paused_until === undefined));
+    const paused = all.filter(x => !x.revoked && (x.paused_until || 0) > _NOW_SEC);
+    const active = all.filter(x => !x.revoked && (!x.paused_until || x.paused_until <= _NOW_SEC));
     $('badge-devmgmt').textContent = active.length;
     $('devices-sub').textContent =
       `${active.length} 活跃${paused.length ? ' · ' + paused.length + ' 暂停' : ''} · ${revoked.length} 已吊销`;
@@ -3524,8 +3527,12 @@ async function loadDevicesMgmt() {
 function renderDeviceCard(dev) {
   const isLegacy = !dev.vless_port;
   const isRevoked = dev.revoked === 1;
-  const isPaused = !isRevoked && dev.paused_until !== null && dev.paused_until !== undefined;
-  const pauseIsIndefinite = isPaused && dev.paused_until === 0;
+  // Server semantics: paused_until=0 → not paused; >now → paused; sentinel
+  // 7258118400 (~year 2200) → indefinite. Threshold "10 years out" is
+  // robust to either-side clock skew without hard-coding the sentinel.
+  const _NOW_SEC = Math.floor(Date.now() / 1000);
+  const isPaused = !isRevoked && (dev.paused_until || 0) > _NOW_SEC;
+  const pauseIsIndefinite = isPaused && dev.paused_until > _NOW_SEC + 86400 * 365 * 10;
   const kindIcons = {router: '🌐', mobile: '📱', tablet: '📱', laptop: '💻', other: '📦'};
   const icon = kindIcons[dev.kind] || '📦';
   const lastSeenAgo = dev.last_seen ? fmtTimeAgo(dev.last_seen) : '从未';

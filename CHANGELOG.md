@@ -5,6 +5,21 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.4] — SPA pause-state rendering fix
+
+### Fixed
+- **Auto-created devices were displayed as "暂停中 · 无期限".** The DB
+  default for `paused_until` is `0` (= NOT paused, matching what the
+  resume endpoint writes back). The SPA's `loadDevicesMgmt` and
+  `renderDeviceCard` both used `paused_until !== null` as the "paused"
+  predicate, which mis-classified every fresh device as paused, then
+  used `paused_until === 0` as the "indefinite" check, surfacing the
+  warning badge on a perfectly active device. Rewrote both to match
+  server semantics: paused iff `paused_until > now()`; indefinite iff
+  `paused_until > now() + 10 years` (threshold-based so it tolerates
+  small clock skew without hard-coding the server's sentinel constant
+  `_PAUSE_INDEFINITE = 7258118400`).
+
 ## [v0.1.3] — polished install summary
 
 ### Changed
