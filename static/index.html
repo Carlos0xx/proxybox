@@ -3283,7 +3283,7 @@ async function loadSubs() {
         </div>
         <div style="display:flex; gap:var(--space-3); align-items:center;">
           <div class="mono" style="flex:1; min-width:0; font-size:var(--text-sm); color:var(--text-1); padding:var(--space-3) var(--space-4); background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; user-select:all;" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>
-          <button class="btn btn-sm ${f.prefer ? 'btn-primary' : ''}" style="flex-shrink:0; min-width:84px;" onclick="copyText(this, ${JSON.stringify(fullUrl)})">
+          <button type="button" class="btn btn-sm ${f.prefer ? 'btn-primary' : ''} btn-copy" style="flex-shrink:0; min-width:84px;" data-copy="${escapeHtml(fullUrl)}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
             复制
           </button>
@@ -3307,8 +3307,15 @@ async function loadSubs() {
 // a "secure context" (HTTPS or localhost). The admin panel is plain HTTP
 // by default, so a textarea + execCommand fallback handles every browser
 // that does NOT meet the secure-context requirement.
+//
+// Bug history: the textarea fallback used to position the element at
+// `top: -9999px; opacity: 0`. Newer Chrome / Safari refuse to copy from
+// truly invisible elements — they treat it as "the user can't see what
+// they're copying" and reject execCommand. The fix: keep the textarea
+// inside the viewport at 1×1 px with zIndex -1 (visually invisible but
+// considered "rendered" by the engine).
 async function _writeClipboard(text) {
-  if (navigator.clipboard && window.isSecureContext) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
@@ -3316,23 +3323,51 @@ async function _writeClipboard(text) {
       // fall through to legacy path
     }
   }
-  // Legacy fallback for HTTP / file: contexts.
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.setAttribute('readonly', '');
-  ta.style.position = 'fixed';
-  ta.style.top = '-9999px';
-  ta.style.opacity = '0';
+  const sx = window.scrollX;
+  const sy = window.scrollY;
+  Object.assign(ta.style, {
+    position: 'fixed',
+    left: '0',
+    top: '0',
+    width: '1px',
+    height: '1px',
+    padding: '0',
+    border: 'none',
+    outline: 'none',
+    boxShadow: 'none',
+    background: 'transparent',
+    zIndex: '-1',
+  });
   document.body.appendChild(ta);
-  ta.focus();
+  ta.focus({preventScroll: true});
   ta.select();
+  ta.setSelectionRange(0, text.length);
   let ok = false;
   try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
   document.body.removeChild(ta);
+  // execCommand may scroll the page on focus; restore.
+  window.scrollTo(sx, sy);
   return ok;
 }
 
-async function copyText(btn, text) {
+// Delegated click handler for any button with class="btn-copy" and a
+// data-copy="<url>" attribute. Replaces the older onclick="copyText(...)"
+// pattern, which broke when JSON.stringify's double quotes collided with
+// the onclick attribute's own double quotes (the URL ended up bleeding
+// out into the HTML and the handler never fired).
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-copy');
+  if (!btn) return;
+  e.preventDefault();
+  const text = btn.dataset.copy;
+  if (!text) return;
+  await copyText(btn, text, btn.dataset.copyLabel);
+});
+
+async function copyText(btn, text, label) {
   const ok = await _writeClipboard(text);
   if (!ok) {
     toast.error('复制失败', '请手动选中 URL 后 Cmd+C / Ctrl+C 复制');
@@ -3342,7 +3377,7 @@ async function copyText(btn, text) {
   btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> 已复制';
   btn.style.color = 'var(--accent)';
   btn.style.borderColor = 'var(--accent-border)';
-  toast.success('已复制', '已写入剪贴板');
+  toast.success('已复制', label || '已写入剪贴板');
   setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1500);
 }
 
@@ -4201,7 +4236,7 @@ async function showDeviceSubs(name) {
                 <div style="font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-1);">${escapeHtml(u.label)}${u.prefer ? ' <span class="badge badge-accent" style="font-size: 9px; padding: 1px 6px;">推荐</span>' : ''}</div>
                 <div style="font-size: var(--text-2xs); color: var(--text-4); font-family: var(--font-mono);">${escapeHtml(u.hint)}</div>
               </div>
-              <button class="btn btn-sm btn-primary" onclick="copySubUrl(this, ${JSON.stringify(fullUrl)}, ${JSON.stringify(u.label)})" style="flex-shrink: 0;">
+              <button type="button" class="btn btn-sm btn-primary btn-copy" data-copy="${escapeHtml(fullUrl)}" data-copy-label="${escapeHtml(u.label)}" style="flex-shrink: 0;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                 复制
               </button>

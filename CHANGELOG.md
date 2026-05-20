@@ -5,6 +5,27 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.12] — copy buttons actually work; hardened clipboard fallback
+
+### Fixed
+- **「订阅链接」+「设备管理 → 📋 订阅 URL」 复制 buttons did nothing.**
+  Inline `onclick="copyText(this, ${JSON.stringify(url)})"` produced HTML
+  like `onclick="copyText(this, "http://..." )"` — the inner double
+  quotes from `JSON.stringify` collided with the outer double quotes of
+  the attribute, so the browser parsed the URL as text *outside* the
+  attribute and the click handler never fired.
+- Switched the two affected templates to `data-copy="..."` attributes
+  (correctly HTML-escaped via `escapeHtml`) plus a single delegated
+  `document.addEventListener('click', ...)` that matches `.btn-copy`.
+  Eliminates the quoting trap class-wide.
+- **`_writeClipboard` execCommand fallback** was using `top: -9999px;
+  opacity: 0` to hide its temporary textarea. Newer Chrome / Safari
+  refuse to copy from off-screen / invisible elements (treat it as
+  "the user can't see what they're copying"). Replaced with a 1×1 px
+  fixed-position textarea at z-index −1 — visually invisible but
+  considered rendered by the engine, so execCommand succeeds. Also
+  saves + restores scroll position so the page doesn't jump.
+
 ## [v0.1.11] — change username / password / rotate login path from the panel
 
 ### Added
