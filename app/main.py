@@ -24,6 +24,9 @@ from app.routers import (
     traffic,
     ui,
 )
+from app.routers import (
+    https as https_router,
+)
 
 
 @asynccontextmanager
@@ -44,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(bans.action_router)
     app.include_router(actions.router)
     app.include_router(actions.api_router)
+    app.include_router(https_router.router)
     app.include_router(login.router)
     app.include_router(ui.router)
 

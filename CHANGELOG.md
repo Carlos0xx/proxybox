@@ -5,6 +5,39 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.10] — HTTPS enablement from the admin UI (no SSH needed)
+
+### Added
+- **「HTTPS · 域名」admin page**. New nav entry under 管理.  Shows current
+  state (HTTPS on / configured but Caddy down / HTTP-only) and a 4-step
+  wizard:
+  1. Set an A record pointing at the auto-detected VPS IP
+  2. Wait 1-10 min for DNS to propagate
+  3. Type the domain + click 启用 HTTPS
+  4. Visit the new https://{domain}/login URL
+  Inline notes explain ports, cert expiry, rollback. Step text is plain
+  enough for non-技术 users.
+- **`app/services/caddy.py`** — Python implementation of the
+  `enable-https.sh` flow. Validates domain syntax + DNS match, apt
+  installs Caddy from Cloudsmith, opens firewall, writes Caddyfile,
+  patches `config.yaml` (public_host / passkey.rp_id / origin),
+  resets the in-process settings cache so admin picks up the new
+  public_host **without self-restart**, then reloads Caddy.
+  `HTTPSEnableError(code, detail)` raised on failure with structured
+  codes (`invalid_domain` / `dns_no_answer` / `dns_mismatch` /
+  `cmd_failed`) the SPA branches on for localised messages.
+- **`/api/https/status`** + **`/api/https/enable`** — admin-gated
+  endpoints driving the above page.
+- **`deploy/enable-https.sh`** refactored into a thin wrapper around
+  `python -m app.services.caddy <domain>` so CLI + UI share one
+  implementation.
+
+### Why
+v0.1.9 already had `enable-https.sh`, but普通用户 don't SSH into
+their VPS — they expect to configure things from the panel.  v0.1.10
+closes that gap.  The HTTPS button is one click + one paste away,
+with auto-detect of the VPS IP and step-by-step inline notes.
+
 ## [v0.1.9] — host categorization + HTTPS one-shot script + 24h heatmap fix
 
 ### Added
