@@ -1823,7 +1823,7 @@ a:hover { color: var(--accent-hover); }
             </button>
           </div>
           <div style="margin-top: var(--space-3); font-size: var(--text-xs); color: var(--text-4); font-family: var(--font-mono);">
-            建议命名: <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">elvis-iphone</code> / <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">wife-ipad</code> / <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">elvis-mbp</code>
+            建议命名: <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">phone-1</code> / <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">tablet-1</code> / <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">laptop-1</code> / <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">home-router</code>
           </div>
         </div>
       </div>
@@ -2129,7 +2129,7 @@ a:hover { color: var(--accent-hover); }
         <div style="padding: var(--space-4) var(--space-5); color: var(--text-3); font-size: var(--text-sm); line-height: 1.7;">
           <p><strong>何时轮换:</strong>怀疑 URL 截图被拍 / 浏览器同步泄露 / 想彻底关闭 URL 后门。</p>
           <p><strong>轮换会:</strong>生成新 32-hex token → 改 <code class="mono" style="background:var(--bg-canvas);padding:1px 6px;border-radius:3px;">/etc/proxy-bot/env</code> → 3 秒后自动重启 <code>proxy-admin</code> + <code>proxy-bot</code> (~3 秒中断,代理本身不受影响)</p>
-          <p><strong>不会影响:</strong>已注册的 Passkey, 已登录的 session, 任何订阅 URL (家用路由器 + 6 台设备订阅照常)</p>
+          <p><strong>不会影响:</strong>已注册的 Passkey, 已登录的 session, 任何订阅 URL (所有设备订阅照常)</p>
           <p style="color:var(--warn);"><strong>注意:</strong>新 token 只显示一次,务必复制保存。后续访问 <code>https://your-domain.com/admin/</code> (不带 token) 用 Passkey 即可。</p>
         </div>
       </div>
@@ -2414,7 +2414,7 @@ async function rotateAdminToken() {
       • <strong>你当前 URL token 立即作废</strong>(旧书签失效)<br>
       • <strong>所有 Passkey session 也会失效</strong>(下次进后台必须 Touch ID)<br>
       • 已注册的 Passkey <strong>不受影响</strong>, 私钥还在你 Mac/iPhone<br>
-      • 所有订阅 URL <strong>不受影响</strong>(家用路由器 + 6 设备照常)<br>
+      • 所有订阅 URL <strong>不受影响</strong>(所有设备订阅照常)<br>
       • <code>proxy-admin</code> + <code>proxy-bot</code> 会在 3 秒后自动重启 (~3 秒中断)<br><br>
       <span style="color:var(--warn);">操作不可撤销 (除非 SSH 手工恢复 env)。</span>`,
     type: 'danger',
@@ -2879,7 +2879,7 @@ function renderConnRow(c) {
     </div>
     <div class="conn-detail">
       <div class="conn-detail-actions">
-        <button class="btn btn-xs" onclick="event.stopPropagation(); jumpToHistory('${escapeHtml(c.device_name || "ASUS_old")}')">📊 查看历史</button>
+        <button class="btn btn-xs" onclick="event.stopPropagation(); jumpToHistory('${escapeHtml(c.device_name || '')}')">📊 查看历史</button>
         <button class="btn btn-xs" onclick="event.stopPropagation(); openRenameDialog('${escapeHtml(c.ip)}')">✏️ 重命名</button>
         <button class="btn btn-xs btn-danger" onclick="event.stopPropagation(); blockIPDirect('${escapeHtml(c.ip)}')">⛔ 封禁</button>
       </div>
@@ -3568,10 +3568,9 @@ function renderDeviceCard(dev) {
         ${!isRevoked ? `<button class="btn btn-sm" onclick="showDeviceSubs('${escapeHtml(dev.name)}')">📋 订阅 URL</button>` : ''}
         ${!isRevoked ? `<button class="btn btn-sm" onclick="renameDevicePrompt('${escapeHtml(dev.name)}', '${escapeHtml(dev.label || '')}')">✏️ 重命名</button>` : ''}
         ${!isLegacy && !isRevoked && !isPaused ? `<button class="btn btn-sm" onclick="rotateDeviceToken('${escapeHtml(dev.name)}')">🔄 换 URL</button>` : ''}
-        ${!isLegacy && !isRevoked && !isPaused && dev.name !== 'ASUS_old' ? `<button class="btn btn-sm btn-warn" onclick="pauseDevicePrompt('${escapeHtml(dev.name)}', '${escapeHtml(dev.label || dev.name)}')">⏸ 暂停</button>` : ''}
+        ${!isLegacy && !isRevoked && !isPaused ? `<button class="btn btn-sm btn-warn" onclick="pauseDevicePrompt('${escapeHtml(dev.name)}', '${escapeHtml(dev.label || dev.name)}')">⏸ 暂停</button>` : ''}
         ${isPaused ? `<button class="btn btn-sm" style="background:var(--accent); color:white;" onclick="resumeDevice('${escapeHtml(dev.name)}', '${escapeHtml(dev.label || dev.name)}')">▶ 恢复</button>` : ''}
         ${!isLegacy && !isRevoked ? `<button class="btn btn-sm btn-danger" onclick="revokeDevicePrompt('${escapeHtml(dev.name)}')">⛔ 吊销</button>` : ''}
-        ${isLegacy && !isRevoked ? `<button class="btn btn-sm btn-warn" onclick="deprecateLegacyURL()">⚠️ 废弃 URL</button>` : ''}
         ${isRevoked ? `<button class="btn btn-sm btn-danger" onclick="deleteDevicePrompt('${escapeHtml(dev.name)}')">🗑️ 删除记录</button>` : ''}
       </div>
     </div>
@@ -3585,22 +3584,19 @@ async function showDeviceSubs(name) {
   if (!dev) { toast.error('未找到设备', name); return; }
   const subToken = dev.sub_token;
   if (!subToken) { toast.error('设备无 sub_token', name); return; }
-  const baseUrl = `${location.protocol}//${location.host}/${subToken}`;
+  const subUrl = `${location.protocol}//${location.host}/api/sub/${subToken}`;
   const kindIcons = {router: '🌐', mobile: '📱', tablet: '📱', laptop: '💻', other: '📦'};
   const icon = kindIcons[dev.kind] || '📦';
   const isLegacy = !dev.vless_port;
   const lastSeenAgo = dev.last_seen ? fmtTimeAgo(dev.last_seen) : '从未';
   const portInfo = isLegacy
-    ? 'vless :443 / :2053 · hy2 :36712 / :36713 (共享)'
+    ? 'vless (legacy share)'
     : `vless :${dev.vless_port} · hy2 :${dev.hy2_port}`;
 
-  const urls = [
-    { file: 'sub',                label: 'Shadowrocket (推荐)',         hint: '📱 iOS · base64 URI 列表 · 兼容性最好',  prefer: true },
-    { file: 'clash.yaml',         label: 'Stash / Clash for iOS',       hint: '📱 iOS · macOS · Android',  prefer: false },
-    { file: 'merlin.yaml',        label: 'Merlin Clash 路由器',          hint: '🌐 家用路由', prefer: false },
-    { file: 'shadowrocket.conf',  label: 'Shadowrocket .conf (备用)',   hint: '⚠️ Surge 格式, 某些情况 Reality 解析失败', prefer: false },
-    { file: 'sub.txt',            label: 'URI 列表 (明文)',             hint: '👀 可直接查看节点细节', prefer: false },
-  ];
+  // v0.1.x serves a single plain-text URI list (vless:// + hy2://).
+  // All sing-box / Shadowrocket / Hiddify / Stash clients consume this as
+  // "Type: Subscribe". BWG's per-client formats (clash.yaml, merlin.yaml,
+  // shadowrocket.conf) are not generated.
 
   // Build inline dialog (using our existing dialog backdrop but with custom content)
   const bd = $('dialog-backdrop');
@@ -3633,27 +3629,24 @@ async function showDeviceSubs(name) {
       </div>
 
       <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3);">
-        ${urls.map((u, idx) => `
-          <div style="border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); background: var(--bg-elevated);">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-1);">
-              <div style="display: flex; flex-direction: column; gap: 0; min-width: 0;">
-                <div style="font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-1);">${escapeHtml(u.label)}${u.prefer ? ' <span class="badge badge-accent" style="font-size: 9px; padding: 1px 6px;">推荐</span>' : ''}</div>
-                <div style="font-size: var(--text-2xs); color: var(--text-4); font-family: var(--font-mono);">${escapeHtml(u.hint)}</div>
-              </div>
-              <button class="btn btn-sm btn-primary" onclick="copySubUrl(this, '${escapeHtml(baseUrl)}/${escapeHtml(u.file)}', '${escapeHtml(u.label)}')" style="flex-shrink: 0;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                复制
-              </button>
+        <div style="border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); background: var(--bg-elevated);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-1);">
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0;">
+              <div style="font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-1);">订阅 URL <span class="badge badge-accent" style="font-size: 9px; padding: 1px 6px;">通用</span></div>
+              <div style="font-size: var(--text-2xs); color: var(--text-4); font-family: var(--font-mono);">📱 sing-box / Shadowrocket / Hiddify / Stash — 选「Type: Subscribe」</div>
             </div>
-            <div style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 4px var(--space-2); font-family: var(--font-mono); font-size: 10px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all;" title="${escapeHtml(baseUrl)}/${escapeHtml(u.file)}" onclick="this.style.whiteSpace = this.style.whiteSpace === 'normal' ? 'nowrap' : 'normal'; this.style.wordBreak = 'break-all'">
-              ${escapeHtml(baseUrl)}/${escapeHtml(u.file)}
-            </div>
+            <button class="btn btn-sm btn-primary" onclick="copySubUrl(this, '${escapeHtml(subUrl)}', '订阅 URL')" style="flex-shrink: 0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              复制
+            </button>
           </div>
-        `).join('')}
+          <div style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 4px var(--space-2); font-family: var(--font-mono); font-size: 10px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: all;" title="${escapeHtml(subUrl)}">
+            ${escapeHtml(subUrl)}
+          </div>
+        </div>
       </div>
 
       <div style="display: flex; gap: var(--space-2); padding: var(--space-2) 0 var(--space-4); border-top: 1px solid var(--border-default); margin-top: var(--space-2);">
-        <button class="btn btn-sm" onclick="copyAllSubUrls('${escapeHtml(baseUrl)}')">📋 复制全部 URL</button>
         ${!isLegacy ? `<button class="btn btn-sm" onclick="closeDialog(); rotateDeviceToken('${escapeHtml(name)}')">🔄 换 URL</button>` : ''}
       </div>
     </div>
@@ -3727,13 +3720,6 @@ function copySubUrl(btn, url, label) {
     setTimeout(() => { btn.innerHTML = orig; }, 1200);
     toast.success('已复制', label);
   }).catch(e => toast.error('复制失败', e.message));
-}
-
-function copyAllSubUrls(baseUrl) {
-  const files = ['clash.yaml', 'merlin.yaml', 'shadowrocket.conf'];
-  const text = files.map(f => `${f}: ${baseUrl}/${f}`).join('\n');
-  navigator.clipboard.writeText(text).then(() => toast.success('全部已复制', '3 个 URL'))
-    .catch(e => toast.error('复制失败', e.message));
 }
 
 async function renameDevicePrompt(name, currentLabel) {
@@ -3963,15 +3949,6 @@ async function revokeDevicePrompt(name) {
   }
 }
 
-async function deprecateLegacyURL() {
-  const ok = await confirmDialog({
-    title: '废弃 ASUS_old 共享 URL?',
-    body: `<strong style="color: var(--danger);">所有家里 10 台设备目前依赖此 URL 通过路由器上网</strong>。<br><br>废弃后:<br>• 现有路由器订阅立刻失效<br>• 需要重新生成路由器订阅 (推荐先建一个 "elvis-router" 新设备)<br>• 出门设备需切换到自己的订阅<br><br>建议先验证所有设备都已切到新 URL 再废弃。`,
-    type: 'danger', confirmText: '我已确认,废弃', confirmKind: 'danger'
-  });
-  if (!ok) return;
-  toast.warning('功能预留', '当前版本暂不提供一键废弃 — 需手动从 sing-box config 移除 vless-in/hy2-in 4 个 inbounds');
-}
 
 async function createDevice() {
   const name = $('newdev-name').value.trim();
