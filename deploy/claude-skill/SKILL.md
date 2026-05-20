@@ -112,11 +112,10 @@ conversation language rather than the server locale.
 the right invocation (`sudo` or not) without assuming `sudo` is installed
 (Debian minimal images don't ship it by default).
 
-This is idempotent — re-running it on an already-installed system does
-nothing destructive. Capture the output, but do **not** quote any line that
-contains an `admin URL: http://...` — the URL contains the token prefix
-which is fine, but echoing the full URL elsewhere is not. The script itself
-only prints the first 8 chars, so quoting its output as-is is safe.
+This is idempotent — re-running on an already-installed system reuses
+the existing first device instead of creating a duplicate. Relay the
+final summary verbatim — Step 5 / Step 7 below explain why the full
+admin URL is okay to quote in this context.
 
 ### Step 4 — Verify
 
@@ -132,7 +131,27 @@ ssh "$USER@$HOST" '
 All four should be `active`. If any is not, fetch its `journalctl -u <svc> -n
 30 --no-pager` and triage.
 
-### Step 5 — Read public IP + token (carefully)
+### Step 5 — Relay the install.sh summary
+
+As of v0.1.2 `install.sh` ends with a self-contained handoff block:
+- The full admin URL (with the live token — not masked)
+- The auto-created first device (default name `phone-1`, override via env
+  `PROXYBOX_FIRST_DEVICE=<name>` before re-running)
+- All 5 per-device subscription URLs ready to copy
+
+**Do not re-mask the token in chat output for this skill.** The whole
+point of v0.1.2's one-shot UX is to avoid making普通用户 SSH back in to
+grep config.yaml. The install.sh output is the user's private channel
+(same as if they ran the installer locally) — relay it verbatim.
+
+This rule is **scoped to install.sh output and this Step 5 / Step 7
+handoff.** Ad-hoc bash you author elsewhere in a session (e.g. for
+debugging or status checks) should still mask the token to first 8 chars,
+because that's chat-only output that doesn't have the same one-shot UX
+constraint.
+
+If the user needs the URL re-printed later (e.g. they lost the chat
+backscroll), this fetches it from the live config:
 
 ```bash
 ssh "$USER@$HOST" '
@@ -140,22 +159,11 @@ ssh "$USER@$HOST" '
 import yaml
 c = yaml.safe_load(open(\"/etc/proxybox/config.yaml\"))
 token = c[\"admin\"][\"token\"]
-host = c[\"server\"][\"public_host\"] or \"<your-vps-ip>\"
-print(f\"URL: http://{host}:8080/admin/{token[:8]}...\")
-print(f\"TOKEN_LEN: {len(token)}\")
-print(f\"TOKEN_PREFIX: {token[:8]}...\")
+host  = c[\"server\"][\"public_host\"] or \"<your-vps-ip>\"
+print(f\"http://{host}:8080/admin/{token}/\")
 "
 '
 ```
-
-Note: use the **venv python** (`/opt/proxybox/.venv/bin/python`), not
-system `python3`. Debian minimal does not ship `python3-yaml`; the venv
-installed by `install.sh` already has `pyyaml` as a ProxyBox dep.
-
-Report back **only** the prefix + URL with truncated token. Tell the user
-the full token is in `/etc/proxybox/config.yaml` on the VPS and they should
-copy it locally (e.g. into a password manager) before sharing the URL with
-anyone.
 
 ### Step 6 — Optional: Telegram bot
 
@@ -179,20 +187,33 @@ token format.
 
 ### Step 7 — Hand off to the user
 
-Tell them, in this order:
+The install.sh summary block already lays everything out. Just relay it
+to the user with a one-line cover sentence — something like:
 
-1. Where the admin URL is (with token prefix only)
-2. Where the full token lives on the VPS
-3. They should set up Caddy + Let's Encrypt before exposing the URL beyond
-   trusted networks — current setup is HTTP only
-4. Next steps inside the admin UI:
-   - Click **设备管理 / Devices** → **生成 / Create**, fill the device name.
-     Use generic names — never personal identifiers. Suggested examples:
-     `phone-1`, `tablet-1`, `laptop-1`, `home-router`.
-   - Open the device, click **📋 订阅 URL** → copy the format that matches
-     the client (see table below)
-   - Paste the URL into the client's subscription / import dialog
-     (Type: Subscribe in Shadowrocket; Profiles → Import URL in Stash; etc.)
+> "装好了。下面 4 块都是直接能用的：管理后台 URL（带 token，登录就进）、
+> 5 个订阅 URL（任挑一个粘进客户端就翻墙）、服务状态、可选功能。"
+
+Then paste install.sh's output (or summarize it) — do not re-format
+or hide the admin URL.
+
+Concretely, the user can:
+1. Open the admin URL in a browser → already logged in via the URL-path token
+2. Pick the subscription URL that matches their client (table below for
+   reference; the install summary already labels each line)
+3. Paste it into the client's "Add Subscription" dialog
+4. Done — traffic should flow through the VPS
+
+The default first device is named `phone-1`. To bootstrap a different
+name (e.g. `tablet-1` for an iPad-first user), re-run install.sh with
+`PROXYBOX_FIRST_DEVICE=tablet-1` in the environment, or rename in the
+admin UI afterwards.
+
+If the user wants extra devices (one per gadget for proper isolation),
+they create them from 设备管理 / Devices → 生成 / Create. Generic
+naming convention: `phone-1`, `phone-2`, `tablet-1`, `laptop-1`,
+`home-router`. **Never use personal identifiers** — device names go
+into sing-box config + subscription file content, so they're surface
+for fingerprinting.
 
 ### Subscription URL formats
 
@@ -214,8 +235,10 @@ phones and laptops — Clash YAML is mainly for routers and Stash power-users.
 
 ## Anti-patterns (do NOT do these)
 
-- **Never** echo the full admin token in chat output. Always mask to first
-  8 chars + `...`
+- **The install.sh output IS the user's handoff** — relay it verbatim
+  including the full admin URL. (Re-masking the token defeats v0.1.2's
+  one-shot UX.) But: ad-hoc bash you author later in the same session
+  for status checks / debugging still masks to first 8 chars.
 - **Never** SSH with `-o StrictHostKeyChecking=no` without the user's
   explicit consent — it disables host-key warnings and would mask MITM
 - **Never** run `install.sh` on a host that already runs unrelated services

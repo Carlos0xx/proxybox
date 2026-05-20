@@ -52,18 +52,24 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_INSTALL_DEPS="==> 安装 ProxyBox 依赖..."
     M_GEN_CONFIG="==> 生成 ProxyBox config.yaml..."
     M_START_SERVICES="==> 启动服务..."
-    M_DONE_HEADER="ProxyBox 已安装"
-    M_ADMIN_URL="  admin URL:    http://%s:8080/admin/%s.../"
-    M_FULL_TOKEN="  完整 token:   %s/config.yaml  (admin.token 字段)"
+    M_BOOTSTRAP_DEVICE="==> 创建首台默认设备 (%s)..."
+    M_BOOTSTRAP_OK="    设备已创建: sub_token=%s"
+    M_BOOTSTRAP_FAIL="    [警告] 首台设备自动创建失败, 请稍后手动到 admin 面板新建"
+    M_DONE_HEADER="ProxyBox 已安装 — 复制下方任一 URL 即可使用"
+    M_ADMIN_URL_LABEL="  🔑 后台管理 URL  (含 token, 请妥善保存):"
+    M_ADMIN_URL_VAL="    %s"
+    M_SUBS_LABEL="  📲 订阅 URL  (粘进客户端的 \"添加订阅\" 即可翻墙):"
+    M_SUB_DEFAULT="    [推荐] sing-box / Shadowrocket / Hiddify (Type: Subscribe)"
+    M_SUB_CLASH="    [Clash] Stash / Clash for iOS / Clash Verge"
+    M_SUB_MERLIN="    [路由] AsusWRT-Merlin (Clash + 透明代理)"
+    M_SUB_SR="    [备用] Shadowrocket .conf (Surge 格式)"
+    M_SUB_TXT="    [.txt] URI 列表 (扩展名别名)"
     M_SERVICES_LABEL="  服务状态:"
-    M_NEXT_LABEL="  接下来:"
-    M_NEXT_1="    1. 从 %s/config.yaml 取 token, 离线保存"
-    M_NEXT_2="    2. 浏览器打开上方 admin URL (HTTP, 生产请套 Caddy + Let's Encrypt)"
-    M_NEXT_3="    3. 在 admin 面板点 '+ 添加设备' 创建第一个设备"
-    M_NEXT_4="    4. 把订阅 URL 粘进 sing-box 兼容客户端 (Shadowrocket / sing-box / Hiddify)"
-    M_OPTIONAL_LABEL="  可选功能:"
+    M_OPTIONAL_LABEL="  可选功能 (后续按需开启):"
     M_OPTIONAL_PASSKEY="    - passkey:  config.yaml 里 features.passkey=true + 填 passkey.rp_id/origin + 套 HTTPS"
     M_OPTIONAL_BOT="    - TG bot:   编辑 /etc/proxybox/bot.env, 然后 'systemctl enable --now proxybox-bot'"
+    M_OPTIONAL_TLS="    - HTTPS:    生产环境请装 Caddy + Let's Encrypt 反代 8080, admin URL 改成 https://"
+    M_FOOTER_TIP="  完整 token 也保存在 %s/config.yaml (admin.token 字段)"
     M_ERR_UNSUPPORTED_ARCH="错误: 不支持的架构 %s"
 else
     M_NOT_PROXYBOX_DIR="ERROR: PROXYBOX_DIR=%s doesn't look like a ProxyBox checkout"
@@ -81,18 +87,24 @@ else
     M_INSTALL_DEPS="==> installing ProxyBox deps..."
     M_GEN_CONFIG="==> generating ProxyBox config..."
     M_START_SERVICES="==> starting services..."
-    M_DONE_HEADER="ProxyBox installed"
-    M_ADMIN_URL="  admin URL:  http://%s:8080/admin/%s.../"
-    M_FULL_TOKEN="  full token: %s/config.yaml  (admin.token field)"
+    M_BOOTSTRAP_DEVICE="==> auto-creating first device (%s)..."
+    M_BOOTSTRAP_OK="    device created: sub_token=%s"
+    M_BOOTSTRAP_FAIL="    [warn] first-device auto-create failed, create one manually from admin UI later"
+    M_DONE_HEADER="ProxyBox installed — copy any URL below to start using it"
+    M_ADMIN_URL_LABEL="  🔑 admin URL  (contains token, keep private):"
+    M_ADMIN_URL_VAL="    %s"
+    M_SUBS_LABEL="  📲 subscription URLs  (paste into client's \"Add Subscription\"):"
+    M_SUB_DEFAULT="    [pick this] sing-box / Shadowrocket / Hiddify (Type: Subscribe)"
+    M_SUB_CLASH="    [Clash]     Stash / Clash for iOS / Clash Verge"
+    M_SUB_MERLIN="    [router]    AsusWRT-Merlin (Clash + transparent proxy)"
+    M_SUB_SR="    [fallback]  Shadowrocket .conf (Surge format)"
+    M_SUB_TXT="    [.txt]      URI list (extension alias)"
     M_SERVICES_LABEL="  services:"
-    M_NEXT_LABEL="  next:"
-    M_NEXT_1="    1. grep token in %s/config.yaml — save it offline"
-    M_NEXT_2="    2. open the admin URL above (HTTP for now; set up Caddy + Let's Encrypt for production)"
-    M_NEXT_3="    3. in the admin UI, click '+ Add device' to create your first device"
-    M_NEXT_4="    4. paste subscription URL into a sing-box-compatible client (Shadowrocket / sing-box / Hiddify)"
-    M_OPTIONAL_LABEL="  optional features:"
+    M_OPTIONAL_LABEL="  optional features (enable later if needed):"
     M_OPTIONAL_PASSKEY="    - passkey:  set features.passkey=true + passkey.rp_id/origin in config.yaml + Caddy/TLS"
     M_OPTIONAL_BOT="    - TG bot:   fill /etc/proxybox/bot.env then 'systemctl enable --now proxybox-bot'"
+    M_OPTIONAL_TLS="    - HTTPS:    install Caddy + Let's Encrypt in front of 8080 for production"
+    M_FOOTER_TIP="  full token also stored at %s/config.yaml (admin.token field)"
     M_ERR_UNSUPPORTED_ARCH="ERROR: unsupported arch %s"
 fi
 
@@ -355,18 +367,91 @@ systemctl enable --now proxybox-admin >/dev/null 2>&1 || true
 systemctl enable --now proxybox-traffic-worker >/dev/null 2>&1 || true
 sleep 3
 
-# ─── 12. summary ───────────────────────────────────────────────────
+# ─── 12. read token + host ─────────────────────────────────────────
 ADMIN_TOKEN=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin']['token'])")
 PUBLIC_HOST=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['server']['public_host'])")
-TOKEN_PREFIX="${ADMIN_TOKEN:0:8}"
+ADMIN_BASE="http://${PUBLIC_HOST:-<your-vps-ip>}:8080"
+ADMIN_URL="$ADMIN_BASE/admin/$ADMIN_TOKEN/"
 
+# ─── 13. auto-create first device (one-shot UX) ────────────────────
+# Wait for proxybox-admin to be reachable on localhost (sleep 3 above
+# is usually enough on a real VPS, but be defensive on slow hosts).
+DEFAULT_DEVICE_NAME="${PROXYBOX_FIRST_DEVICE:-phone-1}"
+SUB_TOKEN=""
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/admin/$ADMIN_TOKEN/api/status" 2>/dev/null | grep -q '^200$'; then
+        break
+    fi
+    sleep 1
+done
+
+# Check if device already exists (re-install on a host that already has one)
+EXISTING=$(curl -s "http://localhost:8080/admin/$ADMIN_TOKEN/api/devices/list" 2>/dev/null \
+    | .venv/bin/python -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    devs = d.get('devices', [])
+    if devs:
+        print(devs[0]['name'] + '\\t' + devs[0]['sub_token'])
+except Exception:
+    pass
+" 2>/dev/null)
+
+if [ -n "$EXISTING" ]; then
+    DEFAULT_DEVICE_NAME=$(echo "$EXISTING" | cut -f1)
+    SUB_TOKEN=$(echo "$EXISTING" | cut -f2)
+else
+    printf "$M_BOOTSTRAP_DEVICE\n" "$DEFAULT_DEVICE_NAME"
+    RESPONSE=$(curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"name\":\"$DEFAULT_DEVICE_NAME\",\"kind\":\"mobile\",\"label\":\"$DEFAULT_DEVICE_NAME\"}" \
+        "http://localhost:8080/admin/$ADMIN_TOKEN/api/devices/new" 2>/dev/null)
+    SUB_TOKEN=$(echo "$RESPONSE" | .venv/bin/python -c "
+import json, sys
+try:
+    print(json.load(sys.stdin)['device']['sub_token'])
+except Exception:
+    pass
+" 2>/dev/null)
+    if [ -n "$SUB_TOKEN" ]; then
+        printf "$M_BOOTSTRAP_OK\n" "$SUB_TOKEN"
+    else
+        echo "$M_BOOTSTRAP_FAIL"
+    fi
+fi
+
+# ─── 14. summary ───────────────────────────────────────────────────
 echo ""
 echo "============================================================"
 echo "  $M_DONE_HEADER"
 echo "============================================================"
-printf "$M_ADMIN_URL\n" "${PUBLIC_HOST:-<your-vps-ip>}" "$TOKEN_PREFIX"
-printf "$M_FULL_TOKEN\n" "$CONFIG_DIR"
 echo ""
+echo "$M_ADMIN_URL_LABEL"
+printf "$M_ADMIN_URL_VAL\n" "$ADMIN_URL"
+echo ""
+
+if [ -n "$SUB_TOKEN" ]; then
+    SUB_BASE="$ADMIN_BASE/api/sub/$SUB_TOKEN"
+    echo "$M_SUBS_LABEL"
+    echo ""
+    echo "$M_SUB_DEFAULT"
+    echo "      $SUB_BASE"
+    echo ""
+    echo "$M_SUB_CLASH"
+    echo "      $SUB_BASE/clash.yaml"
+    echo ""
+    echo "$M_SUB_MERLIN"
+    echo "      $SUB_BASE/merlin.yaml"
+    echo ""
+    echo "$M_SUB_SR"
+    echo "      $SUB_BASE/shadowrocket.conf"
+    echo ""
+    echo "$M_SUB_TXT"
+    echo "      $SUB_BASE/sub.txt"
+    echo ""
+fi
+
 echo "$M_SERVICES_LABEL"
 for svc in sing-box proxybox-admin proxybox-traffic-worker fail2ban; do
     state=$(systemctl is-active "$svc" 2>/dev/null || echo unknown)
@@ -378,13 +463,10 @@ for svc in sing-box proxybox-admin proxybox-traffic-worker fail2ban; do
     printf "    %s %-30s %s\n" "$mark" "$svc" "$state"
 done
 echo ""
-echo "$M_NEXT_LABEL"
-printf "$M_NEXT_1\n" "$CONFIG_DIR"
-echo "$M_NEXT_2"
-echo "$M_NEXT_3"
-echo "$M_NEXT_4"
-echo ""
 echo "$M_OPTIONAL_LABEL"
 echo "$M_OPTIONAL_PASSKEY"
 echo "$M_OPTIONAL_BOT"
+echo "$M_OPTIONAL_TLS"
+echo ""
+printf "$M_FOOTER_TIP\n" "$CONFIG_DIR"
 echo "============================================================"
