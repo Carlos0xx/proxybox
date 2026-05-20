@@ -52,11 +52,13 @@ async def index(token: Annotated[str, Path()], request: Request) -> Response:
 
     has_session = request_has_session(request)
     bypass_ok = settings.features.url_token_bypass
+    login_path = settings.admin.login_path
+    login_url_base = f"/login/{login_path}" if login_path else "/login"
 
     if not (has_session or bypass_ok):
         # Send普通用户 to the login form instead of a 401 wall.
         next_path = request.url.path
-        return RedirectResponse(f"/login?next={next_path}", status_code=303)
+        return RedirectResponse(f"{login_url_base}?next={next_path}", status_code=303)
 
     spa = settings.paths.static_dir / "index.html"
     if not spa.exists():
@@ -71,5 +73,6 @@ async def index(token: Annotated[str, Path()], request: Request) -> Response:
         .replace("{{TOKEN}}", token)
         .replace("{{PASSKEY_ENABLED}}", "true" if passkey_on else "false")
         .replace("{{BOT_ENABLED}}", "true" if bot_on else "false")
+        .replace("{{LOGIN_URL}}", login_url_base)
     )
     return HTMLResponse(content=body, headers=_NO_CACHE_HEADERS)

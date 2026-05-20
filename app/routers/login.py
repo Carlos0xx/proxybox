@@ -34,6 +34,17 @@ from app.config import get_settings
 router = APIRouter(tags=["login"])
 
 
+def _login_path_ok(supplied: str) -> bool:
+    """The login page is reachable at /login when admin.login_path is empty
+    (backward compat for installs that pre-date v0.1.11) or at
+    /login/{login_path} when set. Anything else 404s — bots probing
+    /login can't even confirm the form exists."""
+    expected = get_settings().admin.login_path
+    if not expected:
+        return supplied == ""
+    return secrets.compare_digest(supplied, expected)
+
+
 _LOGIN_HTML = """<!doctype html>
 <html lang="zh">
 <head>
@@ -122,18 +133,43 @@ def _post_login_destination(next_path: str, token: str) -> str:
     return f"/admin/{token}/"
 
 
+def _login_url(suffix: str = "") -> str:
+    """Build the /login or /login/{secret} URL the form should submit to."""
+    p = get_settings().admin.login_path
+    base = f"/login/{p}" if p else "/login"
+    return f"{base}{suffix}"
+
+
+# Two-path registration: legacy /login (active when admin.login_path is
+# empty) AND /login/{secret} (active when admin.login_path is set).
+# Both handlers re-check _login_path_ok so a misconfigured /login/{wrong}
+# returns 404, not "Wrong password".
+
+
 @router.get("/login", response_class=HTMLResponse, include_in_schema=False)
-async def login_page(next: str = "") -> HTMLResponse:
-    action = f"/login?next={html.escape(next)}" if next else "/login"
+async def login_page_legacy(next: str = "") -> HTMLResponse:
+    if not _login_path_ok(""):
+        raise HTTPException(404, "not found")
+    action = _login_url(f"?next={html.escape(next)}" if next else "")
     return _render(action=action)
 
 
-@router.post("/login", include_in_schema=False)
-async def login_submit(
-    username: Annotated[str, Form()],
-    password: Annotated[str, Form()],
-    next: str = "",
+@router.get("/login/{secret}", response_class=HTMLResponse, include_in_schema=False)
+async def login_page_secret(secret: str, next: str = "") -> HTMLResponse:
+    if not _login_path_ok(secret):
+        raise HTTPException(404, "not found")
+    action = _login_url(f"?next={html.escape(next)}" if next else "")
+    return _render(action=action)
+
+
+async def _do_login(
+    username: str,
+    password: str,
+    next_path: str,
+    secret_supplied: str,
 ) -> Response:
+    if not _login_path_ok(secret_supplied):
+        raise HTTPException(404, "not found")
     settings = get_settings()
     if not settings.admin.password:
         raise HTTPException(
@@ -142,15 +178,13 @@ async def login_submit(
             "or enable features.url_token_bypass for token-only access",
         )
 
-    expected_user = settings.admin.username.encode()
-    expected_pass = settings.admin.password.encode()
-    user_ok = secrets.compare_digest(username.encode(), expected_user)
-    pass_ok = secrets.compare_digest(password.encode(), expected_pass)
+    user_ok = secrets.compare_digest(username.encode(), settings.admin.username.encode())
+    pass_ok = secrets.compare_digest(password.encode(), settings.admin.password.encode())
     if not (user_ok and pass_ok):
-        action = f"/login?next={html.escape(next)}" if next else "/login"
+        action = _login_url(f"?next={html.escape(next_path)}" if next_path else "")
         return _render(action=action, error="用户名或密码错误", status=401)
 
-    target = _post_login_destination(next, settings.admin.token)
+    target = _post_login_destination(next_path, settings.admin.token)
     resp = RedirectResponse(target, status_code=303)
     resp.set_cookie(
         SESSION_COOKIE_NAME,
@@ -163,9 +197,28 @@ async def login_submit(
     return resp
 
 
+@router.post("/login", include_in_schema=False)
+async def login_submit_legacy(
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+    next: str = "",
+) -> Response:
+    return await _do_login(username, password, next, secret_supplied="")
+
+
+@router.post("/login/{secret}", include_in_schema=False)
+async def login_submit_secret(
+    secret: str,
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()],
+    next: str = "",
+) -> Response:
+    return await _do_login(username, password, next, secret_supplied=secret)
+
+
 @router.post("/logout", include_in_schema=False)
 async def logout() -> RedirectResponse:
-    resp = RedirectResponse("/login", status_code=303)
+    resp = RedirectResponse(_login_url(), status_code=303)
     resp.delete_cookie(SESSION_COOKIE_NAME, samesite="lax")
     return resp
 

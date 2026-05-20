@@ -5,6 +5,54 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.11] — change username / password / rotate login path from the panel
+
+### Added
+- **`admin.login_path`** config field — a random 12-char alnum suffix.
+  When set, the login form lives at `/login/{login_path}` and `/login`
+  itself 404s, so bots probing common paths can't even confirm the form
+  exists. Empty value preserves the legacy `/login` behaviour for
+  existing installs.
+- **`安全 → 登录设置` card** (top of the security page). Three rows:
+  - **用户名** + edit button (validates alphanumeric, 2-32 chars)
+  - **密码** + edit button (opens a 3-field dialog: current + new + confirm,
+    client-side validates min-8 length + match, server-side requires
+    correct current_password)
+  - **登录路径** + 🎲 轮换 button (generates fresh 12-char suffix,
+    旧地址立即 404; an inline note explains why this defends against
+    /login brute-force)
+- **`app/routers/account.py`** — `GET /api/admin/account` (read current
+  state), `POST /api/admin/account` (change username + password with a
+  `current_password` gate for the password change), `POST /api/admin/
+  login-path` (rotate to random / specific value / "off"). All gated by
+  the existing session-cookie auth; all touch `/etc/proxybox/config.yaml`
+  + `reset_settings_cache()` so changes apply in-process without a
+  self-restart.
+- **install.sh** generates `ADMIN_LOGIN_PATH` on fresh installs and the
+  summary prints the full `/login/{secret}` URL.
+
+### Changed
+- **`app/routers/login.py`** registers both `/login` and `/login/{secret}`
+  paths. Both call `_login_path_ok()` which constant-time-compares the
+  supplied secret against `admin.login_path` (or empty string when
+  unset). Wrong secret → HTTP 404, not "invalid login" — keeps the form
+  un-enumerable.
+- **`ui.py`** redirects unauthed SPA loads to the configured login URL
+  (`/login/{path}` or `/login`).
+- **SPA `api()` helper** now attaches `err.detail` to thrown Errors for
+  4xx responses with JSON bodies, so callers can show structured
+  messages (used by the new account dialogs).
+- **SPA `LOGIN_URL`** injected via the same template substitution as
+  `{{TOKEN}}` — on a 401, the SPA bounces to the right path regardless
+  of whether login_path is set.
+
+### Why
+User: "登录链接太简单, 容易被爆破" + "用户可以更改用户名和密码".
+v0.1.10 ended with /login as the well-known login path and credentials
+only editable via SSH-editing config.yaml. v0.1.11 closes both — random
+path defeats /login bot scans, and the security page lets users rotate
+credentials from the browser.
+
 ## [v0.1.10] — HTTPS enablement from the admin UI (no SSH needed)
 
 ### Added

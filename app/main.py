@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from app.config import get_settings
 from app.db.init import init_schema
 from app.routers import (
+    account,
     actions,
     bans,
     connections,
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(bans.action_router)
     app.include_router(actions.router)
     app.include_router(actions.api_router)
+    app.include_router(account.router)
     app.include_router(https_router.router)
     app.include_router(login.router)
     app.include_router(ui.router)

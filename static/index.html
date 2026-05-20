@@ -1998,6 +1998,48 @@ a:hover { color: var(--accent-hover); }
          VIEW: 安全
          ═══════════════════════════════════════════════════════════ -->
     <section class="view" id="view-security">
+
+      <!-- ────────── 登录设置 (v0.1.11+) ────────── -->
+      <div class="card" style="margin-bottom: var(--space-4);">
+        <div class="card-head">
+          <div>
+            <div class="card-title">🔐 登录设置</div>
+            <div class="card-sub">改用户名 · 改密码 · 轮换登录路径 (防爆破)</div>
+          </div>
+        </div>
+        <div style="padding: var(--space-4) var(--space-5); font-size: var(--text-sm); line-height: 1.7;">
+
+          <!-- Row: username -->
+          <div style="display:grid; grid-template-columns: 110px 1fr auto; gap:var(--space-3); align-items:center; padding:var(--space-2) 0; border-bottom:1px solid var(--border-subtle);">
+            <div style="color:var(--text-3);">用户名</div>
+            <div class="mono" id="acct-username" style="color:var(--text-1);">—</div>
+            <button class="btn btn-sm" onclick="openChangeUsername()">修改</button>
+          </div>
+
+          <!-- Row: password -->
+          <div style="display:grid; grid-template-columns: 110px 1fr auto; gap:var(--space-3); align-items:center; padding:var(--space-2) 0; border-bottom:1px solid var(--border-subtle);">
+            <div style="color:var(--text-3);">密码</div>
+            <div class="mono" id="acct-password" style="color:var(--text-4);">已设置 (••••••••)</div>
+            <button class="btn btn-sm" onclick="openChangePassword()">修改</button>
+          </div>
+
+          <!-- Row: login path -->
+          <div style="display:grid; grid-template-columns: 110px 1fr auto; gap:var(--space-3); align-items:center; padding:var(--space-2) 0;">
+            <div style="color:var(--text-3);">登录路径</div>
+            <div class="mono" id="acct-login-path" style="color:var(--text-1);">—</div>
+            <button class="btn btn-sm" onclick="rotateLoginPath()">🎲 轮换</button>
+          </div>
+
+          <!-- Explanatory note -->
+          <div style="margin-top: var(--space-3); padding: var(--space-3); background: var(--surface-2); border-radius: var(--radius-sm); font-size: var(--text-xs); color: var(--text-3); line-height: 1.6;">
+            <strong style="color:var(--text-2);">💡 关于登录路径</strong><br>
+            完整登录地址 = <code style="background:var(--bg-canvas); padding:1px 5px; border-radius:3px;">{你的域名/IP}/login/<span id="acct-login-path-suffix">…</span></code>。
+            添加随机后缀后,机器人扫到 <code style="background:var(--bg-canvas); padding:1px 5px; border-radius:3px;">/login</code> 直接 404,
+            找不到登录页就无从爆破密码。轮换会生成新的 12 字符后缀,旧地址立刻失效 (现有登录的 session 不受影响)。
+          </div>
+        </div>
+      </div>
+
       <div class="kpi-grid cols-3">
         <div class="kpi">
           <div class="kpi-head"><span class="kpi-label">当前封禁</span><div class="kpi-icon danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></div></div>
@@ -2281,6 +2323,7 @@ function _restoreDialogTpl() {
    ================================================================= */
 const TOKEN = "{{TOKEN}}";
 const API_BASE = `/admin/${TOKEN}`;
+const LOGIN_URL = "{{LOGIN_URL}}";  // /login or /login/{secret}
 const FEATURES = {
   passkey: {{PASSKEY_ENABLED}},
   bot:     {{BOT_ENABLED}},
@@ -2369,13 +2412,28 @@ async function api(path, options = {}) {
     const r = await fetch(url, options);
     if (r.status === 401) {
       // Session expired (or never authed) — bounce to login form and
-      // come back to this exact URL once creds are accepted.
+      // come back to this exact URL once creds are accepted. LOGIN_URL
+      // is /login or /login/{secret} depending on admin.login_path.
       const next = encodeURIComponent(window.location.pathname);
-      window.location.href = `/login?next=${next}`;
+      window.location.href = `${LOGIN_URL}?next=${next}`;
       // Throw so callers stop processing; never resolved.
-      throw new Error('session expired — redirecting to /login');
+      throw new Error('session expired — redirecting to login');
     }
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) {
+      // Try to surface FastAPI's {detail: {code, message}} body so callers
+      // can show a localised error. api() still throws — callers inspect
+      // err.detail when they care.
+      let detail = null;
+      try {
+        if ((r.headers.get('content-type') || '').includes('json')) {
+          detail = (await r.json()).detail;
+        }
+      } catch (_) {}
+      const err = new Error(`HTTP ${r.status}`);
+      err.status = r.status;
+      err.detail = detail;
+      throw err;
+    }
     const ct = r.headers.get('content-type') || '';
     if (ct.includes('json')) return r.json();
     return r.text();
@@ -3305,7 +3363,142 @@ async function rotateToken() {
 /* =================================================================
    VIEW LOADERS — Bans (安全)
    ================================================================= */
+async function loadAccountCard() {
+  // Render the 登录设置 card at top of 安全 view. Cheap GET; runs whenever
+  // the user opens the security page (loadBans is the entry point).
+  try {
+    const a = await api('/api/admin/account');
+    $('acct-username').textContent = a.username || 'admin';
+    $('acct-password').innerHTML = a.password_set
+      ? '<span style="color:var(--text-4);">已设置 (••••••••)</span>'
+      : '<span style="color:var(--danger);">未设置 — 请立即修改</span>';
+    const path = a.login_path || '';
+    $('acct-login-path').innerHTML = path
+      ? `<code style="background:var(--bg-canvas); padding:2px 8px; border-radius:4px; color:var(--accent);">${escapeHtml(path)}</code>`
+      : '<span style="color:var(--warn);">未设置 — 任何人猜到 /login 就能尝试登录</span>';
+    $('acct-login-path-suffix').textContent = path || '(空 — /login 直达)';
+  } catch (e) {
+    $('acct-username').textContent = '加载失败';
+  }
+}
+
+async function openChangeUsername() {
+  const cur = $('acct-username').textContent;
+  const next = await promptDialog({
+    title: '修改用户名',
+    body: '用户名 2-32 字符,只能用 <code>字母 / 数字 / . _ -</code>',
+    label: '新用户名',
+    initial: cur,
+    placeholder: 'admin',
+    confirmText: '保存',
+    icon: '👤',
+  });
+  if (!next || next === cur) return;
+  try {
+    const r = await apiJSON('/api/admin/account', { username: next });
+    toast.success('用户名已改', `→ ${r.username}`);
+    loadAccountCard();
+  } catch (e) {
+    const msg = _adminAccountErr(e);
+    toast.error('修改失败', msg);
+  }
+}
+
+async function openChangePassword() {
+  // Two-step custom dialog: current pw + new pw + confirm. Reuses dialog
+  // backdrop. Validates client-side before posting.
+  _captureDialogTpl();
+  const bd = $('dialog-backdrop');
+  bd.querySelector('.dialog').innerHTML = `
+    <div class="dialog-head">
+      <div class="dialog-icon warn">🔑</div>
+      <div style="flex:1;">
+        <div class="dialog-title">修改密码</div>
+      </div>
+    </div>
+    <div style="padding: 0 var(--space-5) var(--space-4); padding-left: calc(var(--space-5) + 52px);">
+      <label style="display:block; font-size:var(--text-xs); color:var(--text-3); margin-bottom:6px;">当前密码</label>
+      <input id="pw-current" class="input" type="password" autocomplete="current-password" style="margin-bottom:var(--space-3);">
+      <label style="display:block; font-size:var(--text-xs); color:var(--text-3); margin-bottom:6px;">新密码 (≥ 8 字符)</label>
+      <input id="pw-new" class="input" type="password" autocomplete="new-password" minlength="8" style="margin-bottom:var(--space-3);">
+      <label style="display:block; font-size:var(--text-xs); color:var(--text-3); margin-bottom:6px;">再输一次</label>
+      <input id="pw-confirm" class="input" type="password" autocomplete="new-password" minlength="8">
+      <div id="pw-err" style="color:var(--danger); font-size:var(--text-xs); margin-top:var(--space-2); min-height:18px;"></div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn-ghost" id="pw-cancel">取消</button>
+      <button class="btn btn-warn" id="pw-ok">保存</button>
+    </div>
+  `;
+  bd.classList.add('show');
+  setTimeout(() => $('pw-current').focus(), 80);
+  const cleanup = () => {
+    bd.classList.remove('show');
+    setTimeout(() => _restoreDialogTpl(), 200);
+  };
+  $('pw-cancel').onclick = cleanup;
+  bd.onclick = e => { if (e.target === bd) cleanup(); };
+  $('pw-ok').onclick = async () => {
+    const cur = $('pw-current').value;
+    const nw  = $('pw-new').value;
+    const cf  = $('pw-confirm').value;
+    const err = $('pw-err');
+    err.textContent = '';
+    if (!cur) { err.textContent = '请输入当前密码'; return; }
+    if (nw.length < 8) { err.textContent = '新密码至少 8 字符'; return; }
+    if (nw !== cf) { err.textContent = '两次输入的新密码不一致'; return; }
+    if (nw === cur) { err.textContent = '新密码不能跟旧的一样'; return; }
+    try {
+      await apiJSON('/api/admin/account', {
+        current_password: cur,
+        new_password: nw,
+      });
+      cleanup();
+      toast.success('密码已改', '下次登录用新密码');
+      loadAccountCard();
+    } catch (e) {
+      err.textContent = _adminAccountErr(e);
+    }
+  };
+}
+
+async function rotateLoginPath() {
+  const cur = $('acct-login-path').textContent.trim();
+  const body = cur && cur !== '—'
+    ? `当前后缀: <code>${escapeHtml(cur)}</code><br><br>
+       将生成新的 12 字符随机后缀,<strong style="color:var(--warn);">旧地址立即 404</strong>。<br>
+       现有登录的 session 不受影响,下次重新登录时用新地址。`
+    : `当前没有后缀 — 任何人猜到 <code>/login</code> 就能尝试爆破密码。<br><br>
+       建议生成一个 12 字符随机后缀,登录地址变成 <code>/login/{随机串}</code>。`;
+  const ok = await confirmDialog({
+    title: '轮换登录路径?',
+    body,
+    type: 'accent',
+    confirmText: '生成新路径',
+  });
+  if (!ok) return;
+  try {
+    const r = await apiJSON('/api/admin/login-path', {});
+    toast.success('登录路径已轮换', `新后缀: ${r.login_path}`);
+    loadAccountCard();
+  } catch (e) {
+    toast.error('轮换失败', _adminAccountErr(e));
+  }
+}
+
+// Account endpoints return structured 400 errors as {detail: {code, message}}.
+// api() now puts that on err.detail — pull the localised message out, fall
+// back to the raw HTTP status string if missing.
+function _adminAccountErr(e) {
+  const d = e?.detail;
+  if (d && typeof d === 'object' && d.message) return d.message;
+  if (typeof d === 'string') return d;
+  return e?.message || '未知错误';
+}
+
 async function loadBans() {
+  // 安全 page entry point — also loads the account card at the top.
+  loadAccountCard();
   const d = await api('/api/bans');
   // /api/bans v0.1.x returns: {jail, currently_banned, total_banned, banned}.
   // BWG's failures_24h field is not exposed.

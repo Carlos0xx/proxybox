@@ -312,6 +312,9 @@ if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
     ADMIN_TOKEN=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(24))")
     # Password = 16 alnum chars — readable / typeable but ~95 bits entropy.
     ADMIN_PASSWORD=$(.venv/bin/python -c "import secrets, string; alpha = string.ascii_letters + string.digits; print(''.join(secrets.choice(alpha) for _ in range(16)))")
+    # login_path = 12 alnum chars (~71 bits) — makes /login a 404 so bots
+    # can't even find the form to attempt password brute-force.
+    ADMIN_LOGIN_PATH=$(.venv/bin/python -c "import secrets, string; alpha = string.ascii_letters + string.digits; print(''.join(secrets.choice(alpha) for _ in range(12)))")
     PUBLIC_HOST=$(curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
                  || curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
                  || echo "")
@@ -320,6 +323,7 @@ admin:
   token: "$ADMIN_TOKEN"
   username: "admin"
   password: "$ADMIN_PASSWORD"
+  login_path: "$ADMIN_LOGIN_PATH"
   host: "0.0.0.0"
   port: 8080
 server:
@@ -488,7 +492,12 @@ systemctl restart proxybox-admin >/dev/null 2>&1 || true
 # show the user the actual state of the running config.
 ADMIN_USER=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('username', 'admin'))")
 ADMIN_PASSWORD=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('password', ''))")
-LOGIN_URL="$ADMIN_BASE/login"
+ADMIN_LOGIN_PATH=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('login_path', ''))")
+if [ -n "$ADMIN_LOGIN_PATH" ]; then
+    LOGIN_URL="$ADMIN_BASE/login/$ADMIN_LOGIN_PATH"
+else
+    LOGIN_URL="$ADMIN_BASE/login"
+fi
 
 # ─── 15. summary ───────────────────────────────────────────────────
 echo ""

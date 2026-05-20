@@ -41,6 +41,12 @@ class AdminSettings(BaseModel):
     # at fresh-install time so the default is a working login.
     username: str = "admin"
     password: str = ""
+    # v0.1.11+: random suffix on the login URL so /login itself is 404 and
+    # only /login/{login_path} renders the form. Defends against bots that
+    # brute-force common /login paths. Empty = legacy /login still works
+    # (existing installs untouched). install.sh generates a 12-char alnum
+    # value for fresh installs.
+    login_path: str = ""
 
     @field_validator("token")
     @classmethod
