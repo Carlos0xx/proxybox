@@ -36,6 +36,11 @@ class AdminSettings(BaseModel):
     token: str
     host: str = "0.0.0.0"
     port: int = 8080
+    # username/password login (v0.1.6+). Empty password = login disabled and
+    # only url_token_bypass works. install.sh generates a random password
+    # at fresh-install time so the default is a working login.
+    username: str = "admin"
+    password: str = ""
 
     @field_validator("token")
     @classmethod
@@ -98,6 +103,12 @@ class PasskeySettings(BaseModel):
 class FeaturesSettings(BaseModel):
     passkey: bool = False
     bot: bool = False
+    # When false (default), every /admin/{token}/... request MUST present a
+    # valid session cookie (issued by /login). When true, the URL-path token
+    # alone is sufficient — useful for automation / emergency access, but
+    # disabled by default because tokens leak via screenshots and browser
+    # history more easily than passwords.
+    url_token_bypass: bool = False
 
 
 class AppConfig(BaseModel):

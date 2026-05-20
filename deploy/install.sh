@@ -56,7 +56,12 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_BOOTSTRAP_OK="    设备已创建: sub_token=%s"
     M_BOOTSTRAP_FAIL="    [警告] 首台设备自动创建失败, 请稍后手动到 admin 面板新建"
     M_DONE_HEADER="ProxyBox 安装完成"
-    M_DONE_SUB="直接复制下方任一 URL 使用, 无需其他操作"
+    M_DONE_SUB="请保存下方登录凭据, 然后访问后台地址"
+    M_SECTION_LOGIN_TITLE="🛡 后台登录凭据"
+    M_SECTION_LOGIN_HINT="务必复制保存 — 凭据丢失需 SSH 改 config.yaml"
+    M_LOGIN_URL_LABEL="登录地址"
+    M_LOGIN_USER_LABEL="用户名"
+    M_LOGIN_PASS_LABEL="密  码"
     M_SECTION_ADMIN_TITLE="🔑 后台管理 URL"
     M_SECTION_ADMIN_HINT="含 token, 请妥善保存"
     M_SECTION_SUBS_TITLE="📲 订阅 URL"
@@ -76,7 +81,7 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_ADV_PASSKEY="passkey   config.yaml 里 features.passkey=true + 套 HTTPS"
     M_ADV_BOT="TG bot    填 /etc/proxybox/bot.env, 然后 systemctl enable --now proxybox-bot"
     M_ADV_TLS="HTTPS     Caddy + Let's Encrypt 反代 8080 (生产环境)"
-    M_FOOTER_TIP="完整 token 备份位置: %s/config.yaml (admin.token 字段)"
+    M_FOOTER_TIP="凭据备份位置: %s/config.yaml (admin.username / admin.password 字段)"
     M_ERR_UNSUPPORTED_ARCH="错误: 不支持的架构 %s"
 else
     M_NOT_PROXYBOX_DIR="ERROR: PROXYBOX_DIR=%s doesn't look like a ProxyBox checkout"
@@ -98,7 +103,12 @@ else
     M_BOOTSTRAP_OK="    device created: sub_token=%s"
     M_BOOTSTRAP_FAIL="    [warn] first-device auto-create failed, create one manually from admin UI later"
     M_DONE_HEADER="ProxyBox installed"
-    M_DONE_SUB="copy any URL below to start using it, no further steps required"
+    M_DONE_SUB="save the credentials below, then open the login URL"
+    M_SECTION_LOGIN_TITLE="🛡 admin login credentials"
+    M_SECTION_LOGIN_HINT="must save — losing these means SSH-editing config.yaml"
+    M_LOGIN_URL_LABEL="login URL"
+    M_LOGIN_USER_LABEL="username"
+    M_LOGIN_PASS_LABEL="password"
     M_SECTION_ADMIN_TITLE="🔑 admin URL"
     M_SECTION_ADMIN_HINT="contains token, keep private"
     M_SECTION_SUBS_TITLE="📲 subscription URLs"
@@ -118,7 +128,7 @@ else
     M_ADV_PASSKEY="passkey   set features.passkey=true + passkey.rp_id/origin in config.yaml + Caddy/TLS"
     M_ADV_BOT="TG bot    fill /etc/proxybox/bot.env then systemctl enable --now proxybox-bot"
     M_ADV_TLS="HTTPS     install Caddy + Let's Encrypt in front of 8080 for production"
-    M_FOOTER_TIP="full token also stored at %s/config.yaml (admin.token field)"
+    M_FOOTER_TIP="credentials backup: %s/config.yaml (admin.username / admin.password fields)"
     M_ERR_UNSUPPORTED_ARCH="ERROR: unsupported arch %s"
 fi
 
@@ -131,7 +141,7 @@ if [ -t 1 ]; then
     C_GREEN_B=$'\033[1;32m'
     C_YELLOW_B=$'\033[1;33m'
     C_CYAN_B=$'\033[1;36m'
-    C_RED=$'\033[31m'
+    C_RED=$'\033[1;31m'    # bold red — user-must-save credentials
 else
     C_RESET=''
     C_BOLD=''
@@ -304,12 +314,16 @@ echo "$M_INSTALL_DEPS"
 if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
     echo "$M_GEN_CONFIG"
     ADMIN_TOKEN=$(.venv/bin/python -c "import secrets; print(secrets.token_urlsafe(24))")
+    # Password = 16 alnum chars — readable / typeable but ~95 bits entropy.
+    ADMIN_PASSWORD=$(.venv/bin/python -c "import secrets, string; alpha = string.ascii_letters + string.digits; print(''.join(secrets.choice(alpha) for _ in range(16)))")
     PUBLIC_HOST=$(curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
                  || curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
                  || echo "")
     cat > "$CONFIG_DIR/config.yaml" <<YAML
 admin:
   token: "$ADMIN_TOKEN"
+  username: "admin"
+  password: "$ADMIN_PASSWORD"
   host: "0.0.0.0"
   port: 8080
 server:
@@ -342,6 +356,11 @@ passkey:
 features:
   passkey: false
   bot: false
+  # url_token_bypass starts TRUE for the duration of install.sh's auto-
+  # device-creation step (the curl to /api/devices/new needs to authenticate
+  # without a session cookie). Step 15 flips this to false before printing
+  # the summary, so the running config matches the documented default.
+  url_token_bypass: true
 YAML
     chmod 600 "$CONFIG_DIR/config.yaml"
 fi
@@ -457,7 +476,26 @@ except Exception:
     fi
 fi
 
-# ─── 14. summary ───────────────────────────────────────────────────
+# ─── 14. lock down: disable URL-token bypass + restart admin ───────
+# install.sh's auto-device step is done; flip url_token_bypass to false
+# so /admin/{token}/ now requires a /login session cookie. Restart so the
+# @lru_cache'd settings reload. ~3s, harmless.
+.venv/bin/python -c "
+import yaml, pathlib
+p = pathlib.Path('$CONFIG_DIR/config.yaml')
+cfg = yaml.safe_load(p.read_text())
+cfg.setdefault('features', {})['url_token_bypass'] = False
+p.write_text(yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True))
+"
+systemctl restart proxybox-admin >/dev/null 2>&1 || true
+
+# Read credentials for the summary block. Read AFTER the lock-down so we
+# show the user the actual state of the running config.
+ADMIN_USER=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('username', 'admin'))")
+ADMIN_PASSWORD=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('password', ''))")
+LOGIN_URL="$ADMIN_BASE/login"
+
+# ─── 15. summary ───────────────────────────────────────────────────
 echo ""
 echo ""
 printf "%s  %s%s\n" "$C_GREEN_B" "$HR" "$C_RESET"
@@ -466,10 +504,12 @@ printf "      %s%s%s\n" "$C_DIM" "$M_DONE_SUB" "$C_RESET"
 printf "%s  %s%s\n" "$C_GREEN_B" "$HR" "$C_RESET"
 echo ""
 
-# ── Admin URL block (the credential — emphasised) ───────────────────
-printf "  %s%s%s  %s— %s%s\n" "$C_CYAN_B" "$M_SECTION_ADMIN_TITLE" "$C_RESET" "$C_DIM" "$M_SECTION_ADMIN_HINT" "$C_RESET"
+# ── Login credentials — THE primary card, bold + red emphasis ───────
+printf "  %s%s%s  %s— %s%s\n" "$C_CYAN_B" "$M_SECTION_LOGIN_TITLE" "$C_RESET" "$C_DIM" "$M_SECTION_LOGIN_HINT" "$C_RESET"
 echo ""
-printf "      %s%s%s\n" "$C_GREEN_B" "$ADMIN_URL" "$C_RESET"
+printf "      %s%-9s%s %s%s%s\n" "$C_DIM" "$M_LOGIN_URL_LABEL" "$C_RESET" "$C_GREEN_B" "$LOGIN_URL" "$C_RESET"
+printf "      %s%-9s%s %s%s%s\n" "$C_DIM" "$M_LOGIN_USER_LABEL" "$C_RESET" "$C_RED" "$ADMIN_USER" "$C_RESET"
+printf "      %s%-9s%s %s%s%s\n" "$C_DIM" "$M_LOGIN_PASS_LABEL" "$C_RESET" "$C_RED" "$ADMIN_PASSWORD" "$C_RESET"
 echo ""
 
 # ── Subscription URLs block ─────────────────────────────────────────

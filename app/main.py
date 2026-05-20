@@ -18,6 +18,7 @@ from app.routers import (
     connections,
     devices,
     history,
+    login,
     subscriptions,
     system,
     traffic,
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(bans.action_router)
     app.include_router(actions.router)
     app.include_router(actions.api_router)
+    app.include_router(login.router)
     app.include_router(ui.router)
 
     if get_settings().features.passkey:
