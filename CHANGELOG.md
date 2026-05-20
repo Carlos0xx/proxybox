@@ -5,6 +5,33 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.5] — post-install SPA UX fixes (real connection data + clean service list)
+
+### Added
+- **`/api/connections` endpoint** — proxies sing-box Clash API at
+  `127.0.0.1:9090`, aggregates per source-IP, joins to `device.last_ip`
+  to label rows by device, and folds in instantaneous `/traffic` up/down
+  bps. Lights up the previously-stubbed 在线设备 count + 实时速度 KPI
+  + tunnels list with real data.
+- **`{{PASSKEY_ENABLED}}` / `{{BOT_ENABLED}}` template substitutions** in
+  the SPA index route. SPA reads them as `FEATURES.passkey/bot` and hides
+  nav entries for disabled opt-in features (before first paint).
+
+### Fixed
+- **`订阅链接` view now shows all 5 formats per device** in a per-device
+  block (default URI list with `✦ [推荐]` marker + clash.yaml / merlin.yaml
+  / shadowrocket.conf / sub.txt rows). Previously rendered just the base
+  URL.
+- **`服务` page no longer shows `unknown` for 3 services**. The hardcoded
+  list (caddy / proxy-bot / proxy-admin / proxy-traffic-worker /
+  proxy-watchdog.timer — BWG service names) is replaced by an iteration
+  over `lastStatus.services` (which mirrors `config.services.monitored`).
+  Sidebar `data-svc` dots got the same treatment.
+- **Passkey nav 404 confusion**: nav entry is hidden via
+  `display: none` on `DOMContentLoaded` when `features.passkey=false`.
+  Was always visible before and clicking it 404'd because the passkey
+  router wasn't mounted.
+
 ## [v0.1.4] — SPA pause-state rendering fix
 
 ### Fixed

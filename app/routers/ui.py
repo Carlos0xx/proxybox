@@ -30,10 +30,19 @@ _NO_CACHE_HEADERS = {
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
 @router.get("", response_class=HTMLResponse, include_in_schema=False)
 async def index(token: Annotated[str, Path()]) -> HTMLResponse:
-    spa = get_settings().paths.static_dir / "index.html"
+    settings = get_settings()
+    spa = settings.paths.static_dir / "index.html"
     if not spa.exists():
         raise HTTPException(
             500, f"SPA not found at {spa} — ship static/ directory or set paths.static_dir"
         )
-    body = spa.read_text(encoding="utf-8").replace("{{TOKEN}}", token)
+    feats = getattr(settings, "features", None)
+    passkey_on = bool(getattr(feats, "passkey", False)) if feats else False
+    bot_on = bool(getattr(feats, "bot", False)) if feats else False
+    body = (
+        spa.read_text(encoding="utf-8")
+        .replace("{{TOKEN}}", token)
+        .replace("{{PASSKEY_ENABLED}}", "true" if passkey_on else "false")
+        .replace("{{BOT_ENABLED}}", "true" if bot_on else "false")
+    )
     return HTMLResponse(content=body, headers=_NO_CACHE_HEADERS)

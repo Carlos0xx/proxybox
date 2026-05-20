@@ -12,7 +12,17 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.db.init import init_schema
-from app.routers import actions, bans, devices, history, subscriptions, system, traffic, ui
+from app.routers import (
+    actions,
+    bans,
+    connections,
+    devices,
+    history,
+    subscriptions,
+    system,
+    traffic,
+    ui,
+)
 
 
 @asynccontextmanager
@@ -27,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(devices.router)
     app.include_router(subscriptions.router)
     app.include_router(traffic.router)
+    app.include_router(connections.router)
     app.include_router(history.router)
     app.include_router(bans.router)
     app.include_router(bans.action_router)

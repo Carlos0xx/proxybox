@@ -1506,11 +1506,12 @@ a:hover { color: var(--accent-hover); }
   </nav>
 
   <div class="sidebar-foot">
+    <!-- Names match config.services.monitored. caddy/proxybox-bot dots are
+         rendered by loadStatus only if the service exists in /api/status. -->
     <div class="svc-dot-row"><span>sing-box</span><span class="svc-dot off" data-svc="sing-box"></span></div>
-    <div class="svc-dot-row"><span>caddy</span><span class="svc-dot off" data-svc="caddy"></span></div>
-    <div class="svc-dot-row"><span>TG bot</span><span class="svc-dot off" data-svc="proxy-bot"></span></div>
-    <div class="svc-dot-row"><span>traffic-worker</span><span class="svc-dot off" data-svc="proxy-traffic-worker"></span></div>
-    <div class="svc-dot-row"><span>看门狗</span><span class="svc-dot off" data-svc="proxy-watchdog.timer"></span></div>
+    <div class="svc-dot-row"><span>admin</span><span class="svc-dot off" data-svc="proxybox-admin"></span></div>
+    <div class="svc-dot-row"><span>traffic</span><span class="svc-dot off" data-svc="proxybox-traffic-worker"></span></div>
+    <div class="svc-dot-row"><span>fail2ban</span><span class="svc-dot off" data-svc="fail2ban"></span></div>
   </div>
 </aside>
 
@@ -2181,6 +2182,18 @@ function _restoreDialogTpl() {
    ================================================================= */
 const TOKEN = "{{TOKEN}}";
 const API_BASE = `/admin/${TOKEN}`;
+const FEATURES = {
+  passkey: {{PASSKEY_ENABLED}},
+  bot:     {{BOT_ENABLED}},
+};
+
+// Hide opt-in feature nav entries before first paint, so users don't see
+// a "Passkey" nav entry that 404s.
+document.addEventListener('DOMContentLoaded', () => {
+  if (!FEATURES.passkey) {
+    document.querySelectorAll('[data-view="passkeys"]').forEach(el => el.style.display = 'none');
+  }
+});
 
 const PAGE_TITLES = {
   passkeys:    ['Passkey 登录', '生物识别认证 · Touch ID / Face ID'],
@@ -2824,16 +2837,26 @@ async function loadTraffic() {
    ================================================================= */
 const expandedConns = new Set();
 async function loadConns() {
-  // /api/connections requires Clash API proxy — deferred to v0.2.x. Stub for v0.1.x.
-  const d = { count: 0, connections: [] };
-  let tcp = 0, udp = 0, ts = 0, dws = 0;
-  d.connections.forEach(c => { tcp += c.tcp; udp += c.udp; ts += c.up_speed; dws += c.down_speed; });
+  // Live snapshot from sing-box Clash API, proxied through /api/connections.
+  // Server aggregates per source IP and joins to device.last_ip for labels.
+  const d = await api('/api/connections');
+  if (d.error) {
+    $('kpi-conns').innerHTML = `—<span class="unit">台</span>`;
+    $('kpi-conns-sub').textContent = d.error;
+    $('kpi-speed').innerHTML = `—<span class="unit"></span>`;
+    return;
+  }
+  let tcp = 0, udp = 0;
+  d.connections.forEach(c => { tcp += c.tcp; udp += c.udp; });
+  // Aggregate live throughput: server returns up_bps/down_bps from /traffic.
+  const upBps = d.up_bps || 0;
+  const downBps = d.down_bps || 0;
   $('kpi-conns').innerHTML = `${d.count}<span class="unit">台</span>`;
   $('kpi-conns-sub').textContent = `TCP ${tcp} · UDP ${udp}`;
-  $('kpi-speed').innerHTML = `${fmtSpeedHTML(dws)} <span class="unit">/ ${fmtSpeed(ts)}</span>`;
+  $('kpi-speed').innerHTML = `${fmtSpeedHTML(downBps)} <span class="unit">/ ${fmtSpeed(upBps)}</span>`;
   $('badge-conn').textContent = d.count;
-  $('total-speed-down').textContent = fmtSpeed(dws);
-  $('total-speed-up').textContent = fmtSpeed(ts);
+  $('total-speed-down').textContent = fmtSpeed(downBps);
+  $('total-speed-up').textContent = fmtSpeed(upBps);
 
   // Top 5 on overview
   const top5 = d.connections.slice(0, 5);
@@ -3067,20 +3090,33 @@ async function loadSubs() {
     return;
   }
   const origin = window.location.origin;
+  // Same 5 formats install.sh's summary block prints; tag/desc kept in sync.
+  const formats = [
+    {file: '',                   tag: '[推荐]',   desc: 'sing-box · Shadowrocket · Hiddify (Type: Subscribe)', prefer: true},
+    {file: '/clash.yaml',        tag: '[Clash 系]', desc: 'Stash · Clash for iOS · Clash Verge'},
+    {file: '/merlin.yaml',       tag: '[路由器]', desc: 'AsusWRT-Merlin · Clash 透明代理'},
+    {file: '/shadowrocket.conf', tag: '[备用]',   desc: 'Shadowrocket .conf · Surge 格式'},
+    {file: '/sub.txt',           tag: '[别名]',   desc: 'URI 列表 · .txt 扩展名'},
+  ];
   list.innerHTML = devices.map(dev => {
-    const subUrl = `${origin}/api/sub/${dev.sub_token}`;
+    const baseUrl = `${origin}/api/sub/${dev.sub_token}`;
     const displayName = dev.label || dev.name;
     const kindIcon = {router:'🌐', mobile:'📱', tablet:'📱', laptop:'💻', other:'📦'}[dev.kind] || '📦';
-    return `<div class="sub-row">
-      <div>
-        <div class="sub-name">${kindIcon} ${escapeHtml(displayName)}</div>
-        <div class="sub-name-sub mono">${escapeHtml(dev.name)} · sub_token ${escapeHtml(dev.sub_token.slice(0, 8))}…</div>
+    const rows = formats.map(f => {
+      const fullUrl = `${baseUrl}${f.file}`;
+      const preferClass = f.prefer ? 'sub-row-prefer' : '';
+      return `<div class="sub-row ${preferClass}" style="display:grid; grid-template-columns: 110px 1fr auto; gap:var(--space-3); padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--border-subtle); align-items:center;">
+        <div style="font-family:var(--font-mono); font-size:var(--text-xs); ${f.prefer ? 'color:var(--accent); font-weight:var(--weight-semibold);' : 'color:var(--text-3);'}" title="${escapeHtml(f.desc)}">${f.prefer ? '✦ ' : ''}${escapeHtml(f.tag)}</div>
+        <div class="mono" style="font-size:var(--text-xs); color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>
+        <button class="btn btn-xs" onclick="copyText(this, ${JSON.stringify(fullUrl)})">复制</button>
+      </div>`;
+    }).join('');
+    return `<div class="device-sub-block" style="margin-bottom:var(--space-4); border:1px solid var(--border-default); border-radius:var(--radius-md); overflow:hidden;">
+      <div style="padding:var(--space-3) var(--space-4); background:var(--surface-2); border-bottom:1px solid var(--border-default);">
+        <div style="font-weight:var(--weight-semibold); font-size:var(--text-base);">${kindIcon} ${escapeHtml(displayName)}</div>
+        <div class="mono" style="font-size:var(--text-xs); color:var(--text-4); margin-top:2px;">${escapeHtml(dev.name)} · sub_token ${escapeHtml(dev.sub_token.slice(0,8))}…</div>
       </div>
-      <div class="sub-url-box" title="${escapeHtml(subUrl)}">${escapeHtml(subUrl)}</div>
-      <button class="btn btn-sm" onclick="copyText(this, ${JSON.stringify(subUrl)})">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-        复制
-      </button>
+      ${rows}
     </div>`;
   }).join('');
 }
@@ -3171,15 +3207,24 @@ async function quickUnblock(ip) {
    VIEW LOADERS — Services
    ================================================================= */
 function renderServices() {
-  const services = [
-    { name: 'sing-box', label: 'sing-box', desc: '代理核心服务', restart: true },
-    { name: 'caddy', label: 'caddy', desc: 'HTTPS 反向代理', restart: true },
-    { name: 'proxy-bot', label: 'TG bot', desc: 'Telegram 管理 bot', restart: true },
-    { name: 'proxy-admin', label: 'Admin', desc: 'Web 后台', restart: true },
-    { name: 'proxy-traffic-worker', label: 'Traffic Worker', desc: '流量数据采集', restart: true },
-    { name: 'fail2ban', label: 'fail2ban', desc: '入侵检测', restart: false },
-    { name: 'proxy-watchdog.timer', label: '看门狗', desc: '自动健康检查', restart: false },
-  ];
+  // Only list services that appear in /api/status (= config.services.monitored).
+  // Drops BWG-only entries (caddy/proxy-bot/proxy-watchdog.timer) that v0.1.x
+  // doesn't ship — they always rendered "unknown" before.
+  const tracked = lastStatus?.services || {};
+  const META = {
+    'sing-box':                 { label: 'sing-box',       desc: '代理核心服务',         restart: true  },
+    'proxybox-admin':           { label: 'Admin',          desc: 'Web 后台 (本进程)',    restart: false }, // restarting self = bad UX
+    'proxybox-traffic-worker':  { label: 'Traffic Worker', desc: '流量采集 (Clash API)',  restart: true  },
+    'fail2ban':                 { label: 'fail2ban',       desc: '入侵检测 / IP 封禁',    restart: false },
+    'caddy':                    { label: 'caddy',          desc: 'HTTPS 反向代理 (可选)', restart: true  },
+    'proxybox-bot':             { label: 'TG bot',         desc: 'Telegram 管理 bot (可选)', restart: true },
+  };
+  const services = Object.keys(tracked).map(name => ({
+    name,
+    label: META[name]?.label || name,
+    desc: META[name]?.desc || '',
+    restart: META[name]?.restart ?? true,
+  }));
   $('services-grid').innerHTML = services.map(s => {
     const st = lastStatus?.services?.[s.name] || 'unknown';
     const ok = st === 'active';
