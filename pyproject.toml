@@ -1,6 +1,6 @@
 [project]
 name = "proxybox"
-version = "0.1.12"
+version = "0.2.0"
 description = "Per-device isolated home proxy management panel"
 readme = "README.md"
 license = { text = "MIT" }

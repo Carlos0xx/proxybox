@@ -5,6 +5,37 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.2.0] — SPA English version + bilingual login form
+
+### Added
+- **Language toggle in the admin panel topbar** (`中/EN` button next to the
+  theme switcher). Click to flip the SPA between Chinese and English; the
+  choice is persisted in `localStorage` AND a `proxybox-lang` cookie so
+  it sticks across reloads and is visible to the server-rendered login
+  page too.
+- **`I18N_DICT`** — a ~230-entry phrase-to-phrase dictionary embedded in
+  `static/index.html` covering the highest-traffic UI surfaces (nav,
+  page titles, KPI labels, primary buttons, common dialogs, error
+  toasts, the 安全 → 登录设置 card, the HTTPS · 域名 page). Chinese is
+  the source of truth; missing keys gracefully fall back to Chinese.
+- **`translateNode()` walker** + **MutationObserver** — runs a single
+  pass over `document.body` at load, then re-runs incrementally on every
+  subtree mutation. JS-generated content (toasts, dialog bodies, table
+  rows, KPI updates) is translated automatically without per-call `t()`
+  wrapping.
+- **Server-side bilingual login form**. `/login/{secret}?lang=en` (or
+  `?lang=zh`) selects the language; a `proxybox-lang` cookie persists
+  the choice for subsequent visits. The "EN ↔ 中" switch at the top
+  right of the card reloads the page with the other language.
+
+### Notes
+- Coverage is ~80% of high-traffic text. Long composite sentences and
+  rarely-seen warning dialogs still render in Chinese under `LANG=en`
+  — they fall through the dictionary cleanly. Future patches add more
+  entries; the only edit needed is appending to `I18N_DICT`.
+- The MutationObserver only runs when `LANG === 'en'`, so Chinese-only
+  users pay zero overhead.
+
 ## [v0.1.12] — copy buttons actually work; hardened clipboard fallback
 
 ### Fixed
