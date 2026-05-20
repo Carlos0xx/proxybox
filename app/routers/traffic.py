@@ -7,7 +7,7 @@ its last poll cycle — for live counts you may need to wait one poll_interval.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 
@@ -24,7 +24,7 @@ router = APIRouter(
 @router.get("/traffic")
 async def system_traffic() -> dict:
     """Aggregate system traffic over the last 24h + per-hour breakdown."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff_24h = int((now - timedelta(hours=24)).timestamp())
     today_str = now.strftime("%Y-%m-%d")
 
@@ -66,8 +66,5 @@ async def system_traffic() -> dict:
         "rx_today": today["rx"],
         "tx_today": today["tx"],
         "active_devices_24h": totals_24h["active_devices"],
-        "hourly": [
-            {"bucket_ts": r["bucket_ts"], "rx": r["rx"], "tx": r["tx"]}
-            for r in hourly
-        ],
+        "hourly": [{"bucket_ts": r["bucket_ts"], "rx": r["rx"], "tx": r["tx"]} for r in hourly],
     }

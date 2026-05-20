@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path
@@ -100,7 +100,7 @@ async def devices_current_usage() -> dict:
     what the SPA's main view consumes — it joins device metadata with
     traffic_log aggregations.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff_24h = int((now - timedelta(hours=24)).timestamp())
     today_str = now.strftime("%Y-%m-%d")
     current_ts = int(now.timestamp())
@@ -147,9 +147,7 @@ async def get_device(name: NameInPath) -> Device:
 @router.post("/{name}/label")
 async def update_label(name: NameInPath, body: LabelUpdate) -> dict[str, str]:
     with connection() as conn:
-        cur = conn.execute(
-            "UPDATE device SET label = ? WHERE name = ?", (body.label, name)
-        )
+        cur = conn.execute("UPDATE device SET label = ? WHERE name = ?", (body.label, name))
         conn.commit()
     if cur.rowcount == 0:
         raise HTTPException(404, "device not found")
@@ -159,9 +157,7 @@ async def update_label(name: NameInPath, body: LabelUpdate) -> dict[str, str]:
 @router.post("/{name}/notes")
 async def update_notes(name: NameInPath, body: NotesUpdate) -> dict[str, str]:
     with connection() as conn:
-        cur = conn.execute(
-            "UPDATE device SET notes = ? WHERE name = ?", (body.notes, name)
-        )
+        cur = conn.execute("UPDATE device SET notes = ? WHERE name = ?", (body.notes, name))
         conn.commit()
     if cur.rowcount == 0:
         raise HTTPException(404, "device not found")
@@ -174,9 +170,7 @@ async def create_device(body: DeviceCreate, background_tasks: BackgroundTasks) -
         raise HTTPException(400, f"name {body.name!r} is reserved")
 
     with connection() as conn:
-        existing = conn.execute(
-            "SELECT 1 FROM device WHERE name = ?", (body.name,)
-        ).fetchone()
+        existing = conn.execute("SELECT 1 FROM device WHERE name = ?", (body.name,)).fetchone()
         if existing is not None:
             raise HTTPException(409, f"device {body.name!r} already exists")
 
@@ -206,8 +200,19 @@ async def create_device(body: DeviceCreate, background_tasks: BackgroundTasks) -
             "INSERT INTO device (name, label, kind, vless_uuid, hy2_password, "
             "vless_port, hy2_port, sni, created_at, notes, sub_token) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (body.name, label, body.kind, vless_uuid, hy2_password,
-             vless_port, hy2_port, sni, now, body.notes, sub_token),
+            (
+                body.name,
+                label,
+                body.kind,
+                vless_uuid,
+                hy2_password,
+                vless_port,
+                hy2_port,
+                sni,
+                now,
+                body.notes,
+                sub_token,
+            ),
         )
         conn.commit()
 
@@ -240,9 +245,7 @@ async def regen_subs(name: NameInPath) -> dict:
         if old_row is None:
             raise HTTPException(404, "device not found")
         old_sub_token = old_row["sub_token"]
-        conn.execute(
-            "UPDATE device SET sub_token = ? WHERE name = ?", (new_sub_token, name)
-        )
+        conn.execute("UPDATE device SET sub_token = ? WHERE name = ?", (new_sub_token, name))
         conn.commit()
         new_row = conn.execute(_GET_SQL, (name,)).fetchone()
 
@@ -289,9 +292,7 @@ async def pause_device(
         row = conn.execute("SELECT name FROM device WHERE name = ?", (name,)).fetchone()
         if row is None:
             raise HTTPException(404, "device not found")
-        conn.execute(
-            "UPDATE device SET paused_until = ? WHERE name = ?", (paused_until, name)
-        )
+        conn.execute("UPDATE device SET paused_until = ? WHERE name = ?", (paused_until, name))
         conn.commit()
 
     cfg = singbox.read_config()
@@ -308,9 +309,7 @@ async def resume_device(name: NameInPath, background_tasks: BackgroundTasks) -> 
         row = conn.execute(_GET_SQL, (name,)).fetchone()
         if row is None:
             raise HTTPException(404, "device not found")
-        conn.execute(
-            "UPDATE device SET paused_until = 0 WHERE name = ?", (name,)
-        )
+        conn.execute("UPDATE device SET paused_until = 0 WHERE name = ?", (name,))
         conn.commit()
         updated = conn.execute(_GET_SQL, (name,)).fetchone()
 
@@ -354,9 +353,7 @@ async def rename_device(
         old_row = conn.execute(_GET_SQL, (name,)).fetchone()
         if old_row is None:
             raise HTTPException(404, "device not found")
-        clash = conn.execute(
-            "SELECT 1 FROM device WHERE name = ?", (body.new_name,)
-        ).fetchone()
+        clash = conn.execute("SELECT 1 FROM device WHERE name = ?", (body.new_name,)).fetchone()
         if clash is not None:
             raise HTTPException(409, f"device {body.new_name!r} already exists")
         conn.execute("UPDATE device SET name = ? WHERE name = ?", (body.new_name, name))

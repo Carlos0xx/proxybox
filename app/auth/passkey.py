@@ -22,7 +22,6 @@ import json
 import secrets
 import time
 from pathlib import Path as P
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from itsdangerous import BadData, URLSafeTimedSerializer
@@ -52,16 +51,14 @@ def _load_or_create_secret() -> str:
 
 
 def _signer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(
-        _load_or_create_secret(), salt="proxybox-admin-session-v1"
-    )
+    return URLSafeTimedSerializer(_load_or_create_secret(), salt="proxybox-admin-session-v1")
 
 
 def issue_session_cookie() -> str:
     return _signer().dumps({"iat": int(time.time()), "n": secrets.token_urlsafe(6)})
 
 
-def validate_session_cookie(cookie: Optional[str]) -> bool:
+def validate_session_cookie(cookie: str | None) -> bool:
     if not cookie:
         return False
     try:
@@ -154,9 +151,7 @@ def make_public_router() -> APIRouter:
         with connection() as conn:
             existing = [
                 r["credential_id"]
-                for r in conn.execute(
-                    "SELECT credential_id FROM passkey_credential"
-                ).fetchall()
+                for r in conn.execute("SELECT credential_id FROM passkey_credential").fetchall()
             ]
         if not existing:
             raise HTTPException(400, "no passkeys registered yet")
@@ -193,7 +188,7 @@ def make_public_router() -> APIRouter:
                     require_user_verification=True,
                 )
             except Exception as e:
-                raise HTTPException(400, f"verification failed: {e}")
+                raise HTTPException(400, f"verification failed: {e}") from e
             conn.execute(
                 "UPDATE passkey_credential SET sign_count = ?, last_used_at = ? "
                 "WHERE credential_id = ?",
@@ -221,7 +216,6 @@ def make_public_router() -> APIRouter:
 
 def make_admin_router() -> APIRouter:
     """Registration + management endpoints — sit under /admin/{token}/api/auth, admin-gated."""
-    from app.auth.token import admin_auth
     from fastapi import Depends
     from webauthn import (
         generate_registration_options,
@@ -234,6 +228,8 @@ def make_admin_router() -> APIRouter:
         ResidentKeyRequirement,
         UserVerificationRequirement,
     )
+
+    from app.auth.token import admin_auth
 
     router = APIRouter(
         prefix="/admin/{token}/api/auth",
@@ -251,13 +247,9 @@ def make_admin_router() -> APIRouter:
         with connection() as conn:
             existing = [
                 r["credential_id"]
-                for r in conn.execute(
-                    "SELECT credential_id FROM passkey_credential"
-                ).fetchall()
+                for r in conn.execute("SELECT credential_id FROM passkey_credential").fetchall()
             ]
-        excludes = [
-            PublicKeyCredentialDescriptor(id=_b64url_decode(cid)) for cid in existing
-        ]
+        excludes = [PublicKeyCredentialDescriptor(id=_b64url_decode(cid)) for cid in existing]
         opts = generate_registration_options(
             rp_id=rp_id,
             rp_name=rp_name,
@@ -326,9 +318,7 @@ def make_admin_router() -> APIRouter:
     @router.delete("/passkeys/{cid}")
     async def revoke_passkey(cid: str) -> dict:
         with connection() as conn:
-            cur = conn.execute(
-                "DELETE FROM passkey_credential WHERE credential_id = ?", (cid,)
-            )
+            cur = conn.execute("DELETE FROM passkey_credential WHERE credential_id = ?", (cid,))
             conn.commit()
         return {"ok": True, "deleted": cur.rowcount}
 

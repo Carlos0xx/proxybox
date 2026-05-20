@@ -28,7 +28,12 @@ from bot.handlers import dispatch
 log = logging.getLogger("proxybox-bot")
 
 
-def _tg_call(cfg: BotConfig, method: str, params: dict[str, Any] | None = None, timeout: int = 35) -> dict:
+def _tg_call(
+    cfg: BotConfig,
+    method: str,
+    params: dict[str, Any] | None = None,
+    timeout: int = 35,
+) -> dict:
     url = f"https://api.telegram.org/bot{cfg.bot_token}/{method}"
     data = urllib.parse.urlencode(params or {}).encode()
     req = urllib.request.Request(url, data=data)
@@ -78,9 +83,7 @@ def _handle_update(cfg: BotConfig, api: ProxyBoxAPI, update: dict) -> None:
 
 
 def main() -> int:
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     cfg = load_config()
     api = ProxyBoxAPI(cfg.api_url, cfg.admin_token)
 
@@ -89,7 +92,8 @@ def main() -> int:
         log.error("failed to authenticate with Telegram — check BOT_TOKEN")
         return 1
     log.info(
-        "started bot %s allowed_users=%d", (me["result"].get("username") or "?"),
+        "started bot %s allowed_users=%d",
+        (me["result"].get("username") or "?"),
         len(cfg.allowed_users),
     )
 

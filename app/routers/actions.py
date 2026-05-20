@@ -56,9 +56,7 @@ async def restart_service(svc: SvcInPath) -> dict:
 
 
 @router.post("/rotate")
-async def rotate_reality_keypair(
-    body: ConfirmBody, background_tasks: BackgroundTasks
-) -> dict:
+async def rotate_reality_keypair(body: ConfirmBody, background_tasks: BackgroundTasks) -> dict:
     """Regenerate Reality keypair + short_id + rewrite every device's sub file.
 
     Existing clients keep working until sing-box restarts (~5s background
@@ -113,7 +111,8 @@ async def rotate_admin_token() -> dict:
     path = os.environ.get("PROXYBOX_CONFIG", "/etc/proxybox/config.yaml")
     new_token = secrets.token_urlsafe(24)
 
-    raw = yaml.safe_load(open(path).read()) or {}
+    with open(path) as f:
+        raw = yaml.safe_load(f) or {}
     raw.setdefault("admin", {})["token"] = new_token
 
     # Atomic write so we never end up with a truncated config on disk

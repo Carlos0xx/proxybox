@@ -20,8 +20,10 @@ _ENV_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
 
 def _expand_env(value: object) -> object:
     if isinstance(value, str):
+
         def repl(m: re.Match[str]) -> str:
             return os.environ.get(m.group(1), "")
+
         return _ENV_PATTERN.sub(repl, value)
     if isinstance(value, dict):
         return {k: _expand_env(v) for k, v in value.items()}

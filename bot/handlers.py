@@ -28,14 +28,21 @@ def _err(reply: dict) -> str | None:
 
 def cmd_help(api: ProxyBoxAPI, args: str) -> str:
     return (
-        "*ProxyBox bot — commands*" + NL +
-        "/status — system status" + NL +
-        "/devices — devices + current usage" + NL +
-        "/traffic — 24h system traffic" + NL +
-        "/bans — currently banned IPs" + NL +
-        "/pause <name> [until_ts] — pause a device (0 = indefinite)" + NL +
-        "/resume <name> — resume a paused device" + NL +
-        "/help — this message"
+        "*ProxyBox bot — commands*"
+        + NL
+        + "/status — system status"
+        + NL
+        + "/devices — devices + current usage"
+        + NL
+        + "/traffic — 24h system traffic"
+        + NL
+        + "/bans — currently banned IPs"
+        + NL
+        + "/pause <name> [until_ts] — pause a device (0 = indefinite)"
+        + NL
+        + "/resume <name> — resume a paused device"
+        + NL
+        + "/help — this message"
     )
 
 
@@ -54,7 +61,9 @@ def cmd_status(api: ProxyBoxAPI, args: str) -> str:
     lines.append("")
     lines.append(f"load: `{' '.join(r.get('load', []))}`")
     lines.append(f"mem: {mem.get('used_mb', 0)}/{mem.get('total_mb', 0)}MB ({mem.get('pct', 0)}%)")
-    lines.append(f"disk: {disk.get('used', '?')} / {disk.get('total', '?')} ({disk.get('pct', '?')})")
+    lines.append(
+        f"disk: {disk.get('used', '?')} / {disk.get('total', '?')} ({disk.get('pct', '?')})"
+    )
     lines.append(f"uptime: {r.get('uptime', '?')}")
     return NL.join(lines)
 
@@ -83,11 +92,15 @@ def cmd_traffic(api: ProxyBoxAPI, args: str) -> str:
     if err:
         return err
     return (
-        f"*Traffic — last 24h*" + NL +
-        f"down: {_fmt_bytes(r.get('rx_24h', 0))}" + NL +
-        f"up: {_fmt_bytes(r.get('tx_24h', 0))}" + NL +
-        f"active devices: {r.get('active_devices_24h', 0)}" + NL +
-        f"today: {_fmt_bytes(r.get('rx_today', 0))}↓ / {_fmt_bytes(r.get('tx_today', 0))}↑"
+        "*Traffic — last 24h*"
+        + NL
+        + f"down: {_fmt_bytes(r.get('rx_24h', 0))}"
+        + NL
+        + f"up: {_fmt_bytes(r.get('tx_24h', 0))}"
+        + NL
+        + f"active devices: {r.get('active_devices_24h', 0)}"
+        + NL
+        + f"today: {_fmt_bytes(r.get('rx_today', 0))}↓ / {_fmt_bytes(r.get('tx_today', 0))}↑"
     )
 
 
@@ -99,7 +112,9 @@ def cmd_bans(api: ProxyBoxAPI, args: str) -> str:
     banned = r.get("banned", [])
     if not banned:
         return f"_no IPs banned_ ({r.get('total_banned', 0)} historic)"
-    return f"*Banned IPs* ({r.get('currently_banned', 0)}):" + NL + NL.join(f"`{ip}`" for ip in banned)
+    return (
+        f"*Banned IPs* ({r.get('currently_banned', 0)}):" + NL + NL.join(f"`{ip}`" for ip in banned)
+    )
 
 
 def cmd_pause(api: ProxyBoxAPI, args: str) -> str:

@@ -7,6 +7,7 @@ so the HTTP response leaves first, then sing-box restarts.
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import shutil
@@ -40,7 +41,7 @@ def reload_singbox() -> None:
     client through the same sing-box proxy before sing-box itself restarts.
     """
     time.sleep(5)
-    try:
+    with contextlib.suppress(subprocess.SubprocessError, OSError):
         result = subprocess.run(
             ["systemctl", "reload", "sing-box"],
             capture_output=True,
@@ -48,16 +49,12 @@ def reload_singbox() -> None:
         )
         if result.returncode == 0:
             return
-    except (subprocess.SubprocessError, OSError):
-        pass
-    try:
+    with contextlib.suppress(subprocess.SubprocessError, OSError):
         subprocess.run(
             ["systemctl", "restart", "--no-block", "sing-box"],
             capture_output=True,
             timeout=10,
         )
-    except (subprocess.SubprocessError, OSError):
-        pass
 
 
 def find_template_inbound(cfg: dict[str, Any], kind: str) -> dict[str, Any]:
@@ -108,9 +105,7 @@ def add_device_inbounds(cfg: dict[str, Any], device: dict[str, Any]) -> list[str
         inb = copy.deepcopy(vless_tpl)
         inb["tag"] = vless_tag
         inb["listen_port"] = device["vless_port"]
-        inb["users"] = [
-            {"name": device["name"], "uuid": device["vless_uuid"], "flow": flow}
-        ]
+        inb["users"] = [{"name": device["name"], "uuid": device["vless_uuid"], "flow": flow}]
         cfg.setdefault("inbounds", []).append(inb)
         added.append(vless_tag)
 

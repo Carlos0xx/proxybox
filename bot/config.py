@@ -40,9 +40,7 @@ def load_config() -> BotConfig:
     if not raw_users:
         missing.append("TG_ALLOWED_USERS")
     if missing:
-        raise SystemExit(
-            f"missing required env: {', '.join(missing)}; see bot/config.py docstring"
-        )
+        raise SystemExit(f"missing required env: {', '.join(missing)}; see bot/config.py docstring")
     try:
         users = frozenset(int(s.strip()) for s in raw_users.split(",") if s.strip())
     except ValueError as e:

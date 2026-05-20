@@ -28,8 +28,7 @@ async def status() -> dict:
     settings = get_settings()
     return {
         "services": {
-            unit: system_stats.systemctl_is_active(unit)
-            for unit in settings.services.monitored
+            unit: system_stats.systemctl_is_active(unit) for unit in settings.services.monitored
         },
         "load": system_stats.loadavg(),
         "uptime": system_stats.uptime_pretty(),
@@ -56,6 +55,4 @@ async def logs(name: SvcInPath, n: LinesQuery = 50) -> str:
             f"service {name!r} not in monitored allowlist — only services in "
             f"config.services.monitored can be inspected",
         )
-    return shell.run(
-        ["journalctl", "-u", name, "-n", str(n), "--no-pager"], timeout=10
-    )
+    return shell.run(["journalctl", "-u", name, "-n", str(n), "--no-pager"], timeout=10)

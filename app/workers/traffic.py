@@ -20,7 +20,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.config import get_settings
 from app.db.connection import connection
@@ -32,7 +32,7 @@ def _device_from_inbound_tag(tag: str) -> str | None:
     """Inbound tags follow ``vless-{name}`` or ``hy2-{name}``; templates are skipped."""
     for prefix in ("vless-", "hy2-"):
         if tag.startswith(prefix):
-            name = tag[len(prefix):]
+            name = tag[len(prefix) :]
             if name and name != "template":
                 return name
     return None
@@ -43,9 +43,7 @@ def fetch_connections() -> list[dict]:
     headers: dict[str, str] = {}
     if settings.clash.api_secret:
         headers["Authorization"] = f"Bearer {settings.clash.api_secret}"
-    req = urllib.request.Request(
-        f"{settings.clash.api_url}/connections", headers=headers
-    )
+    req = urllib.request.Request(f"{settings.clash.api_url}/connections", headers=headers)
     with urllib.request.urlopen(req, timeout=5) as r:
         data = json.load(r)
     return data.get("connections") or []
@@ -54,10 +52,8 @@ def fetch_connections() -> list[dict]:
 def process_tick() -> int:
     """One poll cycle. Returns the number of distinct devices observed."""
     now = int(time.time())
-    dt = datetime.now(timezone.utc)
-    hour_start = int(
-        datetime(dt.year, dt.month, dt.day, dt.hour, tzinfo=timezone.utc).timestamp()
-    )
+    dt = datetime.now(UTC)
+    hour_start = int(datetime(dt.year, dt.month, dt.day, dt.hour, tzinfo=UTC).timestamp())
     date_str = dt.strftime("%Y-%m-%d")
     hour_int = dt.hour
 

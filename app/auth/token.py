@@ -17,9 +17,7 @@ from fastapi import HTTPException, Path, Request
 from app.config import get_settings
 
 
-async def admin_auth(
-    request: Request, token: Annotated[str, Path()]
-) -> str:
+async def admin_auth(request: Request, token: Annotated[str, Path()]) -> str:
     settings = get_settings()
     expected = settings.admin.token.encode()
     if secrets.compare_digest(token.encode(), expected):

@@ -47,13 +47,24 @@ def _reality_keypair() -> tuple[str, str]:
 def _hy2_self_signed_cert(out_dir: Path, cn: str) -> None:
     subprocess.run(
         [
-            "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-            "-days", "3650",
-            "-keyout", str(out_dir / "key.pem"),
-            "-out", str(out_dir / "cert.pem"),
-            "-subj", f"/CN={cn}",
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-days",
+            "3650",
+            "-keyout",
+            str(out_dir / "key.pem"),
+            "-out",
+            str(out_dir / "cert.pem"),
+            "-subj",
+            f"/CN={cn}",
         ],
-        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     (out_dir / "key.pem").chmod(0o600)
 
@@ -78,9 +89,7 @@ def _gen_singbox_config(sb_dir: Path) -> None:
 
     cfg = {
         "log": {"level": "info", "timestamp": True},
-        "experimental": {
-            "clash_api": {"external_controller": "127.0.0.1:9090"}
-        },
+        "experimental": {"clash_api": {"external_controller": "127.0.0.1:9090"}},
         "inbounds": [
             {
                 "type": "vless",

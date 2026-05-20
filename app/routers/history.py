@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
@@ -33,7 +33,7 @@ DaysQuery = Annotated[int, Query(ge=1, le=90)]
 
 
 def _cutoff_ts(days: int) -> int:
-    return int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp())
+    return int((datetime.now(UTC) - timedelta(days=days)).timestamp())
 
 
 @router.get("/devices")
@@ -146,14 +146,17 @@ async def history_export(days: DaysQuery = 7, format: str = "csv") -> Response:
         ):
             writer.writerow(
                 [
-                    r["device_name"], r["date"], r["hour"], r["bucket_ts"],
-                    r["rx_bytes"], r["tx_bytes"], r["conn_count"],
+                    r["device_name"],
+                    r["date"],
+                    r["hour"],
+                    r["bucket_ts"],
+                    r["rx_bytes"],
+                    r["tx_bytes"],
+                    r["conn_count"],
                 ]
             )
     return Response(
         content=buf.getvalue(),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="proxybox-history-{days}d.csv"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="proxybox-history-{days}d.csv"'},
     )

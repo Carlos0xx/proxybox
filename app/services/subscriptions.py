@@ -48,7 +48,10 @@ def build_vless_uri(device: dict[str, Any], sb_cfg: dict[str, Any], vps_host: st
 def build_hysteria2_uri(device: dict[str, Any], sb_cfg: dict[str, Any], vps_host: str) -> str:
     hy2_tpl = singbox.find_template_inbound(sb_cfg, "hysteria2")
     obfs_pw = hy2_tpl.get("obfs", {}).get("password", "")
-    sni = hy2_tpl.get("tls", {}).get("server_name") or singbox.find_template_inbound(sb_cfg, "vless")["tls"]["server_name"]
+    sni = (
+        hy2_tpl.get("tls", {}).get("server_name")
+        or singbox.find_template_inbound(sb_cfg, "vless")["tls"]["server_name"]
+    )
 
     return (
         f"hysteria2://{device['hy2_password']}@{vps_host}:{device['hy2_port']}"
@@ -57,9 +60,7 @@ def build_hysteria2_uri(device: dict[str, Any], sb_cfg: dict[str, Any], vps_host
     )
 
 
-def generate_subscription_text(
-    device: dict[str, Any], sb_cfg: dict[str, Any] | None = None
-) -> str:
+def generate_subscription_text(device: dict[str, Any], sb_cfg: dict[str, Any] | None = None) -> str:
     """Build the subscription file content for one device.
 
     Raises RuntimeError if server.public_host is not configured — the URIs
@@ -72,16 +73,19 @@ def generate_subscription_text(
         raise RuntimeError(
             "server.public_host is empty in config.yaml — set it before generating subs"
         )
-    return build_vless_uri(device, sb_cfg, vps_host) + "\n" + build_hysteria2_uri(device, sb_cfg, vps_host) + "\n"
+    return (
+        build_vless_uri(device, sb_cfg, vps_host)
+        + "\n"
+        + build_hysteria2_uri(device, sb_cfg, vps_host)
+        + "\n"
+    )
 
 
 def _sub_path(sub_token: str) -> Path:
     return Path(get_settings().paths.sub_dir) / f"{sub_token}.txt"
 
 
-def write_subscription_file(
-    device: dict[str, Any], sb_cfg: dict[str, Any] | None = None
-) -> Path:
+def write_subscription_file(device: dict[str, Any], sb_cfg: dict[str, Any] | None = None) -> Path:
     sub_dir = Path(get_settings().paths.sub_dir)
     sub_dir.mkdir(parents=True, exist_ok=True)
     content = generate_subscription_text(device, sb_cfg)
