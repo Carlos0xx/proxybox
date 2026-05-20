@@ -64,6 +64,11 @@ class ServicesSettings(BaseModel):
     )
 
 
+class PortsSettings(BaseModel):
+    vless_range: tuple[int, int] = (11001, 11050)
+    hy2_range: tuple[int, int] = (21001, 21050)
+
+
 class FeaturesSettings(BaseModel):
     passkey: bool = False
     bot: bool = False
@@ -73,6 +78,7 @@ class AppConfig(BaseModel):
     admin: AdminSettings
     paths: PathsSettings = Field(default_factory=PathsSettings)
     services: ServicesSettings = Field(default_factory=ServicesSettings)
+    ports: PortsSettings = Field(default_factory=PortsSettings)
     features: FeaturesSettings = Field(default_factory=FeaturesSettings)
 
     @classmethod

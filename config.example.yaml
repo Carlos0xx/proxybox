@@ -29,6 +29,13 @@ services:
     - proxybox-traffic-worker
     - fail2ban
 
+ports:
+  # Per-device port allocation ranges (inclusive). install.sh / your firewall
+  # layer should open these. Each new device claims one vless port + one hy2
+  # port from these ranges.
+  vless_range: [11001, 11050]
+  hy2_range:   [21001, 21050]
+
 features:
   # WebAuthn passkey auth (planned for v0.2.0). When false, only URL-path
   # token auth is active.
