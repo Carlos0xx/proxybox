@@ -1,6 +1,28 @@
 # API
 
-Two doc pages cover the surface:
+> All ProxyBox HTTP surfaces, grouped by intent.
 
-- [Endpoints](./endpoints) — all 34 admin endpoints grouped by category
-- [Subscription URLs](./subscription) — the public `/api/sub/{token}` path that clients fetch
+| Page | Covers |
+| --- | --- |
+| [Endpoints](./endpoints.md) | Admin API — devices · traffic · history · HTTPS · account · logs · bans. Cookie + URL-path token gated. |
+| [Subscription URLs](./subscription.md) | Public `/api/sub/{sub_token}` — the URL each client device fetches. Five formats. |
+
+---
+
+## Two URL prefixes
+
+| Prefix | Auth | Used by |
+| --- | --- | --- |
+| `/admin/{admin.token}/...` | session cookie **and** matching URL-path token | Admin SPA + admin API. |
+| `/api/sub/{sub_token}[/format]` | none — `sub_token` *is* the secret | Proxy clients (sing-box, Shadowrocket, Clash, etc.). |
+
+> [!IMPORTANT]
+> `admin.token` and the per-device `sub_token` are independent. Rotating one does not affect the other. Both live in `/etc/proxybox/config.yaml` and the device table respectively.
+
+---
+
+## See also
+
+- [Architecture](../architecture.md) · how the routers fit into the bigger picture
+- [Guide](../guide.md) · day-to-day operations
+- [← Back to README](../../README.md)

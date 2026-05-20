@@ -1,7 +1,10 @@
 # Claude Code skill
 
-The bundle at `deploy/claude-skill/` is a Claude Code "skill" that drives
-the full install via SSH.
+> A bundled Claude Code skill that drives the full install over SSH — pre-flight, `git clone`, `install.sh`, verification, credential handoff.
+
+For the high-level walkthrough, see [Getting started · Path 3](../getting-started.md#path-3--claude-code).
+
+---
 
 ## Install the skill
 
@@ -9,6 +12,10 @@ the full install via SSH.
 mkdir -p ~/.claude/skills/proxybox-deploy
 cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 ```
+
+The skill is self-contained — once installed it is available in every Claude Code session, no per-project setup needed.
+
+---
 
 ## Use the skill
 
@@ -18,15 +25,57 @@ In any Claude Code session:
 
 Claude will:
 
-1. Ask for SSH user / auth method if missing
-2. Pre-flight check (arch, OS, disk, mem, root)
-3. `git clone` (or `git pull` if `/opt/proxybox` exists)
-4. Run `bash deploy/install.sh`
-5. Verify 4 services active
-6. Report admin URL with token masked to 8 chars
-7. (Optional) configure Telegram bot if user supplied credentials
+| # | Step |
+| --- | --- |
+| 1 | Ask for SSH user / auth method if missing from the prompt. |
+| 2 | Run `deploy/check-prereqs.sh` over SSH — abort if it fails. |
+| 3 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox` (or `git pull` if the directory exists). |
+| 4 | Run `bash deploy/install.sh --lang en` (or `--lang zh` if you asked in Chinese). |
+| 5 | Verify the four core services are `active (running)`. |
+| 6 | Relay the login URL, username, password, and 5 subscription URLs back to you. |
 
-## What's masked
+---
 
-The skill explicitly instructs Claude **never** to echo the full admin
-token. Token lives only on the VPS in `/etc/proxybox/config.yaml`.
+## What the skill knows about
+
+The bundled `SKILL.md` carries instructions for:
+
+- **v0.1.6+** login model — username + password form at `/login/{login_path}`, *not* URL-token-only auth.
+- **v0.1.10+** HTTPS UI — how to mention it in the handoff so users know they can switch to HTTPS without SSH.
+- **v0.1.11+** account self-service — how to mention rotation options in the handoff.
+- **v0.1.12** copy-button fix — the SPA now has per-line copy buttons on the subscription page.
+- **v0.2.0** bilingual UI — topbar `中 / EN` toggle, login form also bilingual via `?lang=`.
+
+---
+
+## Credential handling
+
+The skill explicitly instructs Claude to:
+
+1. **Echo the full login URL** (the URL-path token is one of two required factors — printing it alone doesn't leak access).
+2. **Echo the freshly generated `admin.password`** so the user can paste it into a password manager.
+3. **Never echo the bare `admin.token`** outside the login URL context. Don't quote it in commentary, don't write it to logs.
+
+The credentials live only on the VPS in `/etc/proxybox/config.yaml`. The skill never persists them locally.
+
+> [!IMPORTANT]
+> The skill assumes you trust your local Claude Code session. If you'd rather Claude never see the credentials, run `install.sh` over SSH yourself — the skill is a convenience, not a hard requirement.
+
+---
+
+## Telegram bot (optional)
+
+If you also pass Telegram bot details in the initial prompt:
+
+> deploy proxybox on 1.2.3.4 with TG bot token 123:ABC for user id 4567
+
+…the skill will additionally write `/etc/proxybox/bot.env` and `systemctl enable --now proxybox-bot` at the end.
+
+---
+
+## See also
+
+- [`install.sh`](./install-sh.md) · what the skill runs underneath
+- [`deploy/claude-skill/SKILL.md`](../../deploy/claude-skill/SKILL.md) · the actual skill instructions Claude reads
+- [Getting started](../getting-started.md) · the three deploy paths side-by-side
+- [← Back to README](../../README.md)

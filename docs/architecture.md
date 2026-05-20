@@ -1,59 +1,121 @@
 # Architecture
 
-ProxyBox is four processes coordinating through one SQLite database and a
-sing-box-generated JSON config:
+> Five processes coordinating through one SQLite database and a sing-box JSON config.
 
+For end-user workflows, see [`guide.md`](./guide.md). For per-endpoint reference, see [`api/endpoints.md`](./api/endpoints.md).
+
+---
+
+## At a glance
+
+```text
+┌─ Clients ────────────────────────────────────────────────────────────┐
+│  sing-box · Shadowrocket · Hiddify · Stash · Clash · merlin routers  │
+└────────────────────────┬─────────────────────────────────────────────┘
+                         │  VLESS Reality  (TCP 11001-11050, per device)
+                         │  Hysteria2      (UDP 21001-21050, per device)
+                         ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                              VPS                                     │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  sing-box                                  systemd              │  │
+│  │  - reads /etc/sing-box/config.json                              │  │
+│  │  - per-device Reality (TCP) + Hy2 (UDP) inbounds                │  │
+│  │  - exposes Clash API on 127.0.0.1:9090                          │  │
+│  └────────────────────────────┬───────────────────────────────────┘  │
+│                               │ /connections · /traffic                │
+│  ┌────────────────────────────▼───────────────────────────────────┐  │
+│  │  proxybox-traffic-worker                  systemd              │  │
+│  │  - polls Clash API every 10s                                   │  │
+│  │  - byte delta → traffic_log (per device × hour)                │  │
+│  │  - host suffix → app_group → host_log                          │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  proxybox-admin   (FastAPI + uvicorn)     systemd  :8080       │  │
+│  │  - /login/{secret} ──→ username/password ──→ session cookie    │  │
+│  │  - /admin/{token}/...   ←── cookie + URL-path token            │  │
+│  │  - /api/sub/{sub_token}[/format]    (public, sub_token is key) │  │
+│  │  - /api/https/enable     {domain}   → Caddy provisioning       │  │
+│  │  - /api/admin/account, /login-path  → credential rotation      │  │
+│  │  - /api/connections                 → Clash API proxy          │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  caddy            (opt-in, provisioned from the UI)            │  │
+│  │  - reverse_proxy 127.0.0.1:8080                                │  │
+│  │  - Let's Encrypt auto-issue + auto-renew                       │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  proxybox-bot     (opt-in, Telegram long-poll)                 │  │
+│  │  fail2ban         (manual IP jail, backend=systemd)            │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│              ┌──────────────────────────────────────┐                │
+│              │  /var/lib/proxybox/traffic.db        │                │
+│              │  device · traffic_log · host_log     │                │
+│              │  passkey_credential (opt-in)         │                │
+│              └──────────────────────────────────────┘                │
+└──────────────────────────────────────────────────────────────────────┘
 ```
-┌─ /etc/sing-box/config.json ────────────────────────┐
-│ template inbounds (vless-template, hy2-template) +  │
-│ per-device inbounds (vless-{name}, hy2-{name})     │
-└────────────────────┬───────────────────────────────┘
-                     │
-            ┌────────┴────────┐
-            │                 │
-            ▼                 ▼
-   ┌──────────────┐   ┌─────────────────────────┐
-   │   sing-box   │   │  proxybox-admin (HTTP)  │
-   │  (systemd)   │   │  - reads sing-box config │
-   │              │   │  - writes per-device inb │
-   └──────┬───────┘   └──────────┬──────────────┘
-          │                      │
-          │ Clash API            │ admin token URL path
-          │ /connections         │ /admin/{token}/...
-          │                      │
-          ▼                      ▼
-   ┌────────────────┐   ┌────────────────┐
-   │ traffic-worker │   │  Admin SPA     │
-   │ polls every 10s│   │  /admin/{tok}/ │
-   │  → traffic_log │   │  React-ish JS  │
-   └────────┬───────┘   └────────────────┘
-            │
-            ▼
-   ┌────────────────────────────────────┐
-   │     /var/lib/proxybox/traffic.db   │
-   │  device (CRUD)                     │
-   │  traffic_log (per device × hour)   │
-   │  passkey_credential (opt-in)       │
-   └────────────────────────────────────┘
-```
+
+---
 
 ## Processes
 
 | Process | Source | systemd unit | Purpose |
-|---|---|---|---|
-| sing-box | upstream binary | `sing-box.service` | The actual proxy. Configured via `/etc/sing-box/config.json`. |
-| proxybox-admin | `app/main.py` | `proxybox-admin.service` | FastAPI app, 34 admin endpoints + GET / serving the SPA. |
-| proxybox-traffic-worker | `app/workers/traffic.py` | `proxybox-traffic-worker.service` | Polls sing-box Clash API, writes byte deltas to SQLite. |
-| proxybox-bot (opt-in) | `bot/__main__.py` | `proxybox-bot.service` | Telegram long-poll, 7 commands. |
-| fail2ban | apt package | `fail2ban.service` | Manual IP ban backend (custom `[manual]` jail, backend=systemd). |
+| --- | --- | --- | --- |
+| **sing-box** | upstream binary | `sing-box.service` | The actual proxy — per-device Reality + Hy2 inbounds. Configured via `/etc/sing-box/config.json`. |
+| **proxybox-admin** | [`app/main.py`](../app/main.py) | `proxybox-admin.service` | FastAPI app — admin API, SPA, login form, subscription endpoints, HTTPS provisioning. Listens on `:8080`. |
+| **proxybox-traffic-worker** | [`app/workers/traffic.py`](../app/workers/traffic.py) | `proxybox-traffic-worker.service` | Polls sing-box Clash API every 10s; writes byte deltas to `traffic_log`, host suffixes to `host_log`. |
+| **caddy** *(opt-in)* | upstream binary | `caddy.service` | HTTPS reverse-proxy in front of `:8080`. Provisioned via the panel's HTTPS page. |
+| **proxybox-bot** *(opt-in)* | [`bot/__main__.py`](../bot/__main__.py) | `proxybox-bot.service` | Telegram long-poll — `/status`, `/devices`, `/traffic`, `/pause`, `/resume`, `/bans`. |
+| **fail2ban** | apt package | `fail2ban.service` | Manual IP-jail backend (custom `[manual]` jail, `backend=systemd`). |
+
+The first three are always running. The last three are opt-in and start disabled.
+
+---
+
+## Authentication
+
+Two layered checks. Both must pass for every admin endpoint.
+
+```text
+        ┌──────────────────────────────────────┐
+        │  Browser  →  /login/{login_path}     │  ① Layer 1: session
+        │            POST username + password  │     - issued by /login/{...}
+        │            ←  Set-Cookie: session    │     - 30-day expiry
+        └──────────────────────────────────────┘     - HttpOnly, SameSite=Lax
+                            │
+                            ▼
+        ┌──────────────────────────────────────┐
+        │  Browser  →  /admin/{token}/api/...  │  ② Layer 2: URL-path token
+        │            Cookie: session=...       │     - token must match config
+        │            (admin.token in YAML)     │     - re-checked every request
+        └──────────────────────────────────────┘
+```
+
+| Property | Behavior |
+| --- | --- |
+| **Login form** | Lives at `/login/{login_path}`. The bare `/login` returns **404** so brute-force scanners can't even confirm a form exists. |
+| **`admin.login_path`** | Random 12-char alphanumeric, generated by `install.sh`. Rotate from the SPA's *Security* page — no SSH needed. |
+| **`admin.password`** | 16-char random, hashed by FastAPI session middleware. Constant-time compare via `secrets.compare_digest`. |
+| **Session cookie** | `itsdangerous`-signed, 30-day expiry, `HttpOnly`, `SameSite=Lax`. |
+| **`admin.token`** | URL-path component on every admin route. A stolen cookie cannot be replayed against an instance on a different host. |
+| **`features.url_token_bypass`** | When `true`, the URL-path token *alone* authenticates (legacy v0.1.5 behaviour, useful for automation). **Defaults to `false`** in v0.1.6+. |
+| **WebAuthn passkey** *(opt-in)* | Touch ID / Face ID / hardware key. Requires HTTPS. Adds a 2nd factor in front of the password — does not replace the URL-path token. |
+
+---
 
 ## Database
 
-Single SQLite file at `/var/lib/proxybox/traffic.db`, three tables:
+Single SQLite file at `/var/lib/proxybox/traffic.db`, WAL mode, four tables.
 
 ```sql
 CREATE TABLE device (
-  name          TEXT     PRIMARY KEY,    -- "phone-1", "laptop", etc.
+  name          TEXT     PRIMARY KEY,    -- "phone-1", "laptop-1", etc.
   label         TEXT     NOT NULL,        -- human-friendly display name
   kind          TEXT     NOT NULL,        -- "mobile" / "desktop" / "router"
   vless_uuid    TEXT     NOT NULL,        -- 128-bit RFC 4122 v4
@@ -75,13 +137,24 @@ CREATE TABLE traffic_log (
   bucket_ts    INTEGER NOT NULL,  -- UTC hour-aligned epoch
   date         TEXT    NOT NULL,  -- YYYY-MM-DD UTC
   hour         INTEGER NOT NULL,  -- 0-23 UTC
-  rx_bytes     INTEGER NOT NULL,  -- download (server→client)
-  tx_bytes     INTEGER NOT NULL,  -- upload (client→server)
-  conn_count   INTEGER NOT NULL,  -- number of new connections in bucket
+  rx_bytes     INTEGER NOT NULL,  -- download (server → client)
+  tx_bytes     INTEGER NOT NULL,  -- upload (client → server)
+  conn_count   INTEGER NOT NULL,  -- new connections in bucket
   PRIMARY KEY (device_name, bucket_ts)
 );
 
-CREATE TABLE passkey_credential (
+CREATE TABLE host_log (                -- v0.1.9+
+  device_name  TEXT    NOT NULL,
+  bucket_ts    INTEGER NOT NULL,       -- UTC hour-aligned epoch
+  host         TEXT    NOT NULL,       -- destination hostname (or IP)
+  app_group    TEXT    NOT NULL,       -- "video" / "social" / "ai" / "cdn" / ...
+  rx_bytes     INTEGER NOT NULL,
+  tx_bytes     INTEGER NOT NULL,
+  conn_count   INTEGER NOT NULL,
+  PRIMARY KEY (device_name, bucket_ts, host)
+);
+
+CREATE TABLE passkey_credential (      -- opt-in
   credential_id  TEXT     PRIMARY KEY,
   public_key     BLOB     NOT NULL,
   sign_count     INTEGER  NOT NULL,
@@ -91,37 +164,73 @@ CREATE TABLE passkey_credential (
 );
 ```
 
-Migrations are additive only. The schema lives in `app/db/schema.sql` and
-re-runs every app startup via `init_schema()` (all statements use
-`IF NOT EXISTS`).
+> [!NOTE]
+> Schema lives in [`app/db/schema.sql`](../app/db/schema.sql). All statements use `IF NOT EXISTS` — `init_schema()` runs on every startup and migrations are additive only.
+
+---
 
 ## URL layout
 
-| Path | Auth | Purpose |
-|---|---|---|
-| `GET /admin/{token}/` | URL token | SPA HTML (token substituted into JS) |
-| `GET /admin/{token}/api/status` | URL token | system + service stats |
-| `GET /admin/{token}/api/devices` | URL token | per-device current usage |
-| `POST /admin/{token}/api/devices/new` | URL token | create device (allocates ports, generates UUID, writes config + sub file) |
-| `POST /admin/{token}/api/devices/{name}/pause` | URL token | remove inbounds + set `paused_until` |
-| `POST /admin/{token}/api/devices/{name}/resume` | URL token | restore inbounds |
-| `POST /admin/{token}/api/devices/{name}/delete` | URL token | hard delete (DB + config + sub file) |
-| `GET /api/sub/{sub_token}` | **public** (sub_token IS the secret) | client subscription URL list |
-| `GET /admin/{token}/api/history/devices?days=N` | URL token | per-device daily totals |
-| `POST /admin/{token}/action/rotate` | URL token + body confirm | Reality keypair rotation |
-| `GET /admin/{token}/api/logs/{svc}` | URL token (svc in allowlist) | journalctl wrapper |
-| `POST /auth/webauthn/login/begin` (opt-in) | none (passkey is the auth) | WebAuthn challenge |
+### Public (no auth)
 
-Full list: [API · Endpoints](./api/endpoints).
+| Path | Notes |
+| --- | --- |
+| `GET /api/sub/{sub_token}` | Subscription URI list (default). `sub_token` itself is the secret. |
+| `GET /api/sub/{sub_token}/clash.yaml` | Clash config. |
+| `GET /api/sub/{sub_token}/merlin.yaml` | AsusWRT-Merlin variant. |
+| `GET /api/sub/{sub_token}/shadowrocket.conf` | Shadowrocket native format. |
+| `GET /api/sub/{sub_token}/sub.txt` | URI list with `.txt` extension (some clients key on it). |
 
-## Design choices vs other proxy panels
+### Server-rendered HTML
+
+| Path | Notes |
+| --- | --- |
+| `GET /login/{login_path}` | Login form. `?lang=en` / `?lang=zh` to switch language. |
+| `POST /login/{login_path}` | Submit username + password — sets the session cookie. |
+| `POST /logout` | Clears the cookie. |
+| `GET /admin/{token}/` | SPA shell. Requires cookie. |
+| `GET /admin/{token}/static/*` | SPA JS/CSS. |
+
+### Admin API (cookie + URL token)
+
+| Group | Examples |
+| --- | --- |
+| **Status** | `GET /admin/{token}/api/status` · `GET /api/connections` (Clash API proxy) |
+| **Devices** | `GET /api/devices/list` · `POST /api/devices/new` · `POST /api/devices/{name}/pause` · `POST /api/devices/{name}/resume` · `POST /api/devices/{name}/delete` |
+| **Subscription** | `GET /api/devices/{name}/sub` · `POST /api/devices/{name}/sub/regen` |
+| **History** | `GET /api/history/devices?days=N` · `GET /api/history/{device}/hourly` · `GET /api/history/{device}/apps` · `GET /api/history/{device}/hosts` |
+| **HTTPS** | `GET /api/https/status` · `POST /api/https/enable` · `POST /api/https/disable` |
+| **Account** | `GET /api/admin/account` · `POST /api/admin/account` (change username/password) · `POST /api/admin/login-path` (rotate suffix) |
+| **Logs** | `GET /api/logs/{svc}` — allowlist: `sing-box`, `proxybox-admin`, `proxybox-traffic-worker`, `proxybox-bot`, `caddy`, `fail2ban` |
+| **Bans** | `GET /api/bans` · `POST /api/bans` · `POST /api/bans/{id}/release` |
+| **Rotate** | `POST /admin/{token}/action/rotate` (Reality keypair) |
+
+> Full per-endpoint reference: [`api/endpoints.md`](./api/endpoints.md).
+
+---
+
+## Design choices
 
 | Choice | What we did | Why |
-|---|---|---|
-| Per-device inbound | unique vless/hy2 port + UUID per device | revoke surgically, accurate traffic accounting per device |
-| Traffic source | sing-box Clash API (not nftables) | no kernel-level firewall rules to manage, single source of truth, runs in Docker |
-| Subscription path | plain HTTP `text/plain` URI list at `/api/sub/{token}` | maximum client compatibility; Shadowrocket etc. don't all support raw vless:// paste |
-| Admin auth | URL-path token by default, opt-in WebAuthn passkey | URL works in bookmark-able links; passkey adds 2nd factor |
-| Reality cover-domain | random pick from `www.microsoft.com / apple.com / cloudflare.com / amazon.com` per install | no shared fingerprint across deployments |
-| Per-host classifier | **dropped** (vs BWG upstream) | host-level data is a fingerprint; aggregating per-device only is privacy-preserving |
-| install.sh idempotency | every step gated by existence check | safe to re-run, can resume after partial failure |
+| --- | --- | --- |
+| **Per-device inbounds** | Unique TCP/UDP port + UUID per device | Revoke surgically; traffic accounting is naturally per-device. |
+| **Traffic source** | sing-box Clash API (not nftables / eBPF) | No kernel-level rules to manage; single source of truth; works in Docker. |
+| **Subscription path** | Plain HTTP `text/plain` URI list at `/api/sub/{token}` | Maximum client compatibility — not all clients parse raw `vless://`. |
+| **5 subscription formats** | URI list + Clash + Merlin + Shadowrocket + .txt — generated on the fly | Avoid format mismatches with router firmware and edge-case clients. |
+| **Login form** | `/login/{12-char-suffix}`; bare `/login` 404s | Bots probing common paths can't even confirm a form exists. |
+| **Admin auth** | Cookie + URL-path token *both* required; bypass mode opt-in | A stolen cookie can't be replayed against an instance on a different host. |
+| **Reality cover-domain** | Random pick from `www.microsoft.com` / `apple.com` / `cloudflare.com` / `amazon.com` per install | No shared fingerprint across deployments. |
+| **Host categorisation** | Suffix → app_group lookup (~120 entries, no DNS calls) | Privacy: no per-request DNS lookup; performance: O(1) per host. |
+| **HTTPS provisioning** | Caddy + Let's Encrypt, triggered from the SPA | One click instead of an SSH session for a non-technical user. |
+| **`install.sh` idempotency** | Every step gated by an existence check | Safe to re-run; partial failures resume cleanly. |
+| **i18n** | Phrase → phrase dict + MutationObserver | No source-code annotation of every Chinese string; topbar toggle reloads via cookie + `localStorage`. |
+
+---
+
+## See also
+
+- [Guide](./guide.md) · day-to-day usage walkthrough
+- [Getting started](./getting-started.md) · install in under 10 minutes
+- [API endpoints](./api/endpoints.md) · per-router reference
+- [`config.example.yaml`](../config.example.yaml) · full configuration schema
+- [← Back to README](../README.md)

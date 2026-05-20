@@ -4,57 +4,44 @@
 
 </div>
 
-# ProxyBox
+<h1 align="center">ProxyBox</h1>
 
-> **A self-hosted, per-device-isolated proxy admin panel.** Every phone, laptop and
-> router on your VPS gets its own VLESS Reality + Hysteria2 inbound, with byte-level
-> traffic accounting, optional Telegram-bot control, optional WebAuthn passkey, and a
-> one-click admin panel that handles HTTPS provisioning + credential rotation for
-> you. MIT-licensed.
+<p align="center">
+  A self-hosted, per-device-isolated proxy admin panel.<br>
+  Each device gets its own VLESS Reality + Hysteria2 inbound on your VPS, with byte-level traffic accounting,<br>
+  one-click HTTPS, optional Telegram-bot control, optional WebAuthn passkey — all under MIT license.
+</p>
 
-<!-- Status badges go here once the public release is announced (v0.2 candidates). -->
+<p align="center">
+  <a href="#-quick-start">Quick start</a> ·
+  <a href="./docs/guide.md">Guide</a> ·
+  <a href="./docs/architecture.md">Architecture</a> ·
+  <a href="./docs/api/">API</a> ·
+  <a href="./CHANGELOG.md">Changelog</a>
+</p>
 
 ---
 
-## ✨ What you get
+## ✨ Features
 
-- **Per-device inbounds** — every device has its own UUID + port pair. Leak one and
-  you revoke it without rotating everyone else. (`config/sing-box.json` is rewritten
-  per-device by `POST /api/devices/new`.)
-- **VLESS Reality + Hysteria2** — one TCP path, one UDP path. Reality hides the
-  inbound behind a real domain's TLS fingerprint (cloudflare / apple / microsoft
-  picked at install). Hy2 picks up when UDP is the only thing not throttled.
-- **5 subscription URL formats** per device, generated on the fly:
-  - URI list (sing-box / Shadowrocket "Type: Subscribe" / Hiddify)
-  - `clash.yaml` (Stash / Clash for iOS / Clash Verge)
-  - `merlin.yaml` (AsusWRT-Merlin Clash + `tun:` block)
-  - `shadowrocket.conf` (Surge `.conf` syntax)
-  - `sub.txt` (plain `.txt` extension alias)
-- **Real traffic accounting** — a worker polls sing-box's Clash API every 10 s and
-  buckets bytes per device per hour into SQLite. The SPA renders 7-day per-device
-  charts, an hourly heatmap, and a per-app-group breakdown (Video / Social / AI /
-  CDN / 游戏 / Music / ...). CSV export available.
-- **Username / password login** by default — the admin panel binds at
-  `/login/{random_12char_suffix}`, `/login` itself returns 404, and the URL-path
-  token is opt-in for automation (`features.url_token_bypass`). Rotate creds and
-  the login path from the **安全 / Security** page in the panel.
-- **HTTPS in the panel** — paste a domain in **HTTPS · 域名**, click 启用. The
-  panel installs Caddy from the Cloudsmith stable repo, requests Let's Encrypt,
-  writes a reverse-proxy `Caddyfile`, and reloads — typical 30 s. No SSH required.
-- **Manual IP bans** — wraps fail2ban with `backend=systemd` (Debian 13 has no
-  `/var/log/auth.log`), ban/unban from the panel or `POST /action/{block,unblock}`.
-- **Optional Telegram bot** — `/status`, `/devices`, `/traffic`, `/pause`,
-  `/resume`, `/bans` from your phone.
-- **Optional WebAuthn passkey** — Touch ID / Face ID / hardware key in addition
-  to the password (requires HTTPS).
-- **Three deploy paths** — bash one-shot, Docker Compose, or **Claude Code does
-  it for you** via the bundled skill.
+| | |
+| :--- | :--- |
+| 🔐 &nbsp; **Per-device inbounds** | Every device has its own UUID + TCP/UDP port pair. Revoke one device without rotating everyone else. |
+| 🌐 &nbsp; **VLESS Reality + Hysteria2** | TCP path hidden behind a real domain's TLS fingerprint; UDP path picks up when TCP is throttled. |
+| 📲 &nbsp; **5 subscription formats** | URI list · `clash.yaml` · `merlin.yaml` · `shadowrocket.conf` · `sub.txt` — generated on the fly per device. |
+| 📊 &nbsp; **Real traffic accounting** | Background worker polls sing-box's Clash API every 10 s. SQLite buckets bytes per device per hour and tags hosts into categories (Video / Social / AI / CDN / 游戏 / ...). |
+| 🔑 &nbsp; **Username + password login** | Login form at `/login/{random-12-char-suffix}` — `/login` itself returns 404 to deter brute-force bots. URL-path token is opt-in for automation. |
+| 🔒 &nbsp; **HTTPS in the panel** | Enter a domain → click 启用 → Caddy + Let's Encrypt provisioned in ~30 s. No SSH needed. |
+| 🌏 &nbsp; **Bilingual UI** | Topbar `中 / EN` toggle. ~80% English coverage with graceful Chinese fallback. Login form also bilingual via `?lang=`. |
+| 🤖 &nbsp; **Optional Telegram bot** | `/status` · `/devices` · `/traffic` · `/pause` · `/resume` · `/bans` from your phone. |
+| 🛡️ &nbsp; **Optional WebAuthn passkey** | Touch ID / Face ID / hardware key (requires HTTPS). |
+| 🚀 &nbsp; **Three deploy paths** | Bash one-shot · Docker Compose · Claude Code skill drives the install for you. |
+
+---
 
 ## 🚀 Quick start
 
-Pick the path that fits your setup.
-
-### Path A — `install.sh` (Debian / Ubuntu VPS, recommended)
+### Path A — `install.sh` &nbsp;<sub>(recommended, Debian / Ubuntu VPS)</sub>
 
 ```bash
 ssh root@<your-vps>
@@ -64,27 +51,25 @@ cd /opt/proxybox
 bash deploy/install.sh --lang en        # or --lang zh
 ```
 
-The script is idempotent. It auto-detects your public IP, generates a Reality
-keypair + Hy2 cert + a random 16-char admin password, configures fail2ban + 4
-systemd units, **auto-creates a first device** (default name `phone-1`, override
-via `PROXYBOX_FIRST_DEVICE=tablet-1`), and prints a self-contained handoff:
+The script is idempotent. It auto-detects the VPS public IP, generates a Reality keypair + Hy2 cert + random 16-char admin password, installs 4 systemd units, auto-creates a first device, and prints a self-contained handoff:
 
 ```
 🛡 admin credentials
-    login URL  http://<your-vps>:8080/login/<random-12char>
-    username   admin
-    password   <16-char alnum, BOLD RED in your terminal>
+   login URL  http://<your-vps>:8080/login/<random-12char>
+   username   admin
+   password   <16-char alnum>
 
 📲 subscription URLs (phone-1)
-    [pick this] http://<your-vps>:8080/api/sub/<sub-token>
-    [Clash]     http://<your-vps>:8080/api/sub/<sub-token>/clash.yaml
-    [router]    http://<your-vps>:8080/api/sub/<sub-token>/merlin.yaml
-    [fallback]  http://<your-vps>:8080/api/sub/<sub-token>/shadowrocket.conf
-    [.txt]      http://<your-vps>:8080/api/sub/<sub-token>/sub.txt
+   [pick this] http://<your-vps>:8080/api/sub/<sub-token>
+   [Clash]     http://<your-vps>:8080/api/sub/<sub-token>/clash.yaml
+   [router]    http://<your-vps>:8080/api/sub/<sub-token>/merlin.yaml
+   [fallback]  http://<your-vps>:8080/api/sub/<sub-token>/shadowrocket.conf
+   [.txt]      http://<your-vps>:8080/api/sub/<sub-token>/sub.txt
 ```
 
-Copy the login URL + credentials into a password manager **before refreshing**.
-The full password also lives in `/etc/proxybox/config.yaml` (`admin.password`).
+> [!IMPORTANT]
+> Copy the login URL + credentials into a password manager **before closing the terminal**.
+> They are also stored in `/etc/proxybox/config.yaml` (`admin.password` / `admin.login_path`).
 
 ### Path B — Docker Compose
 
@@ -96,13 +81,12 @@ docker compose exec proxybox-admin \
     sh -c 'grep -E "username|password|login_path" /etc/proxybox/config.yaml'
 ```
 
-The `bootstrap` container generates configs on first start; volumes preserve
-state across `docker compose down/up`. fail2ban is **not** included in this
-path — use Caddy + a host firewall for production. Pre-built multi-arch
-images (linux/amd64 + linux/arm64) are published at
-`ghcr.io/carlos0xx/proxybox:latest` for every release.
+A `bootstrap` container generates config on first start; volumes preserve state across `down`/`up`. Pre-built multi-arch images (linux/amd64 + linux/arm64) land at `ghcr.io/carlos0xx/proxybox:latest` on every release.
 
-### Path C — Claude Code does it ("proxybox-deploy" skill)
+> [!NOTE]
+> fail2ban and the HTTPS auto-provisioning UI are not included on the Docker path — pair with Caddy + a host firewall for production.
+
+### Path C — Claude Code
 
 ```bash
 mkdir -p ~/.claude/skills/proxybox-deploy
@@ -113,117 +97,114 @@ Then in a Claude Code session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-Claude walks through pre-flight checks, `git clone`, `install.sh`, and relays
-the credentials to you — same self-contained handoff as Path A.
+Claude walks through pre-flight, `git clone`, `install.sh`, and relays the credentials. See [`docs/deploy/claude-skill.md`](./docs/deploy/claude-skill.md).
+
+---
 
 ## 📐 Architecture
 
+```text
+┌─ Clients (iOS · Android · macOS · Windows) ───┐
+│  sing-box · Shadowrocket · Hiddify · Stash    │
+└───────────────────────┬───────────────────────┘
+                        │ VLESS Reality (TCP 11001-11050, per device)
+                        │ Hysteria2     (UDP 21001-21050, per device)
+                        ▼
+┌───────────────────────────────────────────────┐
+│                    VPS                        │
+│                                               │
+│  ┌─────────────────────────────────────────┐  │
+│  │  sing-box  (systemd)                    │◄─┼─ per-device Reality + Hy2 inbounds
+│  └────────────────┬────────────────────────┘  │
+│                   │ Clash API (127.0.0.1:9090)
+│  ┌────────────────▼────────────────────────┐  │
+│  │  proxybox-traffic-worker                │  │  bytes → traffic_log
+│  │   polls /connections + /traffic every   │  │  hosts → host_log
+│  │   10 s, writes to SQLite                │  │
+│  └─────────────────────────────────────────┘  │
+│                                               │
+│  ┌─────────────────────────────────────────┐  │
+│  │  proxybox-admin  (uvicorn / FastAPI)    │◄─┼─ admin API + SPA on :8080
+│  │   · /login/{secret}  — username+pwd     │  │
+│  │   · /admin/{token}/... — cookie + token │  │
+│  │   · /api/sub/{sub_token}[/format]       │  │  ← public subscription URLs
+│  │   · /api/https/enable {domain}          │  │  ← 1-click HTTPS provision
+│  │   · /api/admin/account, /login-path     │  │  ← credential rotation
+│  └─────────────────────────────────────────┘  │
+│                                               │
+│  ┌─────────────────────────────────────────┐  │
+│  │  caddy  (optional, v0.1.10+)            │  │  HTTPS reverse-proxy
+│  │   reverse_proxy 127.0.0.1:8080          │  │  Let's Encrypt auto-renew
+│  └─────────────────────────────────────────┘  │
+│                                               │
+│  ┌─────────────────────────────────────────┐  │
+│  │  proxybox-bot   (opt-in, Telegram)      │  │
+│  │  fail2ban       (manual IP jail)        │  │
+│  └─────────────────────────────────────────┘  │
+└───────────────────────────────────────────────┘
 ```
-┌─ Clients (iOS / Android / macOS / Win) ──────┐
-│  sing-box · Shadowrocket · Hiddify · Stash   │
-└──────────────────────┬───────────────────────┘
-                       │ VLESS Reality (TCP 11001-11050, per device)
-                       │ Hysteria2 (UDP 21001-21050, per device)
-                       ▼
-┌──────────────────────────────────────────────┐
-│                  VPS                         │
-│  ┌────────────────────────────────────────┐  │
-│  │  sing-box (systemd)                    │◄─┼─ Reality + Hy2 inbounds per device
-│  └──────────────────┬─────────────────────┘  │
-│                     │ Clash API (127.0.0.1:9090)
-│  ┌──────────────────▼─────────────────────┐  │
-│  │  proxybox-traffic-worker               │  │   bytes  → traffic_log
-│  │   polls /connections + /traffic        │  │   hosts  → host_log (v0.1.9+)
-│  │   every 10 s → SQLite                  │  │
-│  └────────────────────────────────────────┘  │
-│                                              │
-│  ┌────────────────────────────────────────┐  │
-│  │  proxybox-admin  (uvicorn / FastAPI)   │◄─┼─ admin API + SPA on :8080
-│  │  · 40+ admin endpoints                 │  │   ────────────
-│  │  · /login/{secret} username+password   │  │   login page (URL-path
-│  │  · /admin/{token}/...  with cookie     │  │     token alone is opt-in)
-│  │  · /api/sub/{sub_token}[/format]       │  │   public subscriptions
-│  │  · /api/https/enable {domain}          │  │   1-click HTTPS provision
-│  │  · /api/admin/account, /login-path     │  │   credential rotation
-│  └────────────────────────────────────────┘  │
-│                                              │
-│  ┌────────────────────────────────────────┐  │
-│  │  caddy (optional, v0.1.10+)            │  │   HTTPS reverse proxy with
-│  │   reverse_proxy 127.0.0.1:8080         │  │   Let's Encrypt auto-renew
-│  └────────────────────────────────────────┘  │
-│                                              │
-│  ┌────────────────────────────────────────┐  │
-│  │  proxybox-bot      (opt-in, Telegram)  │  │
-│  │  fail2ban          (manual IP jail)    │  │
-│  └────────────────────────────────────────┘  │
-└──────────────────────────────────────────────┘
-```
+
+Deep dive: [`docs/architecture.md`](./docs/architecture.md).
+
+---
 
 ## 🧩 Configuration
 
-Everything lives in `/etc/proxybox/config.yaml` (mode 0600, owned by root). See
-[`config.example.yaml`](./config.example.yaml) for the full schema with inline
-comments. Highlights:
+All settings live in `/etc/proxybox/config.yaml` (mode 0600, owned by root). Full schema with inline comments: [`config.example.yaml`](./config.example.yaml).
 
-| Key | What it sets |
+| Key | Effect |
 | --- | --- |
-| `admin.username` / `admin.password` | Browser login. install.sh generates a random 16-char password. |
-| `admin.login_path` | 12-char random suffix on `/login`. Empty = legacy `/login` (still works). |
-| `admin.token` | URL-path admin token (also a fallback API key when `features.url_token_bypass` is on). |
-| `server.public_host` | Public IP/domain baked into subscription URIs. install.sh auto-fills; `enable-https.sh` rewrites to your domain. |
-| `ports.vless_range` / `hy2_range` | Per-device port pools (default 11001-11050 TCP / 21001-21050 UDP). |
+| `admin.username` / `admin.password` | Browser login. `install.sh` generates a random 16-char password. |
+| `admin.login_path` | 12-char random suffix on `/login`. Empty = legacy `/login` works. |
+| `admin.token` | URL-path admin token. Also accepted as an API key when `features.url_token_bypass` is on. |
+| `server.public_host` | Baked into subscription URIs. Auto-filled by `install.sh`; `enable-https.sh` rewrites to your domain. |
+| `ports.vless_range` / `hy2_range` | Per-device port pools (default `11001-11050 TCP` / `21001-21050 UDP`). |
 | `clash.api_url` | sing-box Clash API endpoint (default `127.0.0.1:9090`). |
 | `worker.poll_interval` / `retention_days` | Traffic accounting cadence + retention. |
 | `features.passkey` / `features.bot` | Opt-in WebAuthn / Telegram bot. |
-| `features.url_token_bypass` | When true, the URL-path token alone authenticates. **Default false** — login form required. |
+| `features.url_token_bypass` | When `true`, URL-path token alone authenticates. **Default `false`** — login form required. |
 | `services.monitored` | Which systemd units `GET /api/status` reports on. |
+
+---
 
 ## 🔐 Security model
 
-- **No SaaS dependency.** Everything runs on the user's VPS; no phone-home, no
-  shared control plane.
-- **Username + password login (default)** with a session cookie issued by
-  `/login/{random-suffix}`. The `/login` path itself 404s — bots probing common
-  paths can't even confirm the form exists.
-- **Per-device credentials.** Leaking one device's UUID/Hy2 password doesn't
-  affect others. Revoke + regen-subs cleanly cuts off compromised devices.
-- **Constant-time secret comparison** (`secrets.compare_digest`) on every
-  credential check.
-- **Atomic config writes** — config rotation uses tmp+rename so an aborted
-  process can never leave a truncated `config.yaml`.
-- **HTTP by default.** Wrap with Caddy + Let's Encrypt for production. The
-  HTTPS panel does this in one click; the `enable-https.sh` CLI does the same
-  thing for scripted installs.
-- **All admin endpoints require both the session cookie AND a matching URL-path
-  token.** Defense-in-depth — a stolen cookie can't be replayed against an
-  instance on a different host.
+- **No SaaS dependency.** Everything runs on the user's VPS — no phone-home, no shared control plane.
+- **Username + password by default.** Session cookie issued by `/login/{random-suffix}`. The bare `/login` path 404s — bots probing common paths can't even confirm the form exists.
+- **Per-device credentials.** Leaking one device's UUID/Hy2 password doesn't affect others. Revoke + regen-subs cleanly cuts off compromised devices.
+- **Constant-time secret comparison** (`secrets.compare_digest`) on every credential check.
+- **Atomic config writes** — `config.yaml` rotation uses `tmp + rename`; an aborted process can never leave a truncated config.
+- **HTTP by default**, HTTPS one click away via the admin UI or `deploy/enable-https.sh <domain>`.
+- **Defense in depth** — every admin endpoint requires *both* a valid session cookie AND a matching URL-path token. A stolen cookie can't be replayed against an instance on a different host.
 
-## 🛣️ Status
+---
+
+## 🛣️ Releases
 
 | Version | Highlights |
 | --- | --- |
-| v0.1.0 | initial release: install.sh, Docker, Claude skill, 34 admin endpoints, 5 GHA workflows |
-| v0.1.1 → v0.1.5 | SPA reconciliation with the v0.1.x server (BWG-port migration), multi-format subscription URLs, real `/api/connections` proxy |
-| v0.1.6 | username/password login + URL-token bypass off by default |
-| v0.1.7 → v0.1.8 | history page hardening, clipboard works on HTTP, roomier sub-link layout |
-| v0.1.9 | host categorisation (default-on), `enable-https.sh` CLI |
-| v0.1.10 | **HTTPS provisioning from the admin UI** |
-| v0.1.11 | change username / password / rotate login path from the admin UI |
-| v0.1.12 | copy-button quote-collision fix; clipboard fallback hardened |
-| v0.2 (planned) | SPA English translation · passkey browser E2E · demo screencast |
+| **v0.2.0** | Bilingual SPA + login form. Topbar `中 / EN` switcher. |
+| v0.1.10 → v0.1.12 | HTTPS provisioning from the UI · username/password & login-path rotation in the panel · clipboard fixes |
+| v0.1.7 → v0.1.9 | History page hardening · 5-format subscription URLs · host categorisation default-on |
+| v0.1.6 | Username/password login replaces URL-token-only auth as the default |
+| v0.1.1 → v0.1.5 | SPA reconciliation after the v0.1.x BWG → ProxyBox port · `/api/connections` proxy |
+| v0.1.0 | Initial release — install.sh, Docker, Claude skill, 5 GHA workflows, 7-check release audit |
 
-`scripts/release-audit.sh` enforces 7 gates on every tag: clean tree, PII
-blocklist on tracked files, gitleaks on git history, identity check on
-commit metadata, blocklist on commit-message bodies, version sanity,
-CHANGELOG presence.
+Per-release detail in [`CHANGELOG.md`](./CHANGELOG.md). The `scripts/release-audit.sh` gate enforces clean tree · PII blocklist · gitleaks · committer identity · commit-message blocklist · version sanity · CHANGELOG presence on every tag.
 
-## 📖 More docs
+---
 
-- [`docs/guide.md`](./docs/guide.md) — install + day-to-day usage walkthrough.
-- [`docs/architecture.md`](./docs/architecture.md) — full architecture deep dive.
-- [`docs/api/`](./docs/api/) — endpoint reference per router.
-- [`docs/deploy/`](./docs/deploy/) — deploy paths in detail.
-- [`CHANGELOG.md`](./CHANGELOG.md) — per-version changes (Keep-a-Changelog).
+## 📖 Documentation
+
+| | |
+| --- | --- |
+| [Guide](./docs/guide.md) | Install + day-to-day usage walkthrough |
+| [Architecture](./docs/architecture.md) | Service-by-service deep dive |
+| [API](./docs/api/) | Per-router endpoint reference |
+| [Deploy](./docs/deploy/) | The three deploy paths in detail |
+| [Changelog](./CHANGELOG.md) | Per-version changes (Keep-a-Changelog) |
+
+---
 
 ## 📜 License
 

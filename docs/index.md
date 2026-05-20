@@ -1,13 +1,17 @@
 ---
 layout: home
+
 hero:
   name: ProxyBox
   text: Per-device isolated proxy panel
-  tagline: VLESS Reality + Hysteria2, per-device inbounds, byte-level accounting, all on your VPS.
+  tagline: VLESS Reality + Hysteria2 · byte-level accounting · 1-click HTTPS · MIT
   actions:
     - theme: brand
-      text: Quick start →
-      link: /getting-started
+      text: Get started →
+      link: /guide
+    - theme: alt
+      text: Architecture
+      link: /architecture
     - theme: alt
       text: GitHub
       link: https://github.com/carlos0xx/proxybox
@@ -15,25 +19,37 @@ hero:
 features:
   - icon: 🔐
     title: Per-device credentials
-    details: Each device gets its own UUID + ports. Revoke one without touching the others.
+    details: Every device has its own UUID + TCP/UDP port pair. Revoke one without touching the others. No shared subscriptions, no collateral damage.
 
   - icon: 📊
     title: Real traffic accounting
-    details: Background worker polls sing-box's Clash API, aggregates byte counts per UTC hour into SQLite. SPA shows 7-day chart per device + CSV export.
+    details: Background worker polls sing-box's Clash API every 10 seconds. SQLite buckets bytes per device per hour and tags hosts into Video / Social / AI / CDN categories.
+
+  - icon: 🔑
+    title: Username + password login
+    details: Login form at /login/{random-12-char-suffix}; /login itself 404s. URL-path token is opt-in for automation. Change creds + rotate the login path from the panel — no SSH.
+
+  - icon: 🔒
+    title: 1-click HTTPS
+    details: Enter your domain, click 启用 HTTPS. The panel installs Caddy, fetches a Let's Encrypt cert, and reloads — ~30 seconds end to end.
+
+  - icon: 📲
+    title: 5 subscription formats
+    details: URI list (default) · clash.yaml · merlin.yaml · shadowrocket.conf · sub.txt. All generated on the fly per device — sing-box · Shadowrocket · Stash · Clash · Hiddify all work.
+
+  - icon: 🌏
+    title: Bilingual UI
+    details: Topbar 中 / EN toggle. ~80% English coverage with graceful Chinese fallback. Login form also localised via ?lang=.
 
   - icon: 🤖
+    title: Telegram bot (optional)
+    details: /status · /devices · /traffic · /pause · /resume · /bans from your phone. Opt-in, runs as its own systemd service.
+
+  - icon: 🚀
     title: Three deploy paths
-    details: install.sh on Debian/Ubuntu, docker-compose anywhere, or let Claude Code drive the install via the bundled skill.
-
-  - icon: 🛡️
-    title: Optional passkey login
-    details: WebAuthn (Touch ID / hardware key) as an alternative to the URL-path admin token. Off by default, flip features.passkey to enable.
-
-  - icon: 📱
-    title: Telegram bot control
-    details: /status, /devices, /traffic, /pause, /resume, /bans from your phone. Opt-in, runs as its own systemd service.
+    details: install.sh on Debian / Ubuntu, docker-compose anywhere, or let Claude Code drive the install via the bundled skill.
 
   - icon: 🏠
-    title: Designed for home use
-    details: No SaaS, no API keys, no telemetry. Single VPS deploys family proxy infrastructure in under 10 minutes.
+    title: Self-hosted, no SaaS
+    details: Everything runs on the user's VPS. No phone-home, no API keys, no telemetry. Single VPS deploys family proxy infrastructure in under 10 minutes.
 ---

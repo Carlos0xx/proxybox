@@ -1,89 +1,132 @@
 # Getting started
 
-ProxyBox runs on a single VPS. It binds three TCP ports (8080 admin, 11001-11050
-for VLESS, 21001-21050 for Hysteria2 UDP) and serves clients that speak
-sing-box-compatible protocols.
+> Install ProxyBox on a fresh VPS, log in, get the first client routing through it — typically under 10 minutes.
+
+For a higher-level walkthrough of day-to-day operations after install, see [`guide.md`](./guide.md). For the architecture, see [`architecture.md`](./architecture.md).
+
+---
 
 ## Prerequisites
 
-- Debian 12+ or Ubuntu 22.04+ VPS (Docker path also works on macOS dev machines)
-- SSH access with root (or sudo without password prompt)
-- At least 1 GB RAM and 5 GB free disk
-- Open ports on the VPS firewall: 8080 (admin), 11001-11050 (TCP, VLESS),
-  21001-21050 (UDP, Hy2)
+| Requirement | Detail |
+| --- | --- |
+| **OS** | Debian 12 / 13 or Ubuntu 22.04 / 24.04 / 26.04 — clean install. |
+| **Access** | Root SSH (the installer uses `apt` + `systemctl`). |
+| **Resources** | ≥ 1 GB RAM · ≥ 5 GB free disk. |
+| **Required ports** | `8080/tcp` (admin) · `11000-11050/tcp` (VLESS) · `21000-21050/udp` (Hysteria2). |
+| **For HTTPS later** | A domain pointing at the VPS · `80/tcp` + `443/tcp` open. Optional but recommended for production. |
 
-## Path 1 — `install.sh` (recommended for Linux VPS)
+---
+
+## Path 1 — `install.sh` &nbsp;<sub>(recommended for Linux VPS)</sub>
 
 ```bash
+ssh root@<your-vps>
+apt-get update && apt-get install -y git curl ca-certificates
 git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox
-sudo bash deploy/install.sh
+bash deploy/install.sh --lang en        # --lang zh for Chinese output
 ```
 
-The installer:
+The installer is idempotent — safe to re-run mid-way. It performs:
 
-1. `apt install` python3-venv + curl + fail2ban + sqlite3 + openssl
-2. Pulls latest `sing-box` from GitHub releases (auto-detects amd64/arm64)
-3. Generates Reality keypair, Hy2 self-signed cert, random SNI from a public-domain pool
-4. Writes `/etc/sing-box/config.json` and `/etc/proxybox/config.yaml`
-5. Provisions four systemd units (sing-box, proxybox-admin, proxybox-traffic-worker, fail2ban)
-6. Starts everything
+1. **Pre-flight validation** via `deploy/check-prereqs.sh` (9 categories: OS, arch, privilege, RAM, disk, network, systemd, ports, apt deps).
+2. **apt install** of runtime dependencies (`python3-venv`, `curl`, `sqlite3`, `openssl`, `fail2ban`).
+3. **sing-box** — pulls the latest stable binary from GitHub releases (auto-detects amd64 / arm64).
+4. **Crypto generation** — Reality keypair, Hy2 self-signed cert, random SNI from a public-domain pool (`www.microsoft.com` / `apple.com` / `cloudflare.com` / `amazon.com`).
+5. **Config writes** — `/etc/sing-box/config.json` and `/etc/proxybox/config.yaml` (mode 0600, root-owned).
+6. **systemd units** — `sing-box`, `proxybox-admin`, `proxybox-traffic-worker`, `proxybox-bot` (bot stays disabled until configured).
+7. **Auto-create the first device** — default name `phone-1` (override with env var `PROXYBOX_FIRST_DEVICE=<name>`).
+8. **Print the handoff** — the login URL, username, password, and 5 subscription URLs in a single self-contained block.
 
-Re-running is safe — every step is gated by `[ ! -f ... ]` or `if ! command -v ... `.
+> [!IMPORTANT]
+> Copy the credentials into a password manager **before closing the terminal**. They are also stored in `/etc/proxybox/config.yaml` under `admin.username` / `admin.password` / `admin.login_path`.
+
+Full reference: [`deploy/install-sh.md`](./deploy/install-sh.md).
+
+---
 
 ## Path 2 — Docker Compose
 
 ```bash
 git clone https://github.com/carlos0xx/proxybox && cd proxybox
 docker compose up -d
+docker compose exec proxybox-admin \
+    sh -c 'grep -E "username|password|login_path" /etc/proxybox/config.yaml'
 ```
 
-The compose stack uses a one-shot `bootstrap` container to generate configs
-before the runtime services start. Volumes persist across restarts.
+A one-shot `bootstrap` container generates `config.yaml` on first start. Volumes preserve state across `docker compose down`/`up`.
 
-To also start the Telegram bot:
+To also run the Telegram bot:
 
 ```bash
-# fill BOT_TOKEN + TG_ALLOWED_USERS + ADMIN_TOKEN into /etc/proxybox/bot.env first
+# fill BOT_TOKEN + TG_ALLOWED_USERS into /etc/proxybox/bot.env first
 docker compose --profile bot up -d proxybox-bot
 ```
 
-Limitations of the Docker path:
+| Limitation | Workaround |
+| --- | --- |
+| No fail2ban (host iptables not exposed to containers). | Use the host firewall + your provider's edge filter. |
+| No automatic Caddy / HTTPS provisioning. | Pair with an external Caddy / nginx / Cloudflare Tunnel in front of port 8080. |
 
-- No fail2ban (host iptables not exposed to containers)
-- No automatic Caddy / HTTPS termination
+Full reference: [`deploy/docker.md`](./deploy/docker.md).
+
+---
 
 ## Path 3 — Claude Code
 
-If you have Claude Code installed:
+If you use Claude Code, install the bundled skill once:
 
 ```bash
 mkdir -p ~/.claude/skills/proxybox-deploy
 cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 ```
 
-Then ask Claude:
+Then ask Claude in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-Claude walks through pre-flight checks, ships the code, runs `install.sh`,
-verifies all four services, and reports back the admin URL (with token
-masked to first 8 chars).
+Claude runs the same pre-flight checks, `git clone`s the repo, runs `install.sh`, verifies all four services, and relays the credentials. Full reference: [`deploy/claude-skill.md`](./deploy/claude-skill.md).
 
-## After install — first device
+---
 
-1. SSH in and read your admin token: `grep token /etc/proxybox/config.yaml`
-2. Open `http://<your-vps>:8080/admin/<token>/` in a browser
-3. Click "+ 添加设备", give it a name like `my-phone`
-4. Copy the subscription URL shown in the response
-5. Paste into a sing-box-compatible client (Shadowrocket on iOS,
-   sing-box-for-android, Hiddify Next on desktop, etc.) as a **subscription
-   URL** (not a single node)
-6. Open the configured proxy and visit `https://ifconfig.me` — should
-   return your VPS IP, not your home IP
+## First-time login
+
+1. **Open the login URL** the installer printed — `http://<your-vps>:8080/login/<random-12char>`.
+
+   > [!NOTE]
+   > `/login` alone returns **404**. The random suffix is by design — it stops bots that brute-force common paths from even confirming a form exists.
+
+2. **Enter `admin` + the printed password.** A session cookie is set for 30 days; you land in the SPA.
+
+3. **The first device is already created** (`phone-1` by default). Open **订阅链接 / Endpoints** in the side nav. Five URLs are listed:
+
+   | Format | Best for |
+   | --- | --- |
+   | `[pick this]` (default URI list) | sing-box · Shadowrocket "Type: Subscribe" · Hiddify |
+   | `clash.yaml` | Stash · Clash for iOS · Clash Verge |
+   | `merlin.yaml` | AsusWRT-Merlin routers with Clash |
+   | `shadowrocket.conf` | Shadowrocket native parser (fallback) |
+   | `sub.txt` | Clients that key on file extension |
+
+4. **Paste the matching URL** into the client's "Add subscription" dialog. The client downloads the URI list; the proxy is active.
+
+5. **Verify** — open `https://ifconfig.me` from the client device. It should now report your VPS's IP, not your home ISP's.
+
+---
 
 ## Next steps
 
-- [Set up Caddy + Let's Encrypt](./deploy/install-sh#https-with-caddy) for HTTPS
-- [Enable passkey login](./deploy/install-sh#passkey) (requires HTTPS)
-- [Configure the Telegram bot](./deploy/install-sh#telegram-bot)
+- **Day-to-day operations** — add devices, rotate URLs, pause a device, change credentials: [`guide.md`](./guide.md).
+- **Turn on HTTPS** — paste a domain into the panel's "HTTPS · 域名" page: [`deploy/install-sh.md`](./deploy/install-sh.md#https-with-caddy).
+- **Wire up Telegram** — control devices from your phone: [`deploy/install-sh.md`](./deploy/install-sh.md#telegram-bot).
+- **Switch UI language** — `中 / EN` toggle in the topbar.
+
+---
+
+## See also
+
+- [Guide](./guide.md) · day-to-day usage
+- [Architecture](./architecture.md) · how the four processes coordinate
+- [API endpoints](./api/endpoints.md) · per-router reference
+- [← Back to README](../README.md)
