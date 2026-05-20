@@ -3106,34 +3106,81 @@ async function loadSubs() {
     const baseUrl = `${origin}/api/sub/${dev.sub_token}`;
     const displayName = dev.label || dev.name;
     const kindIcon = {router:'🌐', mobile:'📱', tablet:'📱', laptop:'💻', other:'📦'}[dev.kind] || '📦';
+    // Each format card: title row (tag + desc) on top, full URL on its own
+    // line with a wide copy button. Roomier than the original 3-col grid;
+    // text scales up so it reads cleanly without zooming.
     const rows = formats.map(f => {
       const fullUrl = `${baseUrl}${f.file}`;
-      const preferClass = f.prefer ? 'sub-row-prefer' : '';
-      return `<div class="sub-row ${preferClass}" style="display:grid; grid-template-columns: 110px 1fr auto; gap:var(--space-3); padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--border-subtle); align-items:center;">
-        <div style="font-family:var(--font-mono); font-size:var(--text-xs); ${f.prefer ? 'color:var(--accent); font-weight:var(--weight-semibold);' : 'color:var(--text-3);'}" title="${escapeHtml(f.desc)}">${f.prefer ? '✦ ' : ''}${escapeHtml(f.tag)}</div>
-        <div class="mono" style="font-size:var(--text-xs); color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>
-        <button class="btn btn-xs" onclick="copyText(this, ${JSON.stringify(fullUrl)})">复制</button>
+      const tagColor = f.prefer ? 'color:var(--accent); font-weight:var(--weight-bold);' : 'color:var(--text-1); font-weight:var(--weight-semibold);';
+      const cardBg = f.prefer ? 'background:var(--accent-bg); border-color:var(--accent-border);' : 'background:var(--bg-elevated);';
+      return `<div style="padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--border-subtle); ${cardBg}">
+        <div style="display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); flex-wrap:wrap;">
+          <span style="font-size:var(--text-sm); ${tagColor}">${f.prefer ? '✦ ' : ''}${escapeHtml(f.tag)}</span>
+          <span style="font-size:var(--text-sm); color:var(--text-3);">${escapeHtml(f.desc)}</span>
+        </div>
+        <div style="display:flex; gap:var(--space-3); align-items:center;">
+          <div class="mono" style="flex:1; min-width:0; font-size:var(--text-sm); color:var(--text-1); padding:var(--space-3) var(--space-4); background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; user-select:all;" title="${escapeHtml(fullUrl)}">${escapeHtml(fullUrl)}</div>
+          <button class="btn btn-sm ${f.prefer ? 'btn-primary' : ''}" style="flex-shrink:0; min-width:84px;" onclick="copyText(this, ${JSON.stringify(fullUrl)})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            复制
+          </button>
+        </div>
       </div>`;
     }).join('');
-    return `<div class="device-sub-block" style="margin-bottom:var(--space-4); border:1px solid var(--border-default); border-radius:var(--radius-md); overflow:hidden;">
-      <div style="padding:var(--space-3) var(--space-4); background:var(--surface-2); border-bottom:1px solid var(--border-default);">
-        <div style="font-weight:var(--weight-semibold); font-size:var(--text-base);">${kindIcon} ${escapeHtml(displayName)}</div>
-        <div class="mono" style="font-size:var(--text-xs); color:var(--text-4); margin-top:2px;">${escapeHtml(dev.name)} · sub_token ${escapeHtml(dev.sub_token.slice(0,8))}…</div>
+    return `<div class="device-sub-block" style="margin-bottom:var(--space-5); border:1px solid var(--border-default); border-radius:var(--radius-md); overflow:hidden;">
+      <div style="padding:var(--space-4) var(--space-5); background:var(--surface-2); border-bottom:1px solid var(--border-default);">
+        <div style="display:flex; align-items:baseline; gap:var(--space-3); flex-wrap:wrap;">
+          <span style="font-weight:var(--weight-semibold); font-size:var(--text-lg);">${kindIcon} ${escapeHtml(displayName)}</span>
+          <code class="mono" style="font-size:var(--text-xs); color:var(--text-4); background:var(--bg-canvas); padding:2px 8px; border-radius:var(--radius-sm);">${escapeHtml(dev.name)}</code>
+          <span class="mono" style="font-size:var(--text-xs); color:var(--text-4);">sub_token ${escapeHtml(dev.sub_token.slice(0,8))}…</span>
+        </div>
       </div>
       ${rows}
     </div>`;
   }).join('');
 }
 
-function copyText(btn, text) {
-  navigator.clipboard.writeText(text).then(() => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> 已复制';
-    btn.style.color = 'var(--accent)';
-    btn.style.borderColor = 'var(--accent-border)';
-    toast.success('已复制', '订阅 URL 已复制到剪贴板');
-    setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1500);
-  }).catch(e => toast.error('复制失败', e.message));
+// Clipboard helper with HTTP fallback: navigator.clipboard only works in
+// a "secure context" (HTTPS or localhost). The admin panel is plain HTTP
+// by default, so a textarea + execCommand fallback handles every browser
+// that does NOT meet the secure-context requirement.
+async function _writeClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      // fall through to legacy path
+    }
+  }
+  // Legacy fallback for HTTP / file: contexts.
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-9999px';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+
+async function copyText(btn, text) {
+  const ok = await _writeClipboard(text);
+  if (!ok) {
+    toast.error('复制失败', '请手动选中 URL 后 Cmd+C / Ctrl+C 复制');
+    return;
+  }
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> 已复制';
+  btn.style.color = 'var(--accent)';
+  btn.style.borderColor = 'var(--accent-border)';
+  toast.success('已复制', '已写入剪贴板');
+  setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 1500);
 }
 
 async function rotateToken() {
@@ -3374,25 +3421,41 @@ function renderHistoryDevice(d) {
   const rx = (d.daily || []).reduce((a, x) => a + (x.rx || 0), 0);
   const tx = (d.daily || []).reduce((a, x) => a + (x.tx || 0), 0);
 
+  // v0.1.x doesn't track per-host or per-app traffic (CONSTRAINTS §3 —
+  // BWG's host-fingerprint dict is intentionally dropped). Server returns
+  // d.hosts = [] / d.apps = []; surface that to the user as a clear "by
+  // design" note rather than a generic 0 / 暂无数据.
+  const HOSTS_DEFERRED = '<span style="color:var(--text-4);">—</span>';
   $('hist-total').innerHTML = fmtBytesHTML(total);
-  $('hist-total-sub').textContent = `${d.hosts.length} 域名 · ${d.daily.length || 0} 天有数据`;
+  $('hist-total-sub').textContent = `${d.daily.length || 0} 天有数据 · 域名 / App 维度 v0.2 待实现`;
   $('hist-rx').innerHTML = fmtBytesHTML(rx);
   $('hist-tx').innerHTML = fmtBytesHTML(tx);
-  $('hist-hosts').innerHTML = `${d.hosts.length}<span class="unit">个</span>`;
+  $('hist-hosts').innerHTML = HOSTS_DEFERRED;
 
-  // App chart (multi-color)
-  const appMax = Math.max(...(d.apps || []).map(a => a.total), 1);
-  $('hist-app-chart').innerHTML = (d.apps || []).map(a => {
-    const pct = (a.total / total * 100);
-    const widthPct = Math.max(0.5, a.total / appMax * 100);
-    const isTiny = pct < 0.5;
-    const key = appKey(a.app_group);
-    return `<div class="h-bar-row">
-      <div class="h-bar-label">${escapeHtml(a.app_group)}</div>
-      <div class="h-bar-track"><div class="h-bar-fill ${isTiny ? 'tiny' : ''}" data-app="${key}" style="width: ${widthPct.toFixed(1)}%"></div></div>
-      <div class="h-bar-value">${fmtBytes(a.total)} <span class="pct">${pct.toFixed(0)}%</span></div>
-    </div>`;
-  }).join('') || '<div class="empty-state"><span class="empty-icon">📊</span><div class="empty-desc">暂无数据</div></div>';
+  // App chart — empty in v0.1.x. Show explicit "deferred" message instead
+  // of generic "暂无数据" so users know it's not a bug.
+  const appsList = d.apps || [];
+  const appMax = Math.max(...appsList.map(a => a.total), 1);
+  $('hist-app-chart').innerHTML = appsList.length
+    ? appsList.map(a => {
+        const pct = (a.total / total * 100);
+        const widthPct = Math.max(0.5, a.total / appMax * 100);
+        const isTiny = pct < 0.5;
+        const key = appKey(a.app_group);
+        return `<div class="h-bar-row">
+          <div class="h-bar-label">${escapeHtml(a.app_group)}</div>
+          <div class="h-bar-track"><div class="h-bar-fill ${isTiny ? 'tiny' : ''}" data-app="${key}" style="width: ${widthPct.toFixed(1)}%"></div></div>
+          <div class="h-bar-value">${fmtBytes(a.total)} <span class="pct">${pct.toFixed(0)}%</span></div>
+        </div>`;
+      }).join('')
+    : `<div class="empty-state" style="padding:32px 16px;">
+        <span class="empty-icon">🔒</span>
+        <div class="empty-desc">App 维度统计 · v0.2 待实现</div>
+        <div style="font-size:var(--text-xs); color:var(--text-4); margin-top:8px; line-height:1.6;">
+          v0.1.x 只记录每设备每小时的字节总数,不解析 SNI / DNS 域名。<br>
+          (CONSTRAINTS §3: 出于隐私考虑, 主机指纹字典已从 BWG 移除)
+        </div>
+      </div>`;
 
   // Daily chart with placeholder days
   const daysCount = parseInt($('hist-days').value);
@@ -3807,16 +3870,19 @@ function promptDialog({title, body='', label='', initial='', placeholder='', con
   });
 }
 
-function copySubUrl(btn, url, label) {
-  navigator.clipboard.writeText(url).then(() => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> 已复制';
-    setTimeout(() => { btn.innerHTML = orig; }, 1200);
-    toast.success('已复制', label);
-  }).catch(e => toast.error('复制失败', e.message));
+async function copySubUrl(btn, url, label) {
+  const ok = await _writeClipboard(url);
+  if (!ok) {
+    toast.error('复制失败', '请手动选中 URL 后 Cmd+C / Ctrl+C 复制');
+    return;
+  }
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> 已复制';
+  setTimeout(() => { btn.innerHTML = orig; }, 1200);
+  toast.success('已复制', label);
 }
 
-function copyAllSubUrls(baseUrl) {
+async function copyAllSubUrls(baseUrl) {
   const lines = [
     `default (sing-box / Shadowrocket): ${baseUrl}`,
     `clash.yaml:        ${baseUrl}/clash.yaml`,
@@ -3824,9 +3890,9 @@ function copyAllSubUrls(baseUrl) {
     `shadowrocket.conf: ${baseUrl}/shadowrocket.conf`,
     `sub.txt:           ${baseUrl}/sub.txt`,
   ];
-  navigator.clipboard.writeText(lines.join('\n'))
-    .then(() => toast.success('全部已复制', '5 个 URL'))
-    .catch(e => toast.error('复制失败', e.message));
+  const ok = await _writeClipboard(lines.join('\n'));
+  if (ok) toast.success('全部已复制', '5 个 URL');
+  else toast.error('复制失败', '请手动选中后 Cmd+C / Ctrl+C');
 }
 
 async function renameDevicePrompt(name, currentLabel) {

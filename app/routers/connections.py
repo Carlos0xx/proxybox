@@ -52,10 +52,7 @@ def _fetch_json(path: str, *, stream: bool = False) -> dict[str, Any]:
     """
     try:
         with urllib.request.urlopen(f"{CLASH_API}{path}", timeout=_TIMEOUT) as resp:
-            if stream:
-                raw = resp.readline()
-            else:
-                raw = resp.read()
+            raw = resp.readline() if stream else resp.read()
         if not raw:
             return {}
         return json.loads(raw.split(b"\n", 1)[0])

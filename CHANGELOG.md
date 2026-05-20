@@ -5,6 +5,38 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.8] — clipboard works on HTTP; 订阅链接 layout roomier; apps/hosts deferred-by-design
+
+### Fixed
+- **Copy buttons silently failed on HTTP**. `navigator.clipboard` only
+  works in a "secure context" (HTTPS or `localhost`). With the admin
+  panel on plain HTTP, copies fell into the `.catch()` toast with no
+  recovery. Added `_writeClipboard()` helper that uses
+  `navigator.clipboard` when available and falls back to a hidden
+  `<textarea>` + `document.execCommand('copy')` for HTTP contexts.
+  All three copy paths (`copyText` / `copySubUrl` / `copyAllSubUrls`)
+  now use it.
+- **CI lint failure** — ruff SIM108 on the `_fetch_json(stream)` branch
+  in `app/routers/connections.py`. Collapsed to a ternary.
+
+### Changed
+- **`订阅链接` layout redesigned**. Previously a tight 3-column grid
+  (`tag | URL | button` at `text-xs`). Now each format row is a
+  vertical card: tag + description on top, full URL in its own
+  monospace input-style box with proper padding, fixed-width copy
+  button. Recommended row gets accent background + bolded tag instead
+  of just an ✦ glyph. Easier to read on phones + the URL doesn't crowd
+  the copy button.
+
+### Notes (not a code bug — clearer messaging)
+- **`设备历史` → 按 App 类型 / 访问域名** show no rows because v0.1.x
+  intentionally doesn't track per-host or per-app traffic (BWG's
+  host-fingerprint dictionary is intentionally dropped per CONSTRAINTS
+  §3 for privacy). Replaced generic "暂无数据" with an explicit
+  "App 维度统计 · v0.2 待实现" card explaining the design choice.
+  The "访问域名 N 个" KPI now reads "—" rather than "0 个" so it's
+  visibly distinct from a real zero.
+
 ## [v0.1.7] — SPA history pages no longer crash; logs hide uninstalled services
 
 ### Fixed
