@@ -1,0 +1,97 @@
+# ProxyBox docker-compose stack.
+#
+# Quick start (Linux host):
+#   docker compose up -d         # admin + worker + sing-box
+#   docker compose --profile bot up -d   # also start TG bot
+#
+# Read the admin token after first start:
+#   docker compose exec proxybox-admin cat /etc/proxybox/config.yaml | grep token
+#
+# Limitations vs install.sh: no fail2ban (host-level iptables not exposed
+# into container), no passkey (HTTPS reverse proxy not bundled). Pair this
+# compose stack with Caddy + Let's Encrypt for production.
+
+services:
+
+  # One-shot: generate /etc/sing-box/config.json + /etc/proxybox/config.yaml
+  # on first start. Exits 0 immediately if both files already exist.
+  bootstrap:
+    build:
+      context: .
+    image: proxybox:local
+    restart: "no"
+    command: ["python", "-m", "app.bootstrap"]
+    volumes:
+      - proxybox-config:/etc/proxybox
+      - singbox-config:/etc/sing-box
+
+  sing-box:
+    image: ghcr.io/sagernet/sing-box:latest
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - singbox-config:/etc/sing-box
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+
+  proxybox-admin:
+    image: proxybox:local
+    pull_policy: never
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      - PROXYBOX_CONFIG=/etc/proxybox/config.yaml
+    volumes:
+      - proxybox-config:/etc/proxybox
+      - proxybox-data:/var/lib/proxybox
+      - proxybox-sub:/var/www/proxybox-sub
+      - singbox-config:/etc/sing-box:ro
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+
+  proxybox-traffic-worker:
+    image: proxybox:local
+    pull_policy: never
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      proxybox-admin:
+        condition: service_started
+    environment:
+      - PROXYBOX_CONFIG=/etc/proxybox/config.yaml
+    volumes:
+      - proxybox-config:/etc/proxybox:ro
+      - proxybox-data:/var/lib/proxybox
+      - singbox-config:/etc/sing-box:ro
+    command: ["python", "-m", "app.workers.traffic"]
+
+  # Opt-in: enable with `docker compose --profile bot up -d`. Requires
+  # /etc/proxybox/bot.env to contain BOT_TOKEN + TG_ALLOWED_USERS + ADMIN_TOKEN.
+  proxybox-bot:
+    image: proxybox:local
+    pull_policy: never
+    profiles: ["bot"]
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      proxybox-admin:
+        condition: service_started
+    env_file:
+      - /etc/proxybox/bot.env
+    command: ["python", "-m", "bot"]
+
+volumes:
+  proxybox-config:
+  proxybox-data:
+  proxybox-sub:
+  singbox-config:
