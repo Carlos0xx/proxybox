@@ -2253,7 +2253,7 @@ a:hover { color: var(--accent-hover); }
           <p><strong>注册:</strong>点上方"注册当前设备",系统会弹 Touch ID,确认后这台 Mac 的指纹就能登录后台了。iPhone 通过 iCloud Keychain 同步,Face ID 也能登。</p>
           <p><strong>登录:</strong>下次开后台直接访问 <code style="background:var(--bg-canvas);padding:1px 6px;border-radius:3px;">https://your-domain.com/admin/</code>(不带 token),会跳到登录页 → 自动弹 Touch ID。</p>
           <p><strong>登出:</strong>点上方"登出"清除 session,下次打开后台会重新要 Touch ID。</p>
-          <p><strong>应急:</strong>Passkey 私钥只在你 Mac / iPhone 的 Secure Enclave 里,服务器不存。两台设备都丢了 → 用 SSH 看 <code style="background:var(--bg-canvas);padding:1px 6px;border-radius:3px;">/etc/proxy-bot/env</code> 里的 ADMIN_TOKEN,然后用旧 URL 进后台。</p>
+          <p><strong>应急:</strong>Passkey 私钥只在你 Mac / iPhone 的 Secure Enclave 里,服务器不存。两台设备都丢了 → 用 SSH 看 <code style="background:var(--bg-canvas);padding:1px 6px;border-radius:3px;">/etc/proxybox/config.yaml</code> 里的 admin.password,然后用旧 URL 进后台。</p>
         </div>
       </div>
 
@@ -2270,7 +2270,7 @@ a:hover { color: var(--accent-hover); }
         </div>
         <div style="padding: var(--space-4) var(--space-5); color: var(--text-3); font-size: var(--text-sm); line-height: 1.7;">
           <p><strong>何时轮换:</strong>怀疑 URL 截图被拍 / 浏览器同步泄露 / 想彻底关闭 URL 后门。</p>
-          <p><strong>轮换会:</strong>生成新 32-hex token → 改 <code class="mono" style="background:var(--bg-canvas);padding:1px 6px;border-radius:3px;">/etc/proxy-bot/env</code> → 3 秒后自动重启 <code>proxy-admin</code> + <code>proxy-bot</code> (~3 秒中断,代理本身不受影响)</p>
+          <p><strong>轮换会:</strong>生成新 32-hex token → 改 <code class="mono" style="background:var(--bg-canvas);padding:1px 6px;border-radius:3px;">/etc/proxybox/config.yaml</code> → 3 秒后自动重启 <code>proxybox-admin</code> + <code>proxybox-bot</code> (~3 秒中断,代理本身不受影响)</p>
           <p><strong>不会影响:</strong>已注册的 Passkey, 已登录的 session, 任何订阅 URL (所有设备订阅照常)</p>
           <p style="color:var(--warn);"><strong>注意:</strong>新 token 只显示一次,务必复制保存。后续访问 <code>https://your-domain.com/admin/</code> (不带 token) 用 Passkey 即可。</p>
         </div>
@@ -2523,7 +2523,7 @@ async function registerPasskey() {
     toast.error('不支持', '当前浏览器不支持 WebAuthn');
     return;
   }
-  const label = prompt('给这个设备起个名字 (e.g. "My Mac"):', 'My ' + (navigator.userAgentData?.platform || 'Device'));
+  const label = prompt('给这个设备起个名字 (例: laptop-1):', 'device-' + (navigator.userAgentData?.platform || 'main').toLowerCase().replace(/\s+/g, '-'));
   if (!label) return;
 
   try {
@@ -4347,7 +4347,7 @@ async function renameDevicePrompt(name, currentLabel) {
     body: `为设备 <code style="background: var(--surface-2); padding: 1px 6px; border-radius: 3px;">${escapeHtml(name)}</code> 设置一个易记的显示名。`,
     label: '显示名 (留空可清除)',
     initial: currentLabel || '',
-    placeholder: '例: 我的 iPhone',
+    placeholder: '例: phone-1',
     confirmText: '保存',
     icon: '✏️',
     type: 'accent',

@@ -1,3 +1,6 @@
+# ─── Local agent / session state (Claude Code, IDE) ────────
+.claude/
+
 # ─── Secrets / config ───────────────────────────────────────
 .env
 .env.*

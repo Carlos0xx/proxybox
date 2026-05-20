@@ -7,11 +7,26 @@ Run with:
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 from fastapi import FastAPI
 
 from app.config import get_settings
 from app.db.init import init_schema
+
+
+def _version() -> str:
+    """Pull the canonical version from the installed package metadata so
+    pyproject.toml stays the single source of truth — avoids the drift
+    release-audit.sh flagged before."""
+    try:
+        return _pkg_version("proxybox")
+    except PackageNotFoundError:
+        return "0.0.0-dev"
+
+
+VERSION = _version()
 from app.routers import (
     account,
     actions,
@@ -37,7 +52,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="ProxyBox", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="ProxyBox", version=VERSION, lifespan=lifespan)
     app.include_router(system.router)
     app.include_router(devices.router)
     app.include_router(subscriptions.router)

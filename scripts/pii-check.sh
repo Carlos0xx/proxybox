@@ -57,11 +57,22 @@ if [[ ${#files[@]} -eq 0 ]]; then
     exit 0
 fi
 
+# Self-referential files: some files MUST list blocklist patterns to do
+# their job. E.g. scripts/release-audit-history-ignore enumerates which
+# patterns are allowed in git commit history. Filter those filenames out
+# of any pii-check hit list — they're metadata about the blocklist, not
+# a leak surface. Without this, every release-audit run hits its own
+# exception list (chicken-and-egg).
+self_referential_files='scripts/release-audit-history-ignore'
+
 hits=0
 for pat in "${patterns[@]}"; do
     # -F = fixed strings (no regex), -I = ignore binary, -l = filename only
-    # 注意: 仓库刚 init 时 git grep 找不到 ref,改用 plain grep
     matches=$(grep -FIl -- "$pat" "${files[@]}" 2>/dev/null || true)
+    # Drop any matches that are self-referential files.
+    if [[ -n "$matches" ]]; then
+        matches=$(echo "$matches" | grep -vE "^($self_referential_files)$" || true)
+    fi
     if [[ -n "$matches" ]]; then
         echo "❌ PII hit:  '$pat'"
         echo "   in files:"

@@ -84,14 +84,30 @@ else
 fi
 
 # ───────────────── 5. commit message bodies vs blocklist ─────────────────
+#
+# Some blocklist patterns are appropriate to ENFORCE on file content (so
+# they can never sneak into the running code) but not on commit history
+# — e.g. a developer-private hostname that's benign in audit-trail
+# commit messages, or a string that documents what was REMOVED. List
+# those patterns one-per-line in scripts/release-audit-history-ignore
+# with a rationale. Each line of that file is also skipped by the pii-
+# check sweep (the file's whole purpose is to enumerate patterns, so it
+# would self-trigger otherwise). Keeps the blocklist's content-protection
+# role intact while reflecting that git messages are a different surface
+# than files-on-disk.
 echo ""
 echo "[5/7] commit message bodies vs PII blocklist"
+HISTORY_IGNORE="$(dirname "$0")/release-audit-history-ignore"
 if [ -f "$BLOCKLIST" ]; then
     MSGS=$(git log --all --format='%B')
     HIT=0
     while IFS= read -r pattern; do
         [ -z "$pattern" ] && continue
         case "$pattern" in '#'*) continue ;; esac
+        # Skip patterns explicitly allowed in git history.
+        if [ -f "$HISTORY_IGNORE" ] && grep -qxF "$pattern" "$HISTORY_IGNORE"; then
+            continue
+        fi
         if echo "$MSGS" | grep -qF "$pattern"; then
             fail "blocklist pattern '$pattern' appears in commit messages"
             HIT=$((HIT+1))
@@ -101,16 +117,28 @@ if [ -f "$BLOCKLIST" ]; then
 fi
 
 # ───────────────── 6. version sanity ─────────────────
+#
+# Source of truth = pyproject.toml. app/main.py used to hardcode a
+# duplicate; v0.1.13 moved it to importlib.metadata so the only correct
+# state is the literal string disappearing from app/main.py and the
+# metadata-resolution call appearing instead. We check both: that
+# pyproject is set, AND that app/main.py uses VERSION (sourced via
+# _pkg_version) for the FastAPI app version field.
 echo ""
-echo "[6/7] version sanity (pyproject.toml + app/main.py)"
+echo "[6/7] version sanity (pyproject.toml = canonical)"
 PYP_VER=$(grep -oE '^version = "[^"]+"' pyproject.toml | cut -d'"' -f2)
-APP_VER=$(grep -oE 'version="[^"]+"' app/main.py | cut -d'"' -f2 | head -1)
 echo "      pyproject.toml: $PYP_VER"
-echo "      app/main.py:    $APP_VER"
-if [ "$PYP_VER" = "$APP_VER" ]; then
-    pass "versions match"
+if grep -qE 'version=VERSION' app/main.py && grep -qE '_pkg_version\("proxybox"\)' app/main.py; then
+    pass "app/main.py sources its FastAPI version from importlib.metadata"
+elif grep -qE 'version="[0-9]+\.[0-9]+\.[0-9]+"' app/main.py; then
+    APP_LIT=$(grep -oE 'version="[0-9]+\.[0-9]+\.[0-9]+"' app/main.py | head -1 | cut -d'"' -f2)
+    if [ "$APP_LIT" = "$PYP_VER" ]; then
+        pass "app/main.py hardcoded literal ($APP_LIT) matches pyproject"
+    else
+        fail "app/main.py hardcoded literal ($APP_LIT) != pyproject ($PYP_VER)"
+    fi
 else
-    fail "pyproject.toml and app/main.py disagree on version"
+    fail "app/main.py has neither hardcoded version literal nor importlib wiring"
 fi
 if [ -n "$CANDIDATE_TAG" ]; then
     EXPECTED=${CANDIDATE_TAG#v}

@@ -30,7 +30,22 @@ on an installed system does nothing destructive:
 
 ## HTTPS with Caddy
 
-TODO — coming in v0.1.1.
+Shipped in v0.1.10. Two ways:
+
+1. **From the admin UI (recommended):** log in → "HTTPS · 域名" nav
+   entry → enter your domain → 启用 HTTPS. Server-side validates DNS,
+   apt-installs Caddy from the Cloudsmith stable repo, requests a
+   Let's Encrypt cert, writes a reverse-proxy `Caddyfile`, updates
+   `server.public_host` + `passkey.rp_id` + `passkey.origin` in
+   `config.yaml`, and reloads. Typical end-to-end ~30 s.
+
+2. **CLI fallback:** `sudo bash deploy/enable-https.sh <domain>`. Same
+   flow, no panel access required. Useful for automation or when the
+   panel isn't yet reachable (e.g. wrong public_host).
+
+The cert auto-renews via Caddy. Roll back by stopping Caddy
+(`systemctl stop caddy`) and clearing `server.public_host` in
+config.yaml — the panel keeps working over plain HTTP on port 8080.
 
 ## Passkey
 
