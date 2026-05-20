@@ -133,7 +133,14 @@ if [ -t 1 ]; then
     C_CYAN_B=$'\033[1;36m'
     C_RED=$'\033[31m'
 else
-    C_RESET= C_BOLD= C_DIM= C_GREEN= C_GREEN_B= C_YELLOW_B= C_CYAN_B= C_RED=
+    C_RESET=''
+    C_BOLD=''
+    C_DIM=''
+    C_GREEN=''
+    C_GREEN_B=''
+    C_YELLOW_B=''
+    C_CYAN_B=''
+    C_RED=''
 fi
 HR="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -407,7 +414,7 @@ ADMIN_URL="$ADMIN_BASE/admin/$ADMIN_TOKEN/"
 # is usually enough on a real VPS, but be defensive on slow hosts).
 DEFAULT_DEVICE_NAME="${PROXYBOX_FIRST_DEVICE:-phone-1}"
 SUB_TOKEN=""
-for i in 1 2 3 4 5 6 7 8 9 10; do
+for _ in 1 2 3 4 5 6 7 8 9 10; do
     if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/admin/$ADMIN_TOKEN/api/status" 2>/dev/null | grep -q '^200$'; then
         break
     fi
