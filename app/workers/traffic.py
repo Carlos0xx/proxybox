@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 
 from app.config import get_settings
 from app.db.connection import connection
+from app.services.host_classify import classify as classify_host
 
 _PREV_CONNS: dict[str, dict] = {}
 
@@ -66,6 +67,10 @@ def process_tick() -> int:
     active_cids: set[str] = set()
     deltas: dict[str, dict[str, int]] = {}
     devices_seen: dict[str, str] = {}
+    # Per-device per-host deltas. host == "" when sing-box has no SNI/host
+    # for this connection (rare; raw IP / DoH bypass). Skipped from host_log
+    # so we never store a "(unknown)" bucket — keeps the table small.
+    host_deltas: dict[tuple[str, str], dict[str, int]] = {}
 
     for c in conns:
         cid = c.get("id")
@@ -83,6 +88,7 @@ def process_tick() -> int:
             continue
 
         devices_seen[device_name] = meta.get("sourceIP", "")
+        host = (meta.get("host") or "").strip().lower()
 
         cur_up = c.get("upload", 0) or 0
         cur_dn = c.get("download", 0) or 0
@@ -105,6 +111,13 @@ def process_tick() -> int:
         agg["tx"] += d_up
         if is_new:
             agg["new"] += 1
+
+        if host:
+            h_agg = host_deltas.setdefault((device_name, host), {"rx": 0, "tx": 0, "new": 0})
+            h_agg["rx"] += d_dn
+            h_agg["tx"] += d_up
+            if is_new:
+                h_agg["new"] += 1
 
     # GC connections that closed since last tick
     for cid in list(_PREV_CONNS.keys()):
@@ -131,6 +144,28 @@ def process_tick() -> int:
                        conn_count = conn_count + excluded.conn_count""",
                 (dname, hour_start, date_str, hour_int, agg["rx"], agg["tx"], agg["new"]),
             )
+        for (dname, host), h_agg in host_deltas.items():
+            conn.execute(
+                """INSERT INTO host_log
+                       (device_name, bucket_ts, date, hour, host, app_group,
+                        rx_bytes, tx_bytes, conn_count)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(device_name, bucket_ts, host) DO UPDATE SET
+                       rx_bytes   = rx_bytes   + excluded.rx_bytes,
+                       tx_bytes   = tx_bytes   + excluded.tx_bytes,
+                       conn_count = conn_count + excluded.conn_count""",
+                (
+                    dname,
+                    hour_start,
+                    date_str,
+                    hour_int,
+                    host,
+                    classify_host(host),
+                    h_agg["rx"],
+                    h_agg["tx"],
+                    h_agg["new"],
+                ),
+            )
         conn.commit()
 
     return len(devices_seen)
@@ -140,9 +175,10 @@ def cleanup_old() -> int:
     settings = get_settings()
     cutoff = int(time.time()) - settings.worker.retention_days * 86400
     with connection() as conn:
-        cur = conn.execute("DELETE FROM traffic_log WHERE bucket_ts < ?", (cutoff,))
+        t = conn.execute("DELETE FROM traffic_log WHERE bucket_ts < ?", (cutoff,)).rowcount
+        h = conn.execute("DELETE FROM host_log WHERE bucket_ts < ?", (cutoff,)).rowcount
         conn.commit()
-    return cur.rowcount
+    return t + h
 
 
 def main() -> int:

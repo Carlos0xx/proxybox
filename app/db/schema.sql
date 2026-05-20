@@ -44,6 +44,30 @@ CREATE INDEX IF NOT EXISTS traffic_log_bucket_idx ON traffic_log (bucket_ts);
 CREATE INDEX IF NOT EXISTS traffic_log_date_idx   ON traffic_log (date);
 
 
+-- Per-device per-host traffic accounting (v0.1.9+).
+-- Worker periodically samples sing-box Clash API /connections and groups
+-- by destination host name (metadata.host from sing-box). Each row =
+-- one (device, hour, host) tuple with cumulative bytes / connection count.
+-- app_group is the static classification we hand back to the SPA so the
+-- "按 App 类型" bar chart can aggregate without re-running regexes.
+CREATE TABLE IF NOT EXISTS host_log (
+    device_name  TEXT    NOT NULL,
+    bucket_ts    INTEGER NOT NULL,
+    date         TEXT    NOT NULL,
+    hour         INTEGER NOT NULL,
+    host         TEXT    NOT NULL,
+    app_group    TEXT    NOT NULL,
+    rx_bytes     INTEGER NOT NULL DEFAULT 0,
+    tx_bytes     INTEGER NOT NULL DEFAULT 0,
+    conn_count   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (device_name, bucket_ts, host)
+);
+
+CREATE INDEX IF NOT EXISTS host_log_device_idx ON host_log (device_name, bucket_ts);
+CREATE INDEX IF NOT EXISTS host_log_app_idx    ON host_log (date, app_group);
+CREATE INDEX IF NOT EXISTS host_log_date_idx   ON host_log (date);
+
+
 -- WebAuthn passkey credentials. Populated only when features.passkey is on
 -- and a user has registered at least one device. ``public_key`` is the
 -- COSE-encoded public key from the authenticator's attestation.

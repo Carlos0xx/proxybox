@@ -3421,39 +3421,33 @@ function renderHistoryDevice(d) {
   const rx = (d.daily || []).reduce((a, x) => a + (x.rx || 0), 0);
   const tx = (d.daily || []).reduce((a, x) => a + (x.tx || 0), 0);
 
-  // v0.1.x doesn't track per-host or per-app traffic (CONSTRAINTS §3 —
-  // BWG's host-fingerprint dict is intentionally dropped). Server returns
-  // d.hosts = [] / d.apps = []; surface that to the user as a clear "by
-  // design" note rather than a generic 0 / 暂无数据.
-  const HOSTS_DEFERRED = '<span style="color:var(--text-4);">—</span>';
   $('hist-total').innerHTML = fmtBytesHTML(total);
-  $('hist-total-sub').textContent = `${d.daily.length || 0} 天有数据 · 域名 / App 维度 v0.2 待实现`;
+  $('hist-total-sub').textContent = `${(d.hosts || []).length} 域名 · ${d.daily.length || 0} 天有数据`;
   $('hist-rx').innerHTML = fmtBytesHTML(rx);
   $('hist-tx').innerHTML = fmtBytesHTML(tx);
-  $('hist-hosts').innerHTML = HOSTS_DEFERRED;
+  $('hist-hosts').innerHTML = `${(d.hosts || []).length}<span class="unit">个</span>`;
 
-  // App chart — empty in v0.1.x. Show explicit "deferred" message instead
-  // of generic "暂无数据" so users know it's not a bug.
+  // App chart — populated by traffic worker's host sampling (v0.1.9+).
   const appsList = d.apps || [];
   const appMax = Math.max(...appsList.map(a => a.total), 1);
   $('hist-app-chart').innerHTML = appsList.length
     ? appsList.map(a => {
-        const pct = (a.total / total * 100);
+        const pct = total > 0 ? (a.total / total * 100) : 0;
         const widthPct = Math.max(0.5, a.total / appMax * 100);
         const isTiny = pct < 0.5;
         const key = appKey(a.app_group);
+        const hostCount = a.host_count || 0;
         return `<div class="h-bar-row">
-          <div class="h-bar-label">${escapeHtml(a.app_group)}</div>
+          <div class="h-bar-label" title="${hostCount} 个域名">${escapeHtml(a.app_group)}</div>
           <div class="h-bar-track"><div class="h-bar-fill ${isTiny ? 'tiny' : ''}" data-app="${key}" style="width: ${widthPct.toFixed(1)}%"></div></div>
           <div class="h-bar-value">${fmtBytes(a.total)} <span class="pct">${pct.toFixed(0)}%</span></div>
         </div>`;
       }).join('')
-    : `<div class="empty-state" style="padding:32px 16px;">
-        <span class="empty-icon">🔒</span>
-        <div class="empty-desc">App 维度统计 · v0.2 待实现</div>
-        <div style="font-size:var(--text-xs); color:var(--text-4); margin-top:8px; line-height:1.6;">
-          v0.1.x 只记录每设备每小时的字节总数,不解析 SNI / DNS 域名。<br>
-          (CONSTRAINTS §3: 出于隐私考虑, 主机指纹字典已从 BWG 移除)
+    : `<div class="empty-state" style="padding:24px 16px;">
+        <span class="empty-icon">⏳</span>
+        <div class="empty-desc">尚未采集到域名数据</div>
+        <div style="font-size:var(--text-xs); color:var(--text-4); margin-top:6px;">
+          traffic-worker 每 10 秒采样一次, 持续上网即可看到分类
         </div>
       </div>`;
 
@@ -3487,8 +3481,12 @@ function renderHistoryDevice(d) {
     </div>`;
   }).join('');
 
-  // Hour heatmap
-  renderHistoryHeatmap(d.hourly || [], daysCount, todayStr);
+  // Hour heatmap — server returns d.buckets[] with rx/tx per hour;
+  // fold to {date, hour, total} which renderHistoryHeatmap expects.
+  const hourly = (d.buckets || []).map(b => ({
+    date: b.date, hour: b.hour, total: (b.rx || 0) + (b.tx || 0),
+  }));
+  renderHistoryHeatmap(hourly, daysCount, todayStr);
 
   // Host table
   _histHostPage = 0;

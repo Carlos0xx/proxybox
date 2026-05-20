@@ -147,6 +147,54 @@ async def history_device(name: NameInPath, days: DaysQuery = 7) -> dict:
         day["tx"] += tx
         day["total"] += rx + tx
 
+    # Per-host / per-app rollups from host_log (v0.1.9+). Empty before
+    # the host-tracking worker has had time to populate buckets; the SPA
+    # renders both as "(none yet)" cards rather than crashing.
+    with connection() as conn:
+        host_rows = conn.execute(
+            """SELECT host, app_group,
+                      SUM(rx_bytes) AS rx, SUM(tx_bytes) AS tx,
+                      SUM(conn_count) AS conns
+               FROM host_log
+               WHERE device_name = ? AND bucket_ts >= ?
+               GROUP BY host
+               ORDER BY (SUM(rx_bytes) + SUM(tx_bytes)) DESC
+               LIMIT 200""",
+            (name, cutoff),
+        ).fetchall()
+        app_rows = conn.execute(
+            """SELECT app_group,
+                      SUM(rx_bytes + tx_bytes) AS total,
+                      SUM(conn_count) AS conns,
+                      COUNT(DISTINCT host) AS host_count
+               FROM host_log
+               WHERE device_name = ? AND bucket_ts >= ?
+               GROUP BY app_group
+               ORDER BY total DESC""",
+            (name, cutoff),
+        ).fetchall()
+
+    hosts = [
+        {
+            "hostname": r["host"],
+            "app_group": r["app_group"],
+            "rx": int(r["rx"] or 0),
+            "tx": int(r["tx"] or 0),
+            "total": int((r["rx"] or 0) + (r["tx"] or 0)),
+            "conns": int(r["conns"] or 0),
+        }
+        for r in host_rows
+    ]
+    apps = [
+        {
+            "app_group": r["app_group"],
+            "total": int(r["total"] or 0),
+            "conns": int(r["conns"] or 0),
+            "host_count": int(r["host_count"] or 0),
+        }
+        for r in app_rows
+    ]
+
     return {
         "name": name,
         "days": days,
@@ -159,8 +207,8 @@ async def history_device(name: NameInPath, days: DaysQuery = 7) -> dict:
         },
         "daily": [daily_map[d] for d in sorted(daily_map)],
         "buckets": buckets,
-        "hosts": [],
-        "apps": [],
+        "hosts": hosts,
+        "apps": apps,
     }
 
 

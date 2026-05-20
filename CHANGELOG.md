@@ -5,6 +5,46 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.9] — host categorization + HTTPS one-shot script + 24h heatmap fix
+
+### Added
+- **Per-device per-host traffic accounting**. The traffic worker now
+  also samples sing-box Clash API's `metadata.host` per connection and
+  buckets bytes into a new `host_log` table (`device_name, bucket_ts,
+  host, app_group, rx, tx, conns`). Old buckets are pruned by the same
+  retention window as `traffic_log`.
+- **`app/services/host_classify.py`** — suffix-based domain → app-group
+  lookup table (~120 entries). Categories: Video / Social / 通讯 /
+  Google / Apple / Microsoft / AI / 开发工具 / CDN / Music / 游戏 /
+  新闻 / 购物 / 其他. Generic categorisation only — no personal
+  "sites I track" dictionary (the original §3 concern doesn't apply).
+- **`/api/history/device/{name}`** now returns populated `hosts` and
+  `apps` arrays from `host_log` (was empty placeholders in v0.1.8).
+- **设备历史 SPA** drops the "v0.2 待实现" empty state and renders the
+  按 App 类型 chart + 访问域名 table directly. Per-app-group `title`
+  attribute shows the number of distinct hosts under each category.
+- **`deploy/enable-https.sh <domain>`** — separate post-install script
+  for HTTPS. Validates the domain resolves to this VPS, apt-installs
+  Caddy from Cloudsmith, writes a reverse-proxy Caddyfile, updates
+  `server.public_host` + `passkey.rp_id` + `passkey.origin` in
+  `config.yaml`, restarts services. Let's Encrypt provisions the cert
+  on first request — typical first-issuance latency ~10s. Bilingual
+  (`--lang zh|en`).
+
+### Fixed
+- **24-hour activity heatmap was empty** even when bucket data existed.
+  SPA was reading `d.hourly`, but the server returns `d.buckets[]` with
+  `{date, hour, rx, tx}` (no pre-computed `total`). Folded the
+  client-side conversion to `{date, hour, total: rx+tx}` so the
+  heatmap fills the appropriate cells.
+
+### Memory / project-policy update
+- **CONSTRAINTS §3 partially reversed.** The original "no host-based
+  traffic mapping" rule was about a personal-dictionary feature in
+  BWG. Generic categorisation is different in kind: it doesn't expose
+  which *specific* site within a category. User explicitly requested
+  default-on, so the host_log table populates from install onward.
+
 ## [v0.1.8] — clipboard works on HTTP; 订阅链接 layout roomier; apps/hosts deferred-by-design
 
 ### Fixed
