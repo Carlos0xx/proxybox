@@ -133,34 +133,48 @@ All four should be `active`. If any is not, fetch its `journalctl -u <svc> -n
 
 ### Step 5 — Relay the install.sh summary
 
-As of v0.1.2 `install.sh` ends with a self-contained handoff block:
-- The full admin URL (with the live token — not masked)
+As of v0.1.6 the admin panel uses **username + password login**, not a
+URL-token in the address bar. `install.sh` ends with a self-contained
+handoff block:
+
+- **🛡 后台登录凭据** — the user-must-save block in bold red:
+  - `登录地址  http://{public_host}:8080/login/{random_12char_suffix}`
+    (the random suffix is new in v0.1.11 — `/login` itself 404s, defends
+    against /login bot scans)
+  - `用户名    admin`
+  - `密  码    <16-char alnum>`
 - The auto-created first device (default name `phone-1`, override via env
-  `PROXYBOX_FIRST_DEVICE=<name>` before re-running)
+  `PROXYBOX_FIRST_DEVICE=<name>` before re-running install.sh)
 - All 5 per-device subscription URLs ready to copy
 
-**Do not re-mask the token in chat output for this skill.** The whole
-point of v0.1.2's one-shot UX is to avoid making普通用户 SSH back in to
-grep config.yaml. The install.sh output is the user's private channel
+**Do not re-mask the credentials in chat output for this skill.** The
+whole point of the one-shot UX is to avoid making普通用户 SSH back in
+to grep config.yaml. The install.sh output is the user's private channel
 (same as if they ran the installer locally) — relay it verbatim.
 
 This rule is **scoped to install.sh output and this Step 5 / Step 7
 handoff.** Ad-hoc bash you author elsewhere in a session (e.g. for
-debugging or status checks) should still mask the token to first 8 chars,
-because that's chat-only output that doesn't have the same one-shot UX
-constraint.
+debugging or status checks) should still mask the password / token to
+first 8 chars, because that's chat-only output that doesn't have the
+same one-shot UX constraint.
 
-If the user needs the URL re-printed later (e.g. they lost the chat
-backscroll), this fetches it from the live config:
+If the user needs the credentials re-printed later (e.g. they lost the
+chat backscroll), this fetches them from the live config:
 
 ```bash
 ssh "$USER@$HOST" '
   /opt/proxybox/.venv/bin/python -c "
 import yaml
 c = yaml.safe_load(open(\"/etc/proxybox/config.yaml\"))
-token = c[\"admin\"][\"token\"]
-host  = c[\"server\"][\"public_host\"] or \"<your-vps-ip>\"
-print(f\"http://{host}:8080/admin/{token}/\")
+a = c[\"admin\"]
+host = c[\"server\"][\"public_host\"] or \"<your-vps-ip>\"
+proto = \"https\" if a.get(\"login_path\") and c[\"server\"].get(\"public_host\") else \"http\"
+port = \"\" if proto == \"https\" else \":8080\"
+path = a.get(\"login_path\", \"\")
+login_url = f\"{proto}://{host}{port}/login/{path}\" if path else f\"{proto}://{host}{port}/login\"
+print(f\"login URL: {login_url}\")
+print(f\"username:  {a[\\\"username\\\"]}\")
+print(f\"password:  {a[\\\"password\\\"]}\")
 "
 '
 ```
@@ -190,30 +204,57 @@ token format.
 The install.sh summary block already lays everything out. Just relay it
 to the user with a one-line cover sentence — something like:
 
-> "装好了。下面 4 块都是直接能用的：管理后台 URL（带 token，登录就进）、
-> 5 个订阅 URL（任挑一个粘进客户端就翻墙）、服务状态、可选功能。"
+> "装好了。下面四块全部直接能用：登录凭据（账号 + 密码 + 加随机后缀的
+> 登录地址,粘进浏览器就行）、5 个订阅 URL（任挑一个粘进客户端就翻墙）、
+> 服务状态、可选功能。"
 
-Then paste install.sh's output (or summarize it) — do not re-format
-or hide the admin URL.
+Then paste install.sh's output (or summarize it) — do not re-format,
+do not hide the password / login URL.
 
 Concretely, the user can:
-1. Open the admin URL in a browser → already logged in via the URL-path token
-2. Pick the subscription URL that matches their client (table below for
-   reference; the install summary already labels each line)
-3. Paste it into the client's "Add Subscription" dialog
-4. Done — traffic should flow through the VPS
 
-The default first device is named `phone-1`. To bootstrap a different
-name (e.g. `tablet-1` for an iPad-first user), re-run install.sh with
-`PROXYBOX_FIRST_DEVICE=tablet-1` in the environment, or rename in the
-admin UI afterwards.
+1. **Open the login URL in a browser**. The form auto-focuses the username
+   field — type the username + password from the summary, hit 登录,
+   arrive in the SPA. Session cookie is set for 30 days.
+2. **Pick the subscription URL** that matches their client (table below;
+   the install summary labels each line). Default URI list works for
+   sing-box / Shadowrocket / Hiddify / Stash — pick `clash.yaml` for
+   Clash family or `merlin.yaml` for routers.
+3. **Paste** into the client's "Add Subscription" dialog.
+4. **Traffic should flow** through the VPS — `ifconfig.me` from the
+   client device shows the VPS IP, not the home ISP.
 
-If the user wants extra devices (one per gadget for proper isolation),
-they create them from 设备管理 / Devices → 生成 / Create. Generic
-naming convention: `phone-1`, `phone-2`, `tablet-1`, `laptop-1`,
-`home-router`. **Never use personal identifiers** — device names go
-into sing-box config + subscription file content, so they're surface
-for fingerprinting.
+The default first device is named `phone-1`. Override via env
+`PROXYBOX_FIRST_DEVICE=tablet-1 bash deploy/install.sh ...` before
+install, or rename in the admin UI afterwards.
+
+### Stuff the user can do AFTER login (no SSH needed)
+
+Mention any of these only when the user asks — don't dump them all at
+handoff. v0.1.6+ exposes a lot in the panel:
+
+- **HTTPS (v0.1.10):** `HTTPS · 域名` page. User enters a domain that
+  resolves to the VPS, clicks 启用 HTTPS. Server auto-installs Caddy
+  from Cloudsmith repo, requests Let's Encrypt, updates `config.yaml`,
+  reloads. ~30 seconds. New login URL becomes `https://{domain}/login/
+  {login_path}`. Caddy auto-renews the cert.
+- **Change username / password (v0.1.11):** `安全` page → `🔐 登录设置`
+  card. Password change requires the current password (session-hijack
+  defense).
+- **Rotate login path (v0.1.11):** same card → 🎲 轮换. Old `/login/{x}`
+  immediately 404s; existing sessions unaffected. Defends against
+  `/login` brute-force.
+- **Add more devices:** 设备管理 → 生成. Generic naming convention:
+  `phone-1`, `phone-2`, `tablet-1`, `laptop-1`, `home-router`. **Never
+  use personal identifiers** — device names land in sing-box config
+  + subscription file content, so they're surface for fingerprinting.
+- **Per-device subscription URLs (all 5 formats):** 订阅链接 page or
+  设备管理 → device → 📋 订阅 URL.
+- **Live throughput + per-device history:** 总览 / 设备历史 / 总流量.
+  Host categorisation populates within ~10 s of any client browsing
+  (v0.1.9 default-on).
+- **Re-print credentials:** if user lost the install summary, the SSH
+  fetcher in Step 5 prints login URL + username + password.
 
 ### Subscription URL formats
 
@@ -236,9 +277,10 @@ phones and laptops — Clash YAML is mainly for routers and Stash power-users.
 ## Anti-patterns (do NOT do these)
 
 - **The install.sh output IS the user's handoff** — relay it verbatim
-  including the full admin URL. (Re-masking the token defeats v0.1.2's
-  one-shot UX.) But: ad-hoc bash you author later in the same session
-  for status checks / debugging still masks to first 8 chars.
+  including the login URL + username + password (bold red in the
+  summary). Re-masking defeats v0.1.6+'s one-shot UX. But ad-hoc bash
+  you author later in the same session for status checks / debugging
+  still masks credentials to first 8 chars.
 - **Never** SSH with `-o StrictHostKeyChecking=no` without the user's
   explicit consent — it disables host-key warnings and would mask MITM
 - **Never** run `install.sh` on a host that already runs unrelated services
