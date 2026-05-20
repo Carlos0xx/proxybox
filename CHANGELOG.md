@@ -5,6 +5,29 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.1.2] — one-shot install UX
+
+### Added
+- **Auto-bootstrap first device.** `install.sh` now polls localhost
+  until `/api/status` returns 200, then `POST /api/devices/new` with
+  name `phone-1` (override via `PROXYBOX_FIRST_DEVICE=<name>` env var).
+  Re-running detects the existing device and reuses it — no duplicate.
+- **Self-contained handoff summary.** The post-install block prints:
+  - The full admin URL (token visible — for a brand-new server on the
+    user's own VPS, making them SSH back in to grep `config.yaml` was
+    the wrong default)
+  - All 5 subscription URLs for the auto-created device, each labeled
+    with its target client (default URI list / clash.yaml / merlin.yaml
+    / shadowrocket.conf / sub.txt)
+  - Services state + optional-features hint
+- **`SKILL.md` Step 5 / 7 / anti-patterns updated** to relay install.sh
+  output verbatim instead of masking. Ad-hoc bash authored mid-session
+  (status checks, debugging) still masks to first 8 chars; only install
+  output and the matching skill handoff are exempt.
+- **`SKILL.md` Step 2 preamble**: `apt-get install -y git curl
+  ca-certificates` so a minimal Debian image without `git` doesn't
+  fail at the clone step.
+
 ## [v0.1.1] — SPA refresh fixes + multi-format subscriptions
 
 ### Fixed
