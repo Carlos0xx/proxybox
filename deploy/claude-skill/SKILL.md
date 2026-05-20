@@ -85,12 +85,17 @@ ssh "$USER@$HOST" '
 ssh "$USER@$HOST" '
   cd /opt/proxybox
   if [ "$(id -u)" = "0" ]; then
-    bash deploy/install.sh
+    bash deploy/install.sh --lang $LANG_FLAG
   else
-    sudo bash deploy/install.sh
+    sudo bash deploy/install.sh --lang $LANG_FLAG
   fi
 '
 ```
+
+`$LANG_FLAG` is `zh` if the user has been writing to you in Chinese, else
+`en`. The script also auto-detects from the VPS's `$LANG` if you omit
+`--lang`, but explicit is better so the output language matches the user's
+conversation language rather than the server locale.
 
 `install.sh` itself checks for root at the top; the wrapper above just picks
 the right invocation (`sudo` or not) without assuming `sudo` is installed
