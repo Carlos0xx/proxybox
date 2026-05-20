@@ -1,10 +1,11 @@
-"""Device endpoints: list, single read, label / notes update, create, regen-subs. Delete TBD."""
+"""Device endpoints: current usage, list, single read, label / notes / create / state / delete."""
 
 from __future__ import annotations
 
 import secrets
 import time
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path
@@ -40,9 +41,6 @@ class DeviceCreate(BaseModel):
 
 
 class PauseRequest(BaseModel):
-    # 0 = indefinite (translated to year-2200 sentinel internally so the
-    # column never holds NULL or magic negatives); otherwise unix timestamp
-    # when auto-resume should fire.
     until_ts: int = Field(default=0, ge=0)
 
 
@@ -50,15 +48,9 @@ class RenameRequest(BaseModel):
     new_name: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
-# Year 2200 — sentinel for "paused indefinitely" so paused_until > 0 is a
-# clean predicate for "is this device currently paused".
-_PAUSE_INDEFINITE = 7258118400
-
-
-# Path-conflicting names — /api/devices/list is a literal endpoint, so a
-# device literally named "list" would shadow it (FastAPI matches literal
-# before parametric).
 _RESERVED_NAMES = {"list"}
+
+_PAUSE_INDEFINITE = 7258118400
 
 
 _COLUMNS = (
@@ -70,6 +62,70 @@ _COLUMNS = (
 
 _LIST_SQL = f"SELECT {_COLUMNS} FROM device ORDER BY revoked, created_at DESC"
 _GET_SQL = f"SELECT {_COLUMNS} FROM device WHERE name = ?"
+
+_USAGE_SQL = """
+SELECT
+    d.name,
+    d.label,
+    d.kind,
+    d.last_seen,
+    d.last_ip,
+    d.paused_until,
+    d.revoked,
+    COALESCE(t24.rx, 0) AS rx_24h,
+    COALESCE(t24.tx, 0) AS tx_24h,
+    COALESCE(td.rx, 0)  AS rx_today,
+    COALESCE(td.tx, 0)  AS tx_today
+FROM device d
+LEFT JOIN (
+    SELECT device_name, SUM(rx_bytes) AS rx, SUM(tx_bytes) AS tx
+    FROM traffic_log WHERE bucket_ts >= ?
+    GROUP BY device_name
+) t24 ON t24.device_name = d.name
+LEFT JOIN (
+    SELECT device_name, SUM(rx_bytes) AS rx, SUM(tx_bytes) AS tx
+    FROM traffic_log WHERE date = ?
+    GROUP BY device_name
+) td ON td.device_name = d.name
+WHERE d.revoked = 0
+ORDER BY COALESCE(d.last_seen, 0) DESC
+"""
+
+
+@router.get("")
+async def devices_current_usage() -> dict:
+    """Per-device current usage view (today + 24h totals, paused flag, last_seen).
+
+    Distinct from /list (which returns raw device config). This endpoint is
+    what the SPA's main view consumes — it joins device metadata with
+    traffic_log aggregations.
+    """
+    now = datetime.now(timezone.utc)
+    cutoff_24h = int((now - timedelta(hours=24)).timestamp())
+    today_str = now.strftime("%Y-%m-%d")
+    current_ts = int(now.timestamp())
+
+    with connection() as conn:
+        rows = conn.execute(_USAGE_SQL, (cutoff_24h, today_str)).fetchall()
+
+    return {
+        "devices": [
+            {
+                "name": r["name"],
+                "label": r["label"],
+                "kind": r["kind"],
+                "last_seen": r["last_seen"],
+                "last_ip": r["last_ip"],
+                "is_paused": r["paused_until"] > current_ts,
+                "paused_until": r["paused_until"],
+                "rx_24h": r["rx_24h"],
+                "tx_24h": r["tx_24h"],
+                "rx_today": r["rx_today"],
+                "tx_today": r["tx_today"],
+            }
+            for r in rows
+        ]
+    }
 
 
 @router.get("/list")
