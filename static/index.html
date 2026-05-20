@@ -2810,11 +2810,11 @@ async function loadTraffic() {
     $('kpi-today-sub').textContent = '数据采集中';
     return;
   }
-  $('kpi-today').innerHTML = fmtBytesHTML((parseFloat(d.today.total) * (/GiB/i.test(d.today.total) ? 1024**3 : /MiB/i.test(d.today.total) ? 1024**2 : 1024)));
-  // Actually keep the human-readable form from server
-  const [val, unit] = d.today.total.split(' ');
-  $('kpi-today').innerHTML = `${val}<span class="unit">${unit || ''}</span>`;
-  $('kpi-today-sub').textContent = `↑${d.today.tx} · ↓${d.today.rx} · 月 ${d.month.total}`;
+  // /api/traffic v0.1.x returns raw byte counts: rx_today, tx_today, rx_24h, tx_24h, active_devices_24h.
+  // BWG's "today/month" pre-formatted shape was dropped — format client-side here.
+  const todayTotal = (Number(d.rx_today) || 0) + (Number(d.tx_today) || 0);
+  $('kpi-today').innerHTML = fmtBytesHTML(todayTotal);
+  $('kpi-today-sub').textContent = `↑${fmtBytes(d.tx_today)} · ↓${fmtBytes(d.rx_today)} · ${d.active_devices_24h || 0} 台 / ${d.window_hours || 24}h`;
 }
 
 /* =================================================================
