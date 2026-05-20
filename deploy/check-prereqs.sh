@@ -146,10 +146,14 @@ check_port() {
     local port="$1"; local proto="$2"; local desc="$3"
     local holder
     holder=$(port_holder "$port" "$proto")
-    if [ -n "$holder" ]; then
-        fail "$proto/$port held by $holder (needed for $desc)"
-    else
+    if [ -z "$holder" ]; then
         pass "$proto/$port free ($desc)"
+    elif echo "$holder" | grep -qE '(sing-box|uvicorn|proxybox)'; then
+        # Held by one of our own services — idempotent re-install scenario.
+        # Treat as passing so install.sh can re-run on an existing host.
+        pass "$proto/$port already held by ProxyBox service ($holder) — re-install OK"
+    else
+        fail "$proto/$port held by external process $holder (needed for $desc)"
     fi
 }
 check_port 8080  tcp "admin HTTP"
