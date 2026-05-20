@@ -39,6 +39,22 @@ class DeviceCreate(BaseModel):
     notes: str = Field(default="", max_length=1024)
 
 
+class PauseRequest(BaseModel):
+    # 0 = indefinite (translated to year-2200 sentinel internally so the
+    # column never holds NULL or magic negatives); otherwise unix timestamp
+    # when auto-resume should fire.
+    until_ts: int = Field(default=0, ge=0)
+
+
+class RenameRequest(BaseModel):
+    new_name: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_-]+$")
+
+
+# Year 2200 — sentinel for "paused indefinitely" so paused_until > 0 is a
+# clean predicate for "is this device currently paused".
+_PAUSE_INDEFINITE = 7258118400
+
+
 # Path-conflicting names — /api/devices/list is a literal endpoint, so a
 # device literally named "list" would shadow it (FastAPI matches literal
 # before parametric).
@@ -205,4 +221,101 @@ async def delete_device(name: NameInPath, background_tasks: BackgroundTasks) -> 
         "name": name,
         "removed_inbounds": removed_tags,
         "notice": "device deleted; sing-box reloading in background",
+    }
+
+
+@router.post("/{name}/pause")
+async def pause_device(
+    name: NameInPath, body: PauseRequest, background_tasks: BackgroundTasks
+) -> dict:
+    paused_until = body.until_ts if body.until_ts > 0 else _PAUSE_INDEFINITE
+    with connection() as conn:
+        row = conn.execute("SELECT name FROM device WHERE name = ?", (name,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "device not found")
+        conn.execute(
+            "UPDATE device SET paused_until = ? WHERE name = ?", (paused_until, name)
+        )
+        conn.commit()
+
+    cfg = singbox.read_config()
+    removed = singbox.remove_device_inbounds(cfg, name)
+    singbox.write_config(cfg, defer_reload=True)
+    background_tasks.add_task(singbox.reload_singbox)
+
+    return {"name": name, "paused_until": paused_until, "removed_inbounds": removed}
+
+
+@router.post("/{name}/resume")
+async def resume_device(name: NameInPath, background_tasks: BackgroundTasks) -> dict:
+    with connection() as conn:
+        row = conn.execute(_GET_SQL, (name,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "device not found")
+        conn.execute(
+            "UPDATE device SET paused_until = 0 WHERE name = ?", (name,)
+        )
+        conn.commit()
+        updated = conn.execute(_GET_SQL, (name,)).fetchone()
+
+    cfg = singbox.read_config()
+    added = singbox.add_device_inbounds(cfg, dict(updated))
+    singbox.write_config(cfg, defer_reload=True)
+    background_tasks.add_task(singbox.reload_singbox)
+
+    return {"name": name, "added_inbounds": added}
+
+
+@router.post("/{name}/revoke")
+async def revoke_device(name: NameInPath, background_tasks: BackgroundTasks) -> dict:
+    with connection() as conn:
+        row = conn.execute("SELECT sub_token FROM device WHERE name = ?", (name,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "device not found")
+        sub_token = row["sub_token"]
+        conn.execute("UPDATE device SET revoked = 1 WHERE name = ?", (name,))
+        conn.commit()
+
+    cfg = singbox.read_config()
+    removed = singbox.remove_device_inbounds(cfg, name)
+    singbox.write_config(cfg, defer_reload=True)
+    subscriptions.delete_subscription_file(sub_token)
+    background_tasks.add_task(singbox.reload_singbox)
+
+    return {"name": name, "revoked": True, "removed_inbounds": removed}
+
+
+@router.post("/{name}/rename")
+async def rename_device(
+    name: NameInPath, body: RenameRequest, background_tasks: BackgroundTasks
+) -> dict:
+    if body.new_name in _RESERVED_NAMES:
+        raise HTTPException(400, f"name {body.new_name!r} is reserved")
+    if body.new_name == name:
+        return {"name": name, "previous_name": name, "notice": "no change"}
+
+    with connection() as conn:
+        old_row = conn.execute(_GET_SQL, (name,)).fetchone()
+        if old_row is None:
+            raise HTTPException(404, "device not found")
+        clash = conn.execute(
+            "SELECT 1 FROM device WHERE name = ?", (body.new_name,)
+        ).fetchone()
+        if clash is not None:
+            raise HTTPException(409, f"device {body.new_name!r} already exists")
+        conn.execute("UPDATE device SET name = ? WHERE name = ?", (body.new_name, name))
+        conn.commit()
+        new_row = conn.execute(_GET_SQL, (body.new_name,)).fetchone()
+
+    cfg = singbox.read_config()
+    singbox.remove_device_inbounds(cfg, name)
+    singbox.add_device_inbounds(cfg, dict(new_row))
+    singbox.write_config(cfg, defer_reload=True)
+    subscriptions.write_subscription_file(dict(new_row), cfg)
+    background_tasks.add_task(singbox.reload_singbox)
+
+    return {
+        "name": body.new_name,
+        "previous_name": name,
+        "notice": "device renamed; sing-box reloading in background",
     }
