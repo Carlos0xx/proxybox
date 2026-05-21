@@ -11,7 +11,7 @@ For a higher-level walkthrough of day-to-day operations after install, see [`gui
 | Requirement | Detail |
 | --- | --- |
 | **OS** | Debian / Ubuntu VPS. Docker path can run on an existing host. Native path still expects a clean VPS. |
-| **Access** | Root SSH, Docker, and Docker Compose for the default path. |
+| **Access** | Root SSH or passwordless sudo. The Docker installer installs/starts Docker and Compose if missing. |
 | **Resources** | ≥ 1 GB RAM · ≥ 5 GB free disk. |
 | **Required ports** | Docker installer auto-selects free Admin, VLESS, and Hy2 ports and writes them to `.env`. |
 | **For HTTPS later** | A domain pointing at the VPS · `80/tcp` + `443/tcp` open. Optional but recommended for production. |
@@ -22,13 +22,13 @@ For a higher-level walkthrough of day-to-day operations after install, see [`gui
 
 ```bash
 ssh root@<your-vps>
-apt-get update && (apt-get install -y git curl ca-certificates docker.io docker-compose-plugin || apt-get install -y git curl ca-certificates docker.io docker-compose)
+apt-get update && apt-get install -y git curl ca-certificates
 git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox
 bash deploy/docker-install.sh
 ```
 
-`deploy/docker-install.sh` checks Docker/Compose, scans host ports, writes `.env`, and starts an isolated bridge-network stack. It does not install Python 3.11, write systemd units, enable fail2ban, configure Caddy, or touch SSH known_hosts on the host.
+`deploy/docker-install.sh` checks Docker/Compose, installs missing Docker packages, starts the Docker service, scans host ports, writes `.env`, and starts an isolated bridge-network stack. It does not install Python 3.11, write ProxyBox systemd units, enable fail2ban, configure Caddy, or touch SSH known_hosts on the host.
 
 For a no-trace reinstall on reused Docker volumes:
 

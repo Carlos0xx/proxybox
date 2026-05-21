@@ -25,7 +25,16 @@ def test_compose_uses_bridge_network_and_env_published_ports() -> None:
     assert "/etc/proxybox/bot.env" not in COMPOSE
 
 
-def test_docker_install_scans_ports_without_host_service_changes() -> None:
+def test_docker_install_provisions_runtime_and_scans_ports() -> None:
+    assert "ensure_docker_runtime" in DOCKER_INSTALL
+    assert "install_docker_packages" in DOCKER_INSTALL
+    assert "docker.io" in DOCKER_INSTALL
+    assert "docker-compose-plugin" in DOCKER_INSTALL
+    assert "docker-compose-v2" in DOCKER_INSTALL
+    assert "docker-compose" in DOCKER_INSTALL
+    assert "systemctl enable --now docker" in DOCKER_INSTALL
+    assert "service docker start" in DOCKER_INSTALL
+    assert "docker info" in DOCKER_INSTALL
     assert "choose_admin_port" in DOCKER_INSTALL
     assert "choose_block tcp" in DOCKER_INSTALL
     assert "choose_block udp" in DOCKER_INSTALL
@@ -33,8 +42,7 @@ def test_docker_install_scans_ports_without_host_service_changes() -> None:
     assert "PROXYBOX_FIRST_DEVICE" in DOCKER_INSTALL
     assert "PROXYBOX_REWRITE_ENV=1" in DOCKER_INSTALL
     assert "network_mode" not in DOCKER_INSTALL
-    assert "systemctl" not in DOCKER_INSTALL
-    assert "apt-get" not in DOCKER_INSTALL
+    assert "systemctl restart" not in DOCKER_INSTALL
 
 
 def test_bootstrap_uses_docker_env_ports(monkeypatch, tmp_path: Path) -> None:

@@ -3,6 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
+SUDO=()
+DOCKER=(docker)
+DOCKER_NEEDS_SUDO=0
+COMPOSE=()
 
 die() {
     echo "ERROR: $*" >&2
@@ -14,15 +18,109 @@ info() {
 }
 
 have_docker_compose() {
-    if docker compose version >/dev/null 2>&1; then
-        COMPOSE=(docker compose)
+    if "${DOCKER[@]}" compose version >/dev/null 2>&1; then
+        COMPOSE=("${DOCKER[@]}" compose)
         return 0
     fi
-    if command -v docker-compose >/dev/null 2>&1; then
-        COMPOSE=(docker-compose)
+    local compose_bin
+    compose_bin="$(command -v docker-compose 2>/dev/null || true)"
+    if [ -n "$compose_bin" ]; then
+        if [ "$DOCKER_NEEDS_SUDO" = "1" ]; then
+            COMPOSE=("${SUDO[@]}" "$compose_bin")
+        else
+            COMPOSE=("$compose_bin")
+        fi
         return 0
     fi
     return 1
+}
+
+setup_privilege() {
+    if [ "$(id -u)" = "0" ]; then
+        SUDO=()
+        return
+    fi
+    command -v sudo >/dev/null 2>&1 || die "root or passwordless sudo is required"
+    sudo -n true >/dev/null 2>&1 || die "passwordless sudo is required"
+    SUDO=(sudo)
+}
+
+check_supported_os() {
+    [ -r /etc/os-release ] || die "unsupported OS: /etc/os-release not found"
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    case "${ID:-}" in
+        debian|ubuntu) ;;
+        *) die "unsupported OS: ${ID:-unknown}; Debian or Ubuntu is required" ;;
+    esac
+}
+
+install_docker_packages() {
+    check_supported_os
+    info "installing Docker runtime packages"
+    "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        git curl ca-certificates docker.io
+    if ! "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        docker-compose-plugin; then
+        if ! "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            docker-compose-v2; then
+            "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+                docker-compose
+        fi
+    fi
+}
+
+configure_docker_client() {
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        DOCKER=(docker)
+        DOCKER_NEEDS_SUDO=0
+        return 0
+    fi
+    if command -v docker >/dev/null 2>&1 \
+        && [ "${#SUDO[@]}" -gt 0 ] \
+        && "${SUDO[@]}" docker info >/dev/null 2>&1; then
+        DOCKER=("${SUDO[@]}" docker)
+        DOCKER_NEEDS_SUDO=1
+        return 0
+    fi
+    return 1
+}
+
+start_docker_service() {
+    if configure_docker_client; then
+        return
+    fi
+
+    info "starting Docker service"
+    if command -v systemctl >/dev/null 2>&1; then
+        "${SUDO[@]}" systemctl enable --now docker >/dev/null 2>&1 || true
+    elif command -v service >/dev/null 2>&1; then
+        "${SUDO[@]}" service docker start >/dev/null 2>&1 || true
+    fi
+
+    for _ in {1..20}; do
+        if configure_docker_client; then
+            return
+        fi
+        sleep 1
+    done
+    die "Docker daemon is not available after install/start"
+}
+
+ensure_docker_runtime() {
+    setup_privilege
+    if ! command -v docker >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+        install_docker_packages
+    fi
+
+    start_docker_service
+
+    if ! have_docker_compose; then
+        install_docker_packages
+        start_docker_service
+    fi
+    have_docker_compose || die "Docker Compose is required but could not be installed"
 }
 
 ss_listen() {
@@ -236,9 +334,7 @@ PY
 main() {
     cd "$ROOT_DIR"
 
-    command -v docker >/dev/null 2>&1 || die "Docker is required. Install Docker first, then rerun this script."
-    docker info >/dev/null 2>&1 || die "Docker daemon is not available."
-    have_docker_compose || die "Docker Compose is required."
+    ensure_docker_runtime
 
     if [ -f "$ENV_FILE" ] && [ "${PROXYBOX_REWRITE_ENV:-0}" = "1" ] && [ "${PROXYBOX_FRESH:-0}" != "1" ]; then
         die "port rescan changes published ports; rerun with PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 for a clean reinstall"

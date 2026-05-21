@@ -1,6 +1,6 @@
 # Claude Code skill
 
-> A bundled Claude Code skill that drives the Docker-first install over SSH — minimal VPS check, `git clone` / update, Docker pre-flight, `deploy/docker-install.sh`, verification, credential handoff.
+> A bundled Claude Code skill that drives the Docker-first install over SSH — minimal VPS check, `git clone` / update, Docker runtime provisioning via `deploy/docker-install.sh`, verification, credential handoff.
 
 For the high-level walkthrough, see [Getting started · Path 3](../getting-started.md#path-3--claude-code).
 
@@ -30,10 +30,10 @@ Claude will:
 | 1 | Ask for SSH user / auth method if missing from the prompt. |
 | 2 | Use a temporary session-local `known_hosts` file that is deleted on shell exit instead of editing your normal SSH trust store. |
 | 3 | Run a minimal inline VPS check before the repo exists. |
-| 4 | Install bootstrap tools (`git`, `curl`, `ca-certificates`, Docker, Compose plugin) if missing. |
+| 4 | Install bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
 | 5 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or update an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
-| 6 | Verify Docker / Compose and let `deploy/docker-install.sh` scan free host ports. |
-| 7 | Run `bash deploy/docker-install.sh`. |
+| 6 | Run `bash deploy/docker-install.sh`, which checks/installs Docker + Compose, starts Docker, and scans free host ports. |
+| 7 | Start the isolated Docker stack. |
 | 8 | Verify the Docker services are `Up`. |
 | 9 | Relay the login URL, username, password, and first device status back to you. |
 

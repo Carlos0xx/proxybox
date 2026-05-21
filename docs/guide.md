@@ -30,7 +30,7 @@ It accounts traffic per device, classifies destination hosts (Video / Social / A
 | Requirement | Detail |
 | --- | --- |
 | **OS** | Debian/Ubuntu VPS. Docker path can run on an existing host; native path still expects a clean VPS. |
-| **Access** | Root SSH, Docker, and Docker Compose for the default path. |
+| **Access** | Root SSH or passwordless sudo. The Docker installer installs/starts Docker and Compose if missing. |
 | **Resources** | ≥ 1 GB RAM · ≥ 5 GB free disk. |
 | **Required ports** | Docker installer auto-selects free Admin, VLESS, and Hy2 ports and writes them to `.env`. |
 | **For HTTPS later** | A domain pointing at the VPS · `80/tcp` + `443/tcp` open. **Optional but recommended.** |
@@ -41,7 +41,7 @@ It accounts traffic per device, classifies destination hosts (Video / Social / A
 
 | Path | Best for | Reference |
 | --- | --- | --- |
-| **A · Docker install** *(recommended)* | Existing VPS or clean VPS with Docker | [`deploy/docker.md`](./deploy/docker.md) |
+| **A · Docker install** *(recommended)* | Existing or clean Debian/Ubuntu VPS | [`deploy/docker.md`](./deploy/docker.md) |
 | **B · Claude Code / Codex** | Users with an AI coding agent | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
 | **C · `install.sh`** | Clean Debian/Ubuntu VPS needing host fail2ban/Caddy | [`deploy/install-sh.md`](./deploy/install-sh.md) |
 
@@ -49,13 +49,13 @@ It accounts traffic per device, classifies destination hosts (Video / Social / A
 
 ```bash
 ssh root@<your-vps>
-apt-get update && (apt-get install -y git curl ca-certificates docker.io docker-compose-plugin || apt-get install -y git curl ca-certificates docker.io docker-compose)
+apt-get update && apt-get install -y git curl ca-certificates
 git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox
 bash deploy/docker-install.sh
 ```
 
-The installer checks Docker/Compose, scans host ports, writes `.env`, and starts an isolated bridge-network stack. It does not install Python 3.11, write systemd units, enable fail2ban, configure Caddy, or touch SSH known_hosts on the host.
+The installer checks Docker/Compose, installs missing Docker packages, starts the Docker service, scans host ports, writes `.env`, and starts an isolated bridge-network stack. It does not install Python 3.11, write ProxyBox systemd units, enable fail2ban, configure Caddy, or touch SSH known_hosts on the host.
 
 #### Path B — Claude Code / Codex
 
@@ -178,7 +178,7 @@ ProxyBox 是跑在单台 VPS 上的 sing-box 管理后台。给**每台设备独
 | 要求 | 详情 |
 | --- | --- |
 | **系统** | Debian/Ubuntu VPS。Docker 路径可跑在已有服务的机器上;裸机路径仍建议干净 VPS。 |
-| **访问** | 默认路径需要 root SSH、Docker、Docker Compose。 |
+| **访问** | root SSH 或免密 sudo。Docker/Compose 缺失时安装器会自动安装并启动。 |
 | **资源** | ≥ 1 GB 内存 · ≥ 5 GB 空闲磁盘。 |
 | **必开端口** | Docker 安装器会自动挑空闲的 Admin、VLESS、Hy2 端口并写入 `.env`。 |
 | **想开 HTTPS** | 域名解析到 VPS · `80/tcp` + `443/tcp` 开放。**可选但推荐。** |
@@ -189,7 +189,7 @@ ProxyBox 是跑在单台 VPS 上的 sing-box 管理后台。给**每台设备独
 
 | 方式 | 适合 | 详细 |
 | --- | --- | --- |
-| **A · Docker 安装** *(推荐)* | 已有 VPS 或干净 VPS,只要求 Docker | [`deploy/docker.md`](./deploy/docker.md) |
+| **A · Docker 安装** *(推荐)* | 已有或干净的 Debian/Ubuntu VPS | [`deploy/docker.md`](./deploy/docker.md) |
 | **B · Claude Code / Codex** | 手边有 AI 代理的用户 | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
 | **C · `install.sh`** | 需要宿主 fail2ban/Caddy 的干净 VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
 
@@ -197,13 +197,13 @@ ProxyBox 是跑在单台 VPS 上的 sing-box 管理后台。给**每台设备独
 
 ```bash
 ssh root@<你的-vps>
-apt-get update && (apt-get install -y git curl ca-certificates docker.io docker-compose-plugin || apt-get install -y git curl ca-certificates docker.io docker-compose)
+apt-get update && apt-get install -y git curl ca-certificates
 git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox
 bash deploy/docker-install.sh
 ```
 
-安装器检查 Docker/Compose,扫描宿主机端口,写 `.env`,然后启动 bridge 网络隔离的 Docker stack。它不会在宿主机安装 Python 3.11、写 systemd unit、启用 fail2ban、配置 Caddy 或触碰 SSH known_hosts。
+安装器检查 Docker/Compose,缺失时自动安装 Docker 包并启动 Docker 服务,然后扫描宿主机端口、写 `.env`、启动 bridge 网络隔离的 Docker stack。它不会在宿主机安装 Python 3.11、写 ProxyBox systemd unit、启用 fail2ban、配置 Caddy 或触碰 SSH known_hosts。
 
 #### 方式 B — Claude Code / Codex
 

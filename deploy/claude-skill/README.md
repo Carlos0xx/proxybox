@@ -6,7 +6,7 @@ Trigger in any Claude Code session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-Claude then checks the VPS, clones or updates the repo, runs the Docker pre-flight, executes `deploy/docker-install.sh`, verifies the services, and hands back the login URL + credentials.
+Claude then checks the VPS, clones or updates the repo, lets `deploy/docker-install.sh` install/start Docker if needed, verifies the services, and hands back the login URL + credentials.
 
 ---
 
@@ -28,10 +28,10 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | 1 | Asks for SSH user / auth method if missing from the prompt. |
 | 2 | Creates a temporary session-local `known_hosts` file, deletes it on shell exit, and leaves the user's normal SSH trust store untouched. |
 | 3 | Runs a minimal inline VPS check before the repo exists. |
-| 4 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`, Docker, Compose plugin) if missing. |
+| 4 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
 | 5 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or updates an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
-| 6 | Verifies Docker / Compose and lets `deploy/docker-install.sh` scan free host ports. |
-| 7 | Runs `bash deploy/docker-install.sh`. |
+| 6 | Runs `bash deploy/docker-install.sh`, which checks/installs Docker + Compose, starts Docker, and scans free host ports. |
+| 7 | Starts the isolated Docker stack. |
 | 8 | Verifies `sing-box`, `proxybox-admin`, and `proxybox-traffic-worker` are `Up`. |
 | 9 | Relays the **login URL + full password + first device status** back to the user. |
 | 10 | *(optional)* Writes `/opt/proxybox/bot.env` + starts `proxybox-bot` profile if Telegram details were supplied. |

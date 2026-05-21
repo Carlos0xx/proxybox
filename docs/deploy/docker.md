@@ -6,7 +6,7 @@
 
 ```bash
 ssh root@<your-vps>
-apt-get update && (apt-get install -y git curl ca-certificates docker.io docker-compose-plugin || apt-get install -y git curl ca-certificates docker.io docker-compose)
+apt-get update && apt-get install -y git curl ca-certificates
 git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox
 bash deploy/docker-install.sh
@@ -16,7 +16,7 @@ bash deploy/docker-install.sh
 
 | 步骤 | 行为 |
 | --- | --- |
-| Docker 检查 | 只检查 Docker / Compose 是否可用,不会自动 apt 安装 Docker。 |
+| Docker 检查 | 检查 Docker CLI、Compose、daemon;缺失时 apt 安装 Docker/Compose,daemon 未运行时自动启动。 |
 | 端口扫描 | 8080 可用就用 8080;被占用就选 18080/28080/...。VLESS/Hy2 也会选择一整段空闲端口。 |
 | 写 `.env` | 把选中的端口、public host、fresh 标记写进项目目录 `.env`。 |
 | 启动 stack | `docker compose up -d --build`,使用 bridge network + 显式 published ports。 |

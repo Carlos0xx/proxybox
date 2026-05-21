@@ -40,12 +40,12 @@
 
 ```bash
 ssh root@<你的-vps>
-apt-get update && (apt-get install -y git curl ca-certificates docker.io docker-compose-plugin || apt-get install -y git curl ca-certificates docker.io docker-compose)
+apt-get update && apt-get install -y git curl ca-certificates
 git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox && bash deploy/docker-install.sh
 ```
 
-`deploy/docker-install.sh` 会扫描宿主机端口:默认端口没被占用就用默认值,被占用就自动挑一组空闲端口并写入 `.env`。Docker stack 使用 bridge 网络,只发布被选中的端口,不会安装或改写宿主机 Python、systemd unit、fail2ban、Caddy、SSH known_hosts。设备列表为空时,安装器会自动创建一个 5 位小写随机设备名。
+`deploy/docker-install.sh` 会在缺失时自动安装/启动 Docker 和 Compose,然后扫描宿主机端口:默认端口没被占用就用默认值,被占用就自动挑一组空闲端口并写入 `.env`。Docker stack 使用 bridge 网络,只发布被选中的端口,不会安装或改写宿主机 Python、ProxyBox systemd unit、fail2ban、Caddy、SSH known_hosts。设备列表为空时,安装器会自动创建一个 5 位小写随机设备名。
 
 复用过的 Docker volume 想无痕重装时:
 

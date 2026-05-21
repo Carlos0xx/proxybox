@@ -79,8 +79,9 @@ Bail out if any of:
 
 ### Step 2 — Get the source onto the VPS
 
-A minimal Debian image typically ships *without* `git`, `curl`, or Docker, so
-preamble the clone with an apt install. The package list is small and
+A minimal Debian image typically ships *without* `git` or `curl`, so
+preamble the clone with an apt install. Docker itself is checked and installed
+by `deploy/docker-install.sh` in Step 4. The package list is small and
 idempotent — re-running it on a fully-provisioned host is a no-op. Existing
 checkouts must be updated from `origin/main` explicitly so a stale
 `/opt/proxybox` cannot keep serving an old installer.
@@ -93,8 +94,7 @@ checkouts must be updated from `origin/main` explicitly so a stale
 
   # bootstrap tools that may be missing on a minimal Debian / Ubuntu cloud image
   $SUDO apt-get update -qq
-  $SUDO apt-get install -y -qq git curl ca-certificates docker.io docker-compose-plugin \
-    || $SUDO apt-get install -y -qq git curl ca-certificates docker.io docker-compose
+  $SUDO apt-get install -y -qq git curl ca-certificates
 
   if [ -d /opt/proxybox/.git ]; then
     $SUDO git -C /opt/proxybox remote set-url origin https://github.com/carlos0xx/proxybox
@@ -117,21 +117,20 @@ checkouts must be updated from `origin/main` explicitly so a stale
 
 ### Step 3 — Docker pre-flight
 
-Now that `/opt/proxybox` exists, verify Docker is available. Do not run the
-native `check-prereqs.sh` for the default Docker path; that script is for the
-host-systemd installer.
+Now that `/opt/proxybox` exists, do only a lightweight host probe. Do not run
+the native `check-prereqs.sh` for the default Docker path; that script is for
+the host-systemd installer. Missing Docker / Compose / daemon startup is
+handled by `deploy/docker-install.sh` in the next step.
 
 ```bash
 "${SSH[@]}" "$USER@$HOST" '
   cd /opt/proxybox
-  docker info >/dev/null
-  docker compose version >/dev/null
   ss -H -ltn >/dev/null 2>&1 || true
   ss -H -lun >/dev/null 2>&1 || true
 '
 ```
 
-If Docker is not running, paste the error back to the user and stop.
+If this basic probe fails, paste the error back to the user and stop.
 
 ### Step 4 — Run Docker installer
 
@@ -142,8 +141,9 @@ If Docker is not running, paste the error back to the user and stop.
 '
 ```
 
-`deploy/docker-install.sh` scans host ports and writes `.env`. If `.env`
-already exists, it reuses the existing ports; use
+`deploy/docker-install.sh` checks Docker, installs Docker / Compose if
+missing, starts the Docker service, scans host ports, and writes `.env`. If
+`.env` already exists, it reuses the existing ports; use
 `PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh` only
 when the user explicitly wants a clean reinstall and port rescan.
 

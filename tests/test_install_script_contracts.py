@@ -81,8 +81,8 @@ def test_docker_bootstrap_supports_fresh_mode_for_named_volumes() -> None:
 def test_deploy_skill_updates_existing_checkout_from_origin_main() -> None:
     assert "git -C /opt/proxybox fetch --prune origin main" in DEPLOY_SKILL
     assert "git -C /opt/proxybox pull --ff-only origin main" in DEPLOY_SKILL
-    assert "docker compose version" in DEPLOY_SKILL
     assert "bash deploy/docker-install.sh" in DEPLOY_SKILL
+    assert "installs Docker / Compose" in DEPLOY_SKILL
     assert "deploy/check-prereqs.sh --install --lang $LANG_FLAG" not in DEPLOY_SKILL
     assert "deploy/install.sh --fresh --lang $LANG_FLAG" not in DEPLOY_SKILL
     assert "exists but is not a git checkout" in DEPLOY_SKILL
