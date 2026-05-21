@@ -41,11 +41,26 @@ It accounts traffic per device, classifies destination hosts (Video / Social / A
 
 | Path | Best for | Reference |
 | --- | --- | --- |
-| **A · `install.sh`** | Fresh Debian/Ubuntu VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
-| **B · Docker Compose** | Anywhere with Docker | [`deploy/docker.md`](./deploy/docker.md) |
-| **C · Claude Code skill** | Claude Code users | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
+| **A · Claude Code / Codex** *(recommended)* | Users with an AI coding agent | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
+| **B · `install.sh`** | Fresh Debian/Ubuntu VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
+| **C · Docker Compose** | Anywhere with Docker | [`deploy/docker.md`](./deploy/docker.md) |
 
-#### Path A — `install.sh` *(recommended)*
+#### Path A — Claude Code / Codex *(recommended)*
+
+For Claude Code, install the bundled skill once:
+
+```bash
+mkdir -p ~/.claude/skills/proxybox-deploy
+cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
+```
+
+Then ask in any session:
+
+> deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
+
+The agent walks pre-flight → `git clone` → `install.sh` → verification → relays the credentials back. For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) directly.
+
+#### Path B — `install.sh`
 
 ```bash
 ssh root@<your-vps>
@@ -60,7 +75,7 @@ Idempotent — safe to re-run if it bails mid-way. End-to-end ~3 minutes. Prints
 > [!IMPORTANT]
 > Copy the credentials into a password manager **before closing the terminal**. They're also persisted to `/etc/proxybox/config.yaml`.
 
-#### Path B — Docker Compose
+#### Path C — Docker Compose
 
 ```bash
 git clone https://github.com/carlos0xx/proxybox && cd proxybox
@@ -70,17 +85,6 @@ docker compose exec proxybox-admin \
 ```
 
 Bootstrap container generates the config on first start. No fail2ban, no HTTPS UI on this path — pair with Caddy + a host firewall for production.
-
-#### Path C — Claude Code skill
-
-```bash
-mkdir -p ~/.claude/skills/proxybox-deploy
-cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
-```
-
-Then ask in any Claude Code session:
-
-> deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
 ---
 
@@ -186,11 +190,26 @@ ProxyBox 是跑在单台 VPS 上的 sing-box 管理后台。给**每台设备独
 
 | 方式 | 适合 | 详细 |
 | --- | --- | --- |
-| **A · `install.sh`** | 干净的 Debian/Ubuntu VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
-| **B · Docker Compose** | 任何带 Docker 的环境 | [`deploy/docker.md`](./deploy/docker.md) |
-| **C · Claude Code skill** | Claude Code 用户 | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
+| **A · Claude Code / Codex** *(推荐)* | 手边有 AI 代理的用户 | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
+| **B · `install.sh`** | 干净的 Debian/Ubuntu VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
+| **C · Docker Compose** | 任何带 Docker 的环境 | [`deploy/docker.md`](./deploy/docker.md) |
 
-#### 方式 A — `install.sh` *(推荐)*
+#### 方式 A — Claude Code / Codex *(推荐)*
+
+Claude Code 用户先把 skill 复制过去一次:
+
+```bash
+mkdir -p ~/.claude/skills/proxybox-deploy
+cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
+```
+
+然后在对话里:
+
+> 帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519
+
+代理走 pre-flight → `git clone` → `install.sh` → 验证服务 → 把凭据发给你。Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) 喂给它即可。
+
+#### 方式 B — `install.sh`
 
 ```bash
 ssh root@<你的-vps>
@@ -205,7 +224,7 @@ bash deploy/install.sh --lang zh       # 或 --lang en
 > [!IMPORTANT]
 > **关闭终端前**先把凭据抄到密码管理器。完整凭据也存在 `/etc/proxybox/config.yaml`。
 
-#### 方式 B — Docker Compose
+#### 方式 C — Docker Compose
 
 ```bash
 git clone https://github.com/carlos0xx/proxybox && cd proxybox
@@ -215,17 +234,6 @@ docker compose exec proxybox-admin \
 ```
 
 `bootstrap` 容器首次启动时生成 config。这个路径不带 fail2ban 和 HTTPS UI —— 生产环境请配 Caddy + 主机防火墙。
-
-#### 方式 C — Claude Code skill
-
-```bash
-mkdir -p ~/.claude/skills/proxybox-deploy
-cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
-```
-
-然后在 Claude Code 对话里:
-
-> 帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519
 
 ---
 

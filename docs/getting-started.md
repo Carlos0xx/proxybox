@@ -18,7 +18,30 @@ For a higher-level walkthrough of day-to-day operations after install, see [`gui
 
 ---
 
-## Path 1 — `install.sh` &nbsp;<sub>(recommended for Linux VPS)</sub>
+## Path 1 — Claude Code / Codex &nbsp;<sub>(recommended)</sub>
+
+Let an AI coding agent drive the install over SSH. Lowest-friction option if you already have Claude Code or Codex open.
+
+For **Claude Code**, install the bundled skill once:
+
+```bash
+mkdir -p ~/.claude/skills/proxybox-deploy
+cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
+```
+
+Then in any session:
+
+> deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
+
+The agent runs `deploy/check-prereqs.sh`, `git clone`s the repo on the VPS, executes `install.sh`, verifies the four core services, and relays the **login URL, username, password, and 5 subscription URLs** back to you.
+
+For **Codex** or other coding agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
+
+Full reference: [`deploy/claude-skill.md`](./deploy/claude-skill.md).
+
+---
+
+## Path 2 — `install.sh` &nbsp;<sub>(Debian / Ubuntu VPS)</sub>
 
 ```bash
 ssh root@<your-vps>
@@ -46,7 +69,7 @@ Full reference: [`deploy/install-sh.md`](./deploy/install-sh.md).
 
 ---
 
-## Path 2 — Docker Compose
+## Path 3 — Docker Compose
 
 ```bash
 git clone https://github.com/carlos0xx/proxybox && cd proxybox
@@ -70,23 +93,6 @@ docker compose --profile bot up -d proxybox-bot
 | No automatic Caddy / HTTPS provisioning. | Pair with an external Caddy / nginx / Cloudflare Tunnel in front of port 8080. |
 
 Full reference: [`deploy/docker.md`](./deploy/docker.md).
-
----
-
-## Path 3 — Claude Code
-
-If you use Claude Code, install the bundled skill once:
-
-```bash
-mkdir -p ~/.claude/skills/proxybox-deploy
-cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
-```
-
-Then ask Claude in any session:
-
-> deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
-
-Claude runs the same pre-flight checks, `git clone`s the repo, runs `install.sh`, verifies all four services, and relays the credentials. Full reference: [`deploy/claude-skill.md`](./deploy/claude-skill.md).
 
 ---
 

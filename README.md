@@ -36,7 +36,20 @@
 
 ## Install
 
-### A · `install.sh` *(recommended, Debian / Ubuntu VPS)*
+### A · Claude Code / Codex *(recommended)*
+
+Let an AI coding agent drive the install over SSH. For Claude Code, install the bundled skill once:
+
+```bash
+mkdir -p ~/.claude/skills/proxybox-deploy
+cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
+```
+
+Then in any session: *"deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519"*. The agent runs pre-flight → `git clone` → `install.sh` → service verification → hands back the login URL + credentials.
+
+For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](./deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
+
+### B · `install.sh` *(Debian / Ubuntu VPS)*
 
 ```bash
 ssh root@<your-vps>
@@ -47,7 +60,7 @@ cd /opt/proxybox && bash deploy/install.sh
 
 Idempotent. Generates Reality keypair, Hy2 cert, random 16-char admin password. Auto-creates the first device. Prints **login URL · username · password · 5 subscription URLs** in a single block.
 
-### B · Docker Compose
+### C · Docker Compose
 
 ```bash
 git clone https://github.com/carlos0xx/proxybox && cd proxybox
@@ -55,15 +68,6 @@ docker compose up -d
 ```
 
 Multi-arch images at `ghcr.io/carlos0xx/proxybox:latest`. No fail2ban or HTTPS UI on this path — pair with Caddy + a host firewall for production.
-
-### C · Claude Code skill
-
-```bash
-mkdir -p ~/.claude/skills/proxybox-deploy
-cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
-```
-
-Then in a Claude Code session: *"deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519"*. Claude runs pre-flight + `install.sh` + verification + credential handoff.
 
 > [!IMPORTANT]
 > The installer prints login URL + password **once**. Copy them into a password manager before closing the terminal — they are also stored in `/etc/proxybox/config.yaml`.

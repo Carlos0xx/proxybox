@@ -36,7 +36,20 @@
 
 ## 安装
 
-### 方式 A · `install.sh` *(推荐,Debian / Ubuntu VPS)*
+### 方式 A · Claude Code / Codex *(推荐)*
+
+让 AI 代理通过 SSH 替你装。Claude Code 用户先把 skill 复制过去一次:
+
+```bash
+mkdir -p ~/.claude/skills/proxybox-deploy
+cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
+```
+
+然后在对话里:*"帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519"*。代理走 pre-flight → `git clone` → `install.sh` → 验证服务 → 把登录地址 + 凭据发给你。
+
+Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](./deploy/claude-skill/SKILL.md) 喂给它 —— 指令是通用的,不绑 Claude Code。
+
+### 方式 B · `install.sh` *(Debian / Ubuntu VPS)*
 
 ```bash
 ssh root@<你的-vps>
@@ -47,7 +60,7 @@ cd /opt/proxybox && bash deploy/install.sh --lang zh
 
 幂等。自动生成 Reality 密钥对、Hy2 证书、16 位随机 admin 密码,自动建第一台设备,最后打印自包含的**登录地址 · 用户名 · 密码 · 5 个订阅 URL**。
 
-### 方式 B · Docker Compose
+### 方式 C · Docker Compose
 
 ```bash
 git clone https://github.com/carlos0xx/proxybox && cd proxybox
@@ -55,15 +68,6 @@ docker compose up -d
 ```
 
 多架构镜像在 `ghcr.io/carlos0xx/proxybox:latest`。这个路径不带 fail2ban 和 HTTPS UI —— 生产环境请配 Caddy + 主机防火墙。
-
-### 方式 C · Claude Code skill
-
-```bash
-mkdir -p ~/.claude/skills/proxybox-deploy
-cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
-```
-
-然后在 Claude Code 对话里:*"帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519"*。Claude 走 pre-flight → `install.sh` → 验证服务 → 把凭据发给你。
 
 > [!IMPORTANT]
 > 安装器**只打印一次**登录地址 + 密码。关闭终端前抄进密码管理器 —— 凭据也存在 `/etc/proxybox/config.yaml` 里。
