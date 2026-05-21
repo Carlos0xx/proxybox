@@ -45,14 +45,14 @@ git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox && bash deploy/docker-install.sh
 ```
 
-`deploy/docker-install.sh` installs/starts Docker, Compose, and the port scanner if missing, scans host ports, keeps the defaults when free, otherwise picks a free admin port and free VLESS/Hy2 port blocks, then prints and writes them to `.env`. The stack uses Docker bridge networking and only publishes those selected ports; it does not install or rewrite host Python, ProxyBox systemd units, fail2ban, Caddy, or SSH known_hosts. If the device list is empty, it auto-creates one random five-letter lowercase device.
+`deploy/docker-install.sh` installs/starts Docker, Compose, and the port scanner if missing, scans host ports, keeps the defaults when free, otherwise picks a free admin port and free VLESS/Hy2 port blocks, then prints and writes them to `.env`. Every installer run creates a new isolated Compose project name and new Docker volumes, so admin paths, passwords, keys, and subscription URLs are regenerated without deleting any older ProxyBox projects. The stack uses Docker bridge networking and only publishes those selected ports; it does not install or rewrite host Python, ProxyBox systemd units, fail2ban, Caddy, SSH known_hosts, or unrelated services. If the device list is empty, it auto-creates one random five-letter lowercase device.
 
-For a no-trace reinstall on reused Docker volumes:
+To upgrade the current project in place instead of creating a fresh project:
 
 ```bash
 cd /opt/proxybox
-docker compose down
-PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh
+git pull
+PROXYBOX_UPGRADE=1 bash deploy/docker-install.sh
 ```
 
 ### B · Claude Code / Codex

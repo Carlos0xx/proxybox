@@ -225,12 +225,30 @@ detect_public_host() {
         || true
 }
 
+new_project_name() {
+    printf 'proxybox-%s-%04x%04x' "$(date +%s)" "$RANDOM" "$RANDOM"
+}
+
+validate_project_name() {
+    local name="$1"
+    case "$name" in
+        [a-z0-9]*)
+            if printf '%s' "$name" | grep -Eq '^[a-z0-9][a-z0-9_-]*$'; then
+                return 0
+            fi
+            ;;
+    esac
+    die "invalid PROXYBOX_PROJECT_NAME: use lowercase letters, digits, hyphen, or underscore"
+}
+
 write_env_file() {
-    local admin_port public_host
+    local admin_port public_host project_name
     local vless_block hy2_block
     local vless_template vless_start vless_end
     local hy2_template hy2_start hy2_end
 
+    project_name="${PROXYBOX_PROJECT_NAME:-$(new_project_name)}"
+    validate_project_name "$project_name"
     admin_port="$(choose_admin_port)"
     vless_block="$(choose_block tcp 11000 12000 13000 14000 15000 16000 17000 18000 19000)"
     hy2_block="$(choose_block udp 21000 22000 23000 24000 25000 26000 27000 28000 29000)"
@@ -240,6 +258,9 @@ write_env_file() {
 
     umask 077
     cat > "$ENV_FILE" <<EOF
+COMPOSE_PROJECT_NAME=${project_name}
+PROXYBOX_IMAGE=proxybox:${project_name}
+PROXYBOX_SINGBOX_IMAGE=proxybox-sing-box:${project_name}
 PROXYBOX_PUBLIC_HOST=${public_host}
 PROXYBOX_ADMIN_BIND=0.0.0.0
 PROXYBOX_ADMIN_PORT=${admin_port}
@@ -250,8 +271,9 @@ PROXYBOX_VLESS_END=${vless_end}
 PROXYBOX_HY2_TEMPLATE_PORT=${hy2_template}
 PROXYBOX_HY2_START=${hy2_start}
 PROXYBOX_HY2_END=${hy2_end}
-PROXYBOX_FRESH=${PROXYBOX_FRESH:-0}
+PROXYBOX_FRESH=0
 EOF
+    info "created isolated Docker project: ${project_name}"
     info "selected ports: admin=${admin_port}/tcp, vless=${vless_template}+${vless_start}-${vless_end}/tcp, hy2=${hy2_template}+${hy2_start}-${hy2_end}/udp"
 }
 
@@ -385,15 +407,11 @@ main() {
 
     ensure_docker_runtime
 
-    if [ -f "$ENV_FILE" ] && [ "${PROXYBOX_REWRITE_ENV:-0}" = "1" ] && [ "${PROXYBOX_FRESH:-0}" != "1" ]; then
-        die "port rescan changes published ports; rerun with PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 for a clean reinstall"
-    fi
-
-    if [ -f "$ENV_FILE" ] && [ "${PROXYBOX_REWRITE_ENV:-0}" != "1" ]; then
-        info "using existing .env (set PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 for a clean port rescan)"
+    if [ -f "$ENV_FILE" ] && [ "${PROXYBOX_UPGRADE:-0}" = "1" ]; then
+        info "upgrade mode: using existing .env for the current ProxyBox project"
         print_selected_ports
     else
-        info "scanning free host ports and writing .env"
+        info "scanning free host ports and writing a new isolated .env"
         write_env_file
     fi
 

@@ -142,10 +142,11 @@ If this basic probe fails, paste the error back to the user and stop.
 ```
 
 `deploy/docker-install.sh` checks Docker, installs Docker / Compose if
-missing, starts the Docker service, scans host ports, and writes `.env`. If
-`.env` already exists, it reuses the existing ports; use
-`PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh` only
-when the user explicitly wants a clean reinstall and port rescan.
+missing, starts the Docker service, scans host ports, and writes `.env`.
+Each installer run creates a new Compose project name and new Docker volumes.
+It must not stop, delete, or rewrite any older ProxyBox project or unrelated
+host service. If the user explicitly asks to upgrade the current project in
+place, use `PROXYBOX_UPGRADE=1 bash deploy/docker-install.sh`.
 
 ### Step 5 — Verify
 
@@ -313,11 +314,12 @@ phones and laptops — Clash YAML is mainly for routers and Stash power-users.
   file from the SSH setup step, let the `trap` delete it, and do not report
   or persist host fingerprints.
 - **Never** bypass Docker port detection on a host that already runs unrelated
-  services. Let `deploy/docker-install.sh` write `.env`.
+  services. Let `deploy/docker-install.sh` write a fresh isolated `.env`.
 - **Never** commit the generated `config.yaml`, `bot.env`, or `session-secret`
   to any git repository
-- **Don't** force `PROXYBOX_FRESH=1` unless the user asked for a no-trace
-  reinstall. Default Docker upgrades reuse named volumes.
+- **Never** delete or stop older ProxyBox containers/volumes just because this
+  install is being re-run. New installs create a new Compose project; upgrades
+  require explicit `PROXYBOX_UPGRADE=1`.
 
 ## Reporting failures
 

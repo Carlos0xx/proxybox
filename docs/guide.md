@@ -55,7 +55,7 @@ cd /opt/proxybox
 bash deploy/docker-install.sh
 ```
 
-The installer checks Docker/Compose and `ss`/`iproute2`, installs missing runtime packages, starts the Docker service, scans host ports, prints/writes the selected ports to `.env`, and starts an isolated bridge-network stack. It does not install Python 3.11, write ProxyBox systemd units, enable fail2ban, configure Caddy, or touch SSH known_hosts on the host.
+The installer checks Docker/Compose and `ss`/`iproute2`, installs missing runtime packages, starts the Docker service, scans host ports, prints/writes a fresh isolated Compose project to `.env`, and starts a bridge-network stack. Each installer run creates new ProxyBox Docker volumes and new credentials/subscription URLs without deleting any older ProxyBox projects. It does not install Python 3.11, write ProxyBox systemd units, enable fail2ban, configure Caddy, touch SSH known_hosts, or change unrelated host services.
 
 #### Path B — Claude Code / Codex
 
@@ -203,7 +203,7 @@ cd /opt/proxybox
 bash deploy/docker-install.sh
 ```
 
-安装器检查 Docker/Compose 和 `ss`/`iproute2`,缺失时自动安装运行依赖并启动 Docker 服务,然后扫描宿主机端口、打印/写入 `.env`、启动 bridge 网络隔离的 Docker stack。它不会在宿主机安装 Python 3.11、写 ProxyBox systemd unit、启用 fail2ban、配置 Caddy 或触碰 SSH known_hosts。
+安装器检查 Docker/Compose 和 `ss`/`iproute2`,缺失时自动安装运行依赖并启动 Docker 服务,然后扫描宿主机端口、把新的独立 Compose project 写入 `.env`、启动 bridge 网络隔离的 Docker stack。每次运行安装器都会创建新的 ProxyBox Docker volumes 和新的凭据/订阅地址,不会删除任何旧 ProxyBox 项目。它不会在宿主机安装 Python 3.11、写 ProxyBox systemd unit、启用 fail2ban、配置 Caddy、触碰 SSH known_hosts 或修改无关宿主服务。
 
 #### 方式 B — Claude Code / Codex
 

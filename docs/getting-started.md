@@ -28,14 +28,14 @@ cd /opt/proxybox
 bash deploy/docker-install.sh
 ```
 
-`deploy/docker-install.sh` checks Docker/Compose and `ss`/`iproute2`, installs missing runtime packages, starts the Docker service, scans host ports, prints/writes the selected ports to `.env`, and starts an isolated bridge-network stack. It does not install Python 3.11, write ProxyBox systemd units, enable fail2ban, configure Caddy, or touch SSH known_hosts on the host.
+`deploy/docker-install.sh` checks Docker/Compose and `ss`/`iproute2`, installs missing runtime packages, starts the Docker service, scans host ports, prints/writes the selected ports to `.env`, and starts an isolated bridge-network stack. Every run creates a new Compose project and new Docker volumes, so credentials, keys, login paths, and subscription URLs are regenerated without deleting older ProxyBox projects. It does not install Python 3.11, write ProxyBox systemd units, enable fail2ban, configure Caddy, touch SSH known_hosts, or change unrelated services on the host.
 
-For a no-trace reinstall on reused Docker volumes:
+To upgrade the current project in place instead of creating a fresh project:
 
 ```bash
 cd /opt/proxybox
-docker compose down
-PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh
+git pull
+PROXYBOX_UPGRADE=1 bash deploy/docker-install.sh
 ```
 
 Full reference: [`deploy/docker.md`](./deploy/docker.md).

@@ -25,6 +25,8 @@ def test_compose_uses_bridge_network_and_env_published_ports() -> None:
     assert "${PROXYBOX_ADMIN_BIND:-0.0.0.0}:${PROXYBOX_ADMIN_PORT:-8080}:8080/tcp" in COMPOSE
     assert "${PROXYBOX_VLESS_START:-11001}-${PROXYBOX_VLESS_END:-11050}" in COMPOSE
     assert "${PROXYBOX_HY2_START:-21001}-${PROXYBOX_HY2_END:-21050}" in COMPOSE
+    assert "${PROXYBOX_IMAGE:-proxybox:local}" in COMPOSE
+    assert "${PROXYBOX_SINGBOX_IMAGE:-proxybox-sing-box:local}" in COMPOSE
     assert "proxybox-data:/var/lib/proxybox" in COMPOSE
     assert "/opt/proxybox/deploy/docker/admin-entrypoint.sh" in COMPOSE
     assert "PROXYBOX_DOCKER_LOG_DIR=/var/lib/proxybox/logs" in COMPOSE
@@ -50,9 +52,16 @@ def test_docker_install_provisions_runtime_and_scans_ports() -> None:
     assert "choose_block udp" in DOCKER_INSTALL
     assert "bootstrap_first_device" in DOCKER_INSTALL
     assert "PROXYBOX_FIRST_DEVICE" in DOCKER_INSTALL
-    assert "PROXYBOX_REWRITE_ENV=1" in DOCKER_INSTALL
+    assert "COMPOSE_PROJECT_NAME=" in DOCKER_INSTALL
+    assert "PROXYBOX_IMAGE=proxybox:${project_name}" in DOCKER_INSTALL
+    assert "PROXYBOX_SINGBOX_IMAGE=proxybox-sing-box:${project_name}" in DOCKER_INSTALL
+    assert "PROXYBOX_UPGRADE" in DOCKER_INSTALL
+    assert "PROXYBOX_REWRITE_ENV" not in DOCKER_INSTALL
     assert "network_mode" not in DOCKER_INSTALL
     assert "systemctl restart" not in DOCKER_INSTALL
+    assert "docker compose down" not in DOCKER_INSTALL
+    assert "docker volume rm" not in DOCKER_INSTALL
+    assert "rm -rf" not in DOCKER_INSTALL
 
 
 def test_bootstrap_uses_docker_env_ports(monkeypatch, tmp_path: Path) -> None:

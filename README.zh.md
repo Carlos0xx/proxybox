@@ -45,14 +45,14 @@ git clone https://github.com/carlos0xx/proxybox /opt/proxybox
 cd /opt/proxybox && bash deploy/docker-install.sh
 ```
 
-`deploy/docker-install.sh` 会在缺失时自动安装/启动 Docker、Compose 和端口检测工具,然后扫描宿主机端口:默认端口没被占用就用默认值,被占用就自动挑一组空闲端口并打印/写入 `.env`。Docker stack 使用 bridge 网络,只发布被选中的端口,不会安装或改写宿主机 Python、ProxyBox systemd unit、fail2ban、Caddy、SSH known_hosts。设备列表为空时,安装器会自动创建一个 5 位小写随机设备名。
+`deploy/docker-install.sh` 会在缺失时自动安装/启动 Docker、Compose 和端口检测工具,然后扫描宿主机端口:默认端口没被占用就用默认值,被占用就自动挑一组空闲端口并打印/写入 `.env`。每次运行安装器都会生成新的 Compose project name 和新的 Docker volumes,所以管理路径、密码、密钥、订阅地址都会重新生成,同时不会删除任何旧 ProxyBox 项目。Docker stack 使用 bridge 网络,只发布被选中的端口,不会安装或改写宿主机 Python、ProxyBox systemd unit、fail2ban、Caddy、SSH known_hosts 或无关服务。设备列表为空时,安装器会自动创建一个 5 位小写随机设备名。
 
-复用过的 Docker volume 想无痕重装时:
+如果是要原地升级当前项目,而不是新建一套:
 
 ```bash
 cd /opt/proxybox
-docker compose down
-PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh
+git pull
+PROXYBOX_UPGRADE=1 bash deploy/docker-install.sh
 ```
 
 ### 方式 B · Claude Code / Codex

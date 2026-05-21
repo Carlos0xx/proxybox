@@ -18,14 +18,15 @@ bash deploy/docker-install.sh
 | --- | --- |
 | Docker 检查 | 检查 Docker CLI、Compose、daemon;缺失时 apt 安装 Docker/Compose,daemon 未运行时自动启动。 |
 | 端口扫描 | 确保 `ss`/`iproute2` 可用后精确检测监听端口。8080 可用就用 8080;被占用就选 18080/28080/...。VLESS/Hy2 也会选择一整段空闲端口。 |
-| 写 `.env` | 把选中的端口、public host、fresh 标记写进项目目录 `.env`。 |
+| 写 `.env` | 把新的 Compose project name、专属镜像 tag、选中的端口和 public host 写进项目目录 `.env`。 |
 | 启动 stack | `docker compose up -d --build`,使用 bridge network + 显式 published ports。 |
 | 首台设备 | 如果设备列表为空,自动创建 5 个小写字母的随机设备名。`PROXYBOX_FIRST_DEVICE=` 可跳过。 |
 
-如果 `.env` 已存在,脚本默认复用它,避免升级时悄悄换端口。需要清理旧 volume 并重新扫描端口:
+每次运行安装器默认都会新建一套 Compose project 和 Docker volumes。它不会 `down`、删除或改写旧 ProxyBox project；旧项目如果还在运行,只会被端口扫描识别为“端口已占用”,新项目会自动选择其他端口。需要原地升级当前 `.env` 指向的项目时,显式使用:
 
 ```bash
-PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh
+git pull
+PROXYBOX_UPGRADE=1 bash deploy/docker-install.sh
 ```
 
 ## 端口策略
@@ -40,6 +41,9 @@ PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh
 `.env` 示例:
 
 ```dotenv
+COMPOSE_PROJECT_NAME=proxybox-1770000000-1a2b3c4d
+PROXYBOX_IMAGE=proxybox:proxybox-1770000000-1a2b3c4d
+PROXYBOX_SINGBOX_IMAGE=proxybox-sing-box:proxybox-1770000000-1a2b3c4d
 PROXYBOX_PUBLIC_HOST=203.0.113.10
 PROXYBOX_ADMIN_BIND=0.0.0.0
 PROXYBOX_ADMIN_PORT=18080
@@ -70,17 +74,13 @@ Docker 模式下,后台不会调用宿主 `systemctl` 来控制服务:
 | sing-box reload | Admin 写共享卷里的 reload flag,`sing-box` 容器内 wrapper 给进程发 HUP。 |
 | traffic worker restart | Admin 写共享卷里的 restart flag,worker 容器内 wrapper 重启子进程。 |
 | 服务状态 | Admin 自检自身、探测 sing-box Clash API、读取 worker heartbeat。 |
-| 日志 | 面板提示使用 `docker compose logs --tail=N <service>`。 |
+| 日志 | 面板直接读取容器共享卷里的服务日志。 |
 
-## 无痕重装
+## 新装与升级边界
 
-```bash
-cd /opt/proxybox
-docker compose down
-PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh
-```
+默认重新运行 `bash deploy/docker-install.sh` 是“新装”:生成新的 Compose project、新的 volume、新的端口选择、新的登录地址和订阅地址,不删除旧项目。
 
-这会清理 ProxyBox Docker volumes 内的配置、流量库、订阅缓存和 sing-box 密钥,再重新 bootstrap。它不会删除项目目录、不会改宿主 systemd/fail2ban/Caddy/SSH 配置。
+如果只是升级当前项目的代码和镜像,使用 `PROXYBOX_UPGRADE=1 bash deploy/docker-install.sh`。升级模式会复用当前 `.env` 指向的 Compose project。
 
 ## HTTPS 与 fail2ban
 
