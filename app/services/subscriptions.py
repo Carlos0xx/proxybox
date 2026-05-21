@@ -13,10 +13,13 @@ from __future__ import annotations
 import base64
 import contextlib
 import os
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
 import yaml
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from app.config import get_settings
@@ -251,12 +254,31 @@ def build_hysteria2_uri(device: dict[str, Any], sb_cfg: dict[str, Any], vps_host
         hy2_tpl.get("tls", {}).get("server_name")
         or singbox.find_template_inbound(sb_cfg, "vless")["tls"]["server_name"]
     )
+    query = {
+        "sni": sni,
+        "obfs": "salamander",
+        "obfs-password": obfs_pw,
+        "insecure": "1",
+    }
+    if pin := _hy2_cert_pin_sha256(hy2_tpl):
+        query["pinSHA256"] = pin
 
     return (
-        f"hysteria2://{device['hy2_password']}@{vps_host}:{device['hy2_port']}"
-        f"?sni={sni}&obfs=salamander&obfs-password={obfs_pw}&insecure=1"
+        f"hysteria2://{urllib.parse.quote(device['hy2_password'], safe='')}"
+        f"@{vps_host}:{device['hy2_port']}/?{urllib.parse.urlencode(query)}"
         f"#ProxyBox-{device['name']}-hy2"
     )
+
+
+def _hy2_cert_pin_sha256(hy2_tpl: dict[str, Any]) -> str | None:
+    cert_path = hy2_tpl.get("tls", {}).get("certificate_path")
+    if not cert_path:
+        return None
+    with contextlib.suppress(OSError, ValueError):
+        cert = x509.load_pem_x509_certificate(Path(cert_path).read_bytes())
+        digest = cert.fingerprint(hashes.SHA256())
+        return ":".join(f"{byte:02X}" for byte in digest)
+    return None
 
 
 def _reality_params(sb_cfg: dict[str, Any]) -> dict[str, Any]:
@@ -270,10 +292,6 @@ def _reality_params(sb_cfg: dict[str, Any]) -> dict[str, Any]:
         "short_id": reality["short_id"][0],
         "flow": (tpl_users[0].get("flow") if tpl_users else None) or "xtls-rprx-vision",
     }
-
-
-def _hy2_obfs_password(sb_cfg: dict[str, Any]) -> str:
-    return singbox.find_template_inbound(sb_cfg, "hysteria2").get("obfs", {}).get("password", "")
 
 
 def _require_public_host() -> str:
@@ -302,6 +320,8 @@ def build_clash_yaml(
         sb_cfg = singbox.read_config()
     vps_host = _require_public_host()
     r = _reality_params(sb_cfg)
+    hy2_tpl = singbox.find_template_inbound(sb_cfg, "hysteria2")
+    hy2_pin = _hy2_cert_pin_sha256(hy2_tpl)
     name_v = f"ProxyBox-{device['name']}-vless"
     name_h = f"ProxyBox-{device['name']}-hy2"
     cfg: dict[str, Any] = {
@@ -332,9 +352,10 @@ def build_clash_yaml(
                 "password": device["hy2_password"],
                 "sni": r["sni"],
                 "obfs": "salamander",
-                "obfs-password": _hy2_obfs_password(sb_cfg),
+                "obfs-password": hy2_tpl.get("obfs", {}).get("password", ""),
                 "alpn": ["h3"],
                 "skip-cert-verify": True,
+                **({"fingerprint": hy2_pin} if hy2_pin else {}),
             },
         ],
         "proxy-groups": [

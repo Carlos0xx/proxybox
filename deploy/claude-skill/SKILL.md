@@ -352,15 +352,16 @@ are generated on-the-fly from the same per-device row:
 | ------------------------- | --------------- | ------------------------------------------------- |
 | *(none, default)*         | URI list        | sing-box-iOS, Shadowrocket (Type: Subscribe), Hiddify |
 | `/sub.txt`                | URI list        | Same as default — `.txt` alias for clients that key on extension |
+| `/shadowrocket.yaml`      | Clash YAML      | Recommended Shadowrocket subscription with nodes + rules |
 | `/shadowrocket.txt`       | URI list        | Explicit Shadowrocket node-subscription alias |
 | `/clash.yaml`             | Mihomo / Clash  | Stash, Clash for iOS, Clash Verge (macOS/Win), Clash for Android |
-| `/shadowrocket.yaml`      | Clash YAML      | Shadowrocket config import with nodes + rules |
 | `/merlin.yaml`            | Clash + `tun:`  | AsusWRT-Merlin with Clash on the router (transparent proxy) |
 | `/shadowrocket.conf`      | Rules `.conf`   | Shadowrocket rules only; add node subscription first |
 
-If the user is in doubt, the default (URI list) is the right choice for
-phones and laptops. For Shadowrocket with built-in split rules, use
-`/shadowrocket.yaml` from Shadowrocket's configuration page.
+If the user is in doubt on Shadowrocket, use `/shadowrocket.yaml` first. The
+URI list and rule profiles keep both VLESS and Hysteria2. If Hysteria2 times
+out while VLESS works, diagnose the UDP/QUIC path and the client core
+compatibility instead of hiding the Hysteria2 node from generated configs.
 
 ## Anti-patterns (do NOT do these)
 

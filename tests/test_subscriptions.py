@@ -95,7 +95,7 @@ def test_build_hysteria2_uri_shape():
     priv_b64, _ = _gen_keypair()
     device = _fake_device()
     uri = build_hysteria2_uri(device, _fake_sb_cfg(priv_b64), "1.2.3.4")
-    assert uri.startswith("hysteria2://fake-hy2-pw@1.2.3.4:21001?")
+    assert uri.startswith("hysteria2://fake-hy2-pw@1.2.3.4:21001/?")
     assert "sni=www.example.com" in uri
     assert "obfs=salamander" in uri
     assert "obfs-password=obfs-pw-hex" in uri
@@ -119,6 +119,7 @@ def test_clash_yaml_uses_split_rules_without_binance(monkeypatch):
     assert auto_group["lazy"] is False
     assert auto_group["tolerance"] == 50
     assert auto_group["timeout"] == 5000
+    assert "ProxyBox-test-phone-hy2" in auto_group["proxies"]
     assert "DOMAIN-SUFFIX,push.apple.com,PROXY" in cfg["rules"]
     assert "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve" in cfg["rules"]
     assert "DOMAIN-SUFFIX,openai.com,AI" in cfg["rules"]
@@ -140,6 +141,7 @@ def test_merlin_yaml_keeps_tun_and_split_rules(monkeypatch):
     cfg = yaml.safe_load(text)
 
     assert cfg["tun"]["enable"] is True
+    assert {proxy["type"] for proxy in cfg["proxies"]} == {"vless", "hysteria2"}
     assert cfg["rules"][-1] == "MATCH,Final"
     assert "DOMAIN-SUFFIX,openai.com,AI" in cfg["rules"]
     assert "binance" not in text.lower()

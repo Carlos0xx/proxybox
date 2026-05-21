@@ -159,17 +159,17 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_LOGIN_USER_LABEL="用户名"
     M_LOGIN_PASS_LABEL="密  码"
     M_SECTION_SUBS_TITLE="📲 订阅 URL"
-    M_SECTION_SUBS_HINT="Shadowrocket 分流用 [SR 分流]; 节点订阅用 [推荐]/[SR 节点]"
-    M_SUB_DEFAULT_TAG="[推荐]"
-    M_SUB_DEFAULT_DESC="Shadowrocket 节点订阅 · sing-box · Hiddify"
+    M_SECTION_SUBS_HINT="Shadowrocket 分流优先用 [SR 分流]; 普通节点用 [SR 节点]"
+    M_SUB_DEFAULT_TAG="[通用]"
+    M_SUB_DEFAULT_DESC="sing-box · Hiddify · 双协议节点"
     M_SUB_CLASH_TAG="[Clash 系]"
     M_SUB_CLASH_DESC="Stash · Clash for iOS · Clash Verge"
     M_SUB_SR_YAML_TAG="[SR 分流]"
-    M_SUB_SR_YAML_DESC="Shadowrocket 配置页导入 · 节点+规则"
+    M_SUB_SR_YAML_DESC="Shadowrocket 订阅链接 · 节点+规则"
     M_SUB_MERLIN_TAG="[路由器]"
     M_SUB_MERLIN_DESC="AsusWRT-Merlin · Clash 透明代理"
     M_SUB_SR_NODE_TAG="[SR 节点]"
-    M_SUB_SR_NODE_DESC="Shadowrocket Add Subscribe 节点订阅"
+    M_SUB_SR_NODE_DESC="Shadowrocket 双协议节点订阅"
     M_SUB_SR_TAG="[SR 规则]"
     M_SUB_SR_DESC="Shadowrocket .conf · 规则文件, 需先添加节点订阅"
     M_SUB_TXT_TAG="[别名]"
@@ -218,17 +218,17 @@ else
     M_LOGIN_USER_LABEL="username"
     M_LOGIN_PASS_LABEL="password"
     M_SECTION_SUBS_TITLE="📲 subscription URLs"
-    M_SECTION_SUBS_HINT="use [SR rules] for Shadowrocket split config; [pick this]/[SR nodes] for nodes"
-    M_SUB_DEFAULT_TAG="[pick this]"
-    M_SUB_DEFAULT_DESC="Shadowrocket nodes · sing-box · Hiddify"
+    M_SECTION_SUBS_HINT="use [SR rules] first for Shadowrocket split config; [SR nodes] for nodes"
+    M_SUB_DEFAULT_TAG="[generic]"
+    M_SUB_DEFAULT_DESC="sing-box · Hiddify · dual-protocol nodes"
     M_SUB_CLASH_TAG="[Clash]"
     M_SUB_CLASH_DESC="Stash · Clash for iOS · Clash Verge"
     M_SUB_SR_YAML_TAG="[SR rules]"
-    M_SUB_SR_YAML_DESC="Shadowrocket config import · nodes + rules"
+    M_SUB_SR_YAML_DESC="Shadowrocket subscription · nodes + rules"
     M_SUB_MERLIN_TAG="[router]"
     M_SUB_MERLIN_DESC="AsusWRT-Merlin · Clash transparent proxy"
     M_SUB_SR_NODE_TAG="[SR nodes]"
-    M_SUB_SR_NODE_DESC="Shadowrocket Add Subscribe node subscription"
+    M_SUB_SR_NODE_DESC="Shadowrocket dual-protocol node subscription"
     M_SUB_SR_TAG="[SR conf]"
     M_SUB_SR_DESC="Shadowrocket .conf rules only · add node subscription first"
     M_SUB_TXT_TAG="[alias]"
@@ -849,17 +849,17 @@ if [ -n "$SUB_TOKEN" ]; then
 
     # Recommended — yellow ✦ + bold tag + bold green URL
     printf "    %s✦ %s%s  %s%s%s\n" \
-        "$C_YELLOW_B" "$M_SUB_DEFAULT_TAG" "$C_RESET" "$C_BOLD" "$M_SUB_DEFAULT_DESC" "$C_RESET"
-    printf "      %s%s%s\n" "$C_GREEN_B" "$SUB_BASE" "$C_RESET"
+        "$C_YELLOW_B" "$M_SUB_SR_YAML_TAG" "$C_RESET" "$C_BOLD" "$M_SUB_SR_YAML_DESC" "$C_RESET"
+    printf "      %s%s/shadowrocket.yaml%s\n" "$C_GREEN_B" "$SUB_BASE" "$C_RESET"
     echo ""
 
     # Other formats — same tag-bold + URL-green pattern, no ✦, no bold on URL
     for entry in \
         "$M_SUB_CLASH_TAG|$M_SUB_CLASH_DESC|/clash.yaml" \
-        "$M_SUB_SR_YAML_TAG|$M_SUB_SR_YAML_DESC|/shadowrocket.yaml" \
         "$M_SUB_MERLIN_TAG|$M_SUB_MERLIN_DESC|/merlin.yaml" \
         "$M_SUB_SR_NODE_TAG|$M_SUB_SR_NODE_DESC|/shadowrocket.txt" \
         "$M_SUB_SR_TAG|$M_SUB_SR_DESC|/shadowrocket.conf" \
+        "$M_SUB_DEFAULT_TAG|$M_SUB_DEFAULT_DESC|" \
         "$M_SUB_TXT_TAG|$M_SUB_TXT_DESC|/sub.txt"; do
         IFS='|' read -r tag desc suffix <<< "$entry"
         printf "      %s%s%s  %s\n" "$C_BOLD" "$tag" "$C_RESET" "$desc"

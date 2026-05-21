@@ -3296,11 +3296,10 @@ async function loadSubs() {
   const origin = window.location.origin;
   // Same formats install.sh's summary block prints; tag/desc kept in sync.
   const formats = [
-    {file: '',                   tag: '[推荐]',   desc: 'Shadowrocket 节点订阅 · sing-box · Hiddify', prefer: true},
+    {file: '/shadowrocket.yaml', tag: '[SR 分流]', desc: 'Shadowrocket 订阅链接 · 节点+规则', prefer: true},
     {file: '/clash.yaml',        tag: '[Clash 系]', desc: 'Stash · Clash for iOS · AI/流媒体/CN 分流'},
-    {file: '/shadowrocket.yaml', tag: '[SR 分流]', desc: 'Shadowrocket 配置页导入 · 节点+规则'},
     {file: '/merlin.yaml',       tag: '[路由器]', desc: 'AsusWRT-Merlin · 透明代理分流'},
-    {file: '/shadowrocket.txt',  tag: '[SR 节点]', desc: 'Shadowrocket Add Subscribe 节点订阅'},
+    {file: '/shadowrocket.txt',  tag: '[SR 节点]', desc: 'Shadowrocket 双协议节点订阅'},
     {file: '/shadowrocket.conf', tag: '[SR 规则]', desc: '规则文件 · 需先添加节点订阅'},
     {file: '/sub.txt',           tag: '[别名]',   desc: 'URI 列表 · .txt 扩展名'},
   ];
@@ -4306,11 +4305,10 @@ async function showDeviceSubs(name) {
   // merlin.yaml / shadowrocket.conf).
   // Built on-the-fly by the subscription router, no extra files on disk.
   const urls = [
-    { file: '',                   label: 'Shadowrocket / sing-box 节点订阅 (推荐)', hint: '📱 Add Subscribe · 通用 URI 列表',  prefer: true },
+    { file: '/shadowrocket.yaml', label: 'Shadowrocket 分流订阅 (推荐)',            hint: '📱 节点+规则 · 配置页导入',          prefer: true },
     { file: '/clash.yaml',        label: 'Stash / Clash for iOS',          hint: '📱 内置 AI/流媒体/CN 分流规则',              prefer: false },
-    { file: '/shadowrocket.yaml', label: 'Shadowrocket 分流配置',            hint: '📱 配置页导入 · 节点+规则',                prefer: false },
     { file: '/merlin.yaml',       label: 'Merlin Clash 路由器',             hint: '🌐 内置 tun + 分流规则',                    prefer: false },
-    { file: '/shadowrocket.txt',  label: 'Shadowrocket 节点订阅',           hint: '📱 填到 Add Subscribe / 节点订阅',         prefer: false },
+    { file: '/shadowrocket.txt',  label: 'Shadowrocket 双协议节点订阅',     hint: '📱 填到 Add Subscribe / 节点订阅',         prefer: false },
     { file: '/shadowrocket.conf', label: 'Shadowrocket 规则文件',            hint: '⚠️ 先加节点订阅, 再导入这个规则文件',     prefer: false },
     { file: '/sub.txt',           label: 'URI 列表 (.txt 别名)',           hint: '👀 与默认链接同内容, 部分客户端按扩展名识别',   prefer: false },
   ];
