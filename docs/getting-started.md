@@ -33,7 +33,7 @@ Then in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-The agent uses a temporary SSH `known_hosts`, runs a minimal VPS check, clones or updates the repo on the VPS, runs `deploy/check-prereqs.sh --install` to provision Python 3.11 and runtime deps, executes `install.sh`, verifies the four core services, and relays the **login URL, username, password, and 5 subscription URLs** back to you.
+The agent uses an auto-deleted temporary SSH `known_hosts`, runs a minimal VPS check, clones or updates the repo on the VPS, runs `deploy/check-prereqs.sh --install` to provision Python 3.11 and runtime deps, executes `install.sh`, verifies the four core services, and relays the **login URL, username, password, and 5 subscription URLs** back to you.
 
 For **Codex** or other coding agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
 

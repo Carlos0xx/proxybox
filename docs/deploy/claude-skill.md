@@ -28,7 +28,7 @@ Claude will:
 | # | Step |
 | --- | --- |
 | 1 | Ask for SSH user / auth method if missing from the prompt. |
-| 2 | Use a temporary session-local `known_hosts` file and print the VPS fingerprint instead of editing your normal SSH trust store. |
+| 2 | Use a temporary session-local `known_hosts` file that is deleted on shell exit instead of editing your normal SSH trust store. |
 | 3 | Run a minimal inline VPS check before the repo exists. |
 | 4 | Install bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
 | 5 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or update an existing checkout from `origin/main` with `git pull --ff-only origin main`. |

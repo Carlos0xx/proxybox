@@ -22,9 +22,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Deploy skill now updates stale VPS checkouts from `origin/main`.** The
   agent path performs a minimal host check, installs bootstrap tools, clones or
   fast-forwards `/opt/proxybox`, then runs the full repo pre-flight.
-- **Deploy skill avoids local SSH known-host churn.** It now uses a temporary
-  session-local `known_hosts` file and reports the VPS fingerprint instead of
-  deleting or rewriting the user's normal SSH trust store.
+- **Deploy skill avoids SSH host-key residue.** It now uses a temporary
+  session-local `known_hosts` file, deletes it on shell exit, and does not
+  print or persist VPS host fingerprints.
 - **Ubuntu 22.04 installs now provision Python 3.11.** Pre-flight `--install`
   and `install.sh` install `python3.11` + `python3.11-venv` before creating the
   app venv, preserving the project's Python `>=3.11` runtime contract.

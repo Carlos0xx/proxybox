@@ -56,5 +56,9 @@ def test_deploy_skill_uses_session_local_known_hosts() -> None:
     assert "PROXYBOX_KNOWN_HOSTS" in DEPLOY_SKILL
     assert 'UserKnownHostsFile="$PROXYBOX_KNOWN_HOSTS"' in DEPLOY_SKILL
     assert "StrictHostKeyChecking=accept-new" in DEPLOY_SKILL
-    assert "ssh-keygen -lf" in DEPLOY_SKILL
+    assert "UpdateHostKeys=no" in DEPLOY_SKILL
+    assert "LogLevel=ERROR" in DEPLOY_SKILL
+    assert "trap 'rm -f \"$PROXYBOX_KNOWN_HOSTS\"'" in DEPLOY_SKILL
+    assert "ssh-keyscan" not in DEPLOY_SKILL
+    assert "ssh-keygen -lf" not in DEPLOY_SKILL
     assert "StrictHostKeyChecking=no" in DEPLOY_SKILL

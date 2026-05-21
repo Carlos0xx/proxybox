@@ -36,15 +36,22 @@ the path).
 Before the first SSH call, isolate host-key handling for this deployment
 session. VPS rebuilds and recycled IPs often conflict with the operator's
 normal `~/.ssh/known_hosts`; do not edit or delete that file. Use a temporary
-known-hosts file, record the new fingerprint in the final handoff, and use the
-`SSH` array for every SSH command below.
+known-hosts file that is deleted when the deploy shell exits, and use the
+`SSH` array for every SSH command below. Do not print, persist, or hand off
+SSH host fingerprints from this template flow.
 
 ```bash
 : "${SSH_PORT:=22}"
 PROXYBOX_KNOWN_HOSTS="$(mktemp "${TMPDIR:-/tmp}/proxybox-known-hosts.XXXXXX")"
-ssh-keyscan -p "$SSH_PORT" -H "$HOST" > "$PROXYBOX_KNOWN_HOSTS"
-ssh-keygen -lf "$PROXYBOX_KNOWN_HOSTS"
-SSH=(ssh -p "$SSH_PORT" -o UserKnownHostsFile="$PROXYBOX_KNOWN_HOSTS" -o StrictHostKeyChecking=accept-new)
+trap 'rm -f "$PROXYBOX_KNOWN_HOSTS"' EXIT
+SSH=(
+  ssh
+  -p "$SSH_PORT"
+  -o UserKnownHostsFile="$PROXYBOX_KNOWN_HOSTS"
+  -o StrictHostKeyChecking=accept-new
+  -o UpdateHostKeys=no
+  -o LogLevel=ERROR
+)
 ```
 
 ### Step 1 — Minimal host pre-flight
@@ -247,11 +254,11 @@ to the user with a one-line cover sentence — something like:
 
 > "装好了。下面四块全部直接能用：登录凭据（账号 + 密码 + 加随机后缀的
 > 登录地址,粘进浏览器就行）、5 个订阅 URL（任挑一个粘进客户端就翻墙）、
-> 服务状态、可选功能。本次 SSH 主机指纹也在下面。"
+> 服务状态、可选功能。"
 
-Then paste install.sh's output (or summarize it), plus the `ssh-keygen -lf`
-fingerprint captured in the SSH setup step — do not re-format, do not hide
-the password / login URL.
+Then paste install.sh's output (or summarize it) — do not re-format, do not
+hide the password / login URL. Do not include SSH host-key material in the
+handoff.
 
 Concretely, the user can:
 
@@ -340,7 +347,8 @@ phones and laptops — Clash YAML is mainly for routers and Stash power-users.
   explicit consent — it disables host-key warnings and would mask MITM
 - **Never** delete or rewrite the user's normal `~/.ssh/known_hosts` to
   work around a rebuilt VPS. Use the session-local `PROXYBOX_KNOWN_HOSTS`
-  file from the SSH setup step and report the fingerprint instead.
+  file from the SSH setup step, let the `trap` delete it, and do not report
+  or persist host fingerprints.
 - **Never** run `install.sh` on a host that already runs unrelated services
   on port 8080, 11000-11050, or 21000-21050 — check `ss -tlnp` first
 - **Never** commit the generated `config.yaml`, `bot.env`, or `session-secret`

@@ -26,7 +26,7 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | # | Step |
 | --- | --- |
 | 1 | Asks for SSH user / auth method if missing from the prompt. |
-| 2 | Creates a temporary session-local `known_hosts` file, records the VPS fingerprint, and leaves the user's normal SSH trust store untouched. |
+| 2 | Creates a temporary session-local `known_hosts` file, deletes it on shell exit, and leaves the user's normal SSH trust store untouched. |
 | 3 | Runs a minimal inline VPS check before the repo exists. |
 | 4 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
 | 5 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or updates an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
