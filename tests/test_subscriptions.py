@@ -115,12 +115,12 @@ def test_clash_yaml_uses_split_rules_without_binance(monkeypatch):
     hy2_proxy = next(proxy for proxy in cfg["proxies"] if proxy["type"] == "hysteria2")
     auto_group = next(group for group in cfg["proxy-groups"] if group["name"] == "AUTO")
     assert hy2_proxy["password"] == _fake_device()["hy2_password"]
-    assert hy2_proxy["auth"] == _fake_device()["hy2_password"]
-    assert hy2_proxy["alpn"] == ["h3"]
-    assert auto_group["url"] == "https://www.gstatic.com/generate_204"
-    assert auto_group["lazy"] is False
-    assert auto_group["tolerance"] == 50
-    assert auto_group["timeout"] == 5000
+    assert "auth" not in hy2_proxy
+    assert "alpn" not in hy2_proxy
+    assert auto_group["url"] == "http://www.gstatic.com/generate_204"
+    assert "lazy" not in auto_group
+    assert "tolerance" not in auto_group
+    assert "timeout" not in auto_group
     assert "DOMAIN-SUFFIX,push.apple.com,PROXY" in cfg["rules"]
     assert "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve" in cfg["rules"]
     assert "DOMAIN-SUFFIX,openai.com,AI" in cfg["rules"]

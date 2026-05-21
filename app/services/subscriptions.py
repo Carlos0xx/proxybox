@@ -28,7 +28,6 @@ POLICY_AI = "AI"
 POLICY_STREAMING = "Streaming"
 POLICY_CHINA = "China"
 POLICY_FINAL = "Final"
-PROBE_URL = "https://www.gstatic.com/generate_204"
 _BLOCKED_REFERENCE_RULE_KEYWORDS = ("binance", "bnbstatic", "bnbchain", "bsc-dataseed")
 
 _APPLE_PUSH_PROXY_RULES = [
@@ -329,14 +328,10 @@ def build_clash_yaml(
                 "type": "hysteria2",
                 "server": vps_host,
                 "port": device["hy2_port"],
-                # Mihomo uses "password"; Stash uses "auth" for the same Hy2 secret.
-                # Emitting both keeps one Clash YAML compatible with both clients.
                 "password": device["hy2_password"],
-                "auth": device["hy2_password"],
                 "sni": r["sni"],
                 "obfs": "salamander",
                 "obfs-password": _hy2_obfs_password(sb_cfg),
-                "alpn": ["h3"],
                 "skip-cert-verify": True,
             },
         ],
@@ -350,11 +345,8 @@ def build_clash_yaml(
                 "name": POLICY_AUTO,
                 "type": "url-test",
                 "proxies": [name_v, name_h],
-                "url": PROBE_URL,
+                "url": "http://www.gstatic.com/generate_204",
                 "interval": 300,
-                "tolerance": 50,
-                "lazy": False,
-                "timeout": 5000,
             },
             {
                 "name": POLICY_AI,
