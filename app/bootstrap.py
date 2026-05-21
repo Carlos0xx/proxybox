@@ -110,7 +110,40 @@ def _detect_public_host() -> str:
     return ""
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw in (None, ""):
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if not (1 <= value <= 65535):
+        raise ValueError(f"{name} must be between 1 and 65535")
+    return value
+
+
+def _env_range(prefix: str, default_start: int, default_end: int) -> tuple[int, int]:
+    start = _env_int(f"{prefix}_START", default_start)
+    end = _env_int(f"{prefix}_END", default_end)
+    if start > end:
+        raise ValueError(f"{prefix}_START must be <= {prefix}_END")
+    return start, end
+
+
+def _docker_ports() -> dict[str, int | tuple[int, int]]:
+    return {
+        "admin": _env_int("PROXYBOX_ADMIN_PORT", 8080),
+        "clash": _env_int("PROXYBOX_CLASH_PORT", 9090),
+        "vless_template": _env_int("PROXYBOX_VLESS_TEMPLATE_PORT", 11000),
+        "hy2_template": _env_int("PROXYBOX_HY2_TEMPLATE_PORT", 21000),
+        "vless_range": _env_range("PROXYBOX_VLESS", 11001, 11050),
+        "hy2_range": _env_range("PROXYBOX_HY2", 21001, 21050),
+    }
+
+
 def _gen_singbox_config(sb_dir: Path) -> None:
+    ports = _docker_ports()
     priv_key, _ = _reality_keypair()
     sni = secrets.choice(SNI_CANDIDATES)
     short_id = secrets.token_hex(8)
@@ -120,13 +153,15 @@ def _gen_singbox_config(sb_dir: Path) -> None:
 
     cfg = {
         "log": {"level": "info", "timestamp": True},
-        "experimental": {"clash_api": {"external_controller": "127.0.0.1:9090"}},
+        "experimental": {
+            "clash_api": {"external_controller": f"0.0.0.0:{ports['clash']}"}
+        },
         "inbounds": [
             {
                 "type": "vless",
                 "tag": "vless-template",
                 "listen": "::",
-                "listen_port": 11000,
+                "listen_port": ports["vless_template"],
                 "users": [],
                 "tls": {
                     "enabled": True,
@@ -143,7 +178,7 @@ def _gen_singbox_config(sb_dir: Path) -> None:
                 "type": "hysteria2",
                 "tag": "hy2-template",
                 "listen": "::",
-                "listen_port": 21000,
+                "listen_port": ports["hy2_template"],
                 "users": [],
                 "obfs": {"type": "salamander", "password": hy2_obfs},
                 "tls": {
@@ -188,13 +223,16 @@ def _gen_proxybox_config(pb_dir: Path) -> dict[str, str]:
     admin_token = secrets.token_urlsafe(24)
     admin_password = _gen_admin_password()
     admin_login_path = _gen_login_path()
-    public_host = _detect_public_host()
+    ports = _docker_ports()
+    vless_range = ports["vless_range"]
+    hy2_range = ports["hy2_range"]
+    public_host = os.environ.get("PROXYBOX_PUBLIC_HOST") or _detect_public_host()
     yaml_text = f"""admin:
   token: "{admin_token}"
   username: "admin"
   login_path: "{admin_login_path}"
   host: "0.0.0.0"
-  port: 8080
+  port: {ports["admin"]}
 server:
   public_host: "{public_host}"
 paths:
@@ -209,10 +247,10 @@ services:
     - proxybox-admin
     - proxybox-traffic-worker
 ports:
-  vless_range: [11001, 11050]
-  hy2_range: [21001, 21050]
+  vless_range: [{vless_range[0]}, {vless_range[1]}]
+  hy2_range: [{hy2_range[0]}, {hy2_range[1]}]
 clash:
-  api_url: "http://127.0.0.1:9090"
+  api_url: "http://sing-box:{ports["clash"]}"
   api_secret: ""
 worker:
   poll_interval: 10
@@ -240,6 +278,7 @@ features:
         "password": admin_password,
         "login_path": admin_login_path,
         "public_host": public_host,
+        "admin_port": str(ports["admin"]),
     }
 
 
@@ -267,13 +306,13 @@ def main() -> int:
 
     if not (pb_dir / "config.yaml").exists():
         creds = _gen_proxybox_config(pb_dir)
-        host = creds["public_host"]
+        host = creds["public_host"] or "<your-vps-ip>"
         print(
             "\n"
             "================================================================\n"
             " ProxyBox · Docker bootstrap — admin credentials (saved once)\n"
             "================================================================\n"
-            f"  Login URL    http://{host}:8080/login/{creds['login_path']}\n"
+            f"  Login URL    http://{host}:{creds['admin_port']}/login/{creds['login_path']}\n"
             "  Username     admin\n"
             f"  Password     {creds['password']}\n"
             "----------------------------------------------------------------\n"

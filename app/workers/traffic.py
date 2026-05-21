@@ -16,17 +16,28 @@ in-memory state, never corrupts the DB.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
+from pathlib import Path
 
 from app.config import get_settings
 from app.db.connection import connection
 from app.services.host_classify import classify as classify_host
 
 _PREV_CONNS: dict[str, dict] = {}
+
+
+def _write_heartbeat() -> None:
+    path = os.environ.get("PROXYBOX_TRAFFIC_HEARTBEAT")
+    if not path:
+        return
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(str(int(time.time())), encoding="utf-8")
 
 
 def _device_from_inbound_tag(tag: str) -> str | None:
@@ -196,6 +207,7 @@ def main() -> int:
                 print(f"[tick] recorded {n} device(s)", flush=True)
         except Exception as e:
             print(f"[tick-error] {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        _write_heartbeat()
 
         if time.time() - last_cleanup > 86400:
             try:

@@ -1,17 +1,17 @@
 ---
 name: proxybox-deploy
-description: Deploy ProxyBox (per-device isolated home proxy panel) on a fresh Debian or Ubuntu VPS via SSH. Use this skill when the user asks to "install proxybox", "deploy proxybox on my server", "set up a proxy panel", or similar. Requires the user to provide an SSH-reachable VPS with root or sudo access.
+description: Deploy ProxyBox (per-device isolated home proxy panel) on a Debian or Ubuntu VPS via SSH. Use this skill when the user asks to "install proxybox", "deploy proxybox on my server", "set up a proxy panel", or similar. Requires the user to provide an SSH-reachable VPS with root or sudo access.
 ---
 
 # ProxyBox · One-shot VPS deploy
 
 This skill drives a non-interactive install of ProxyBox onto a user-supplied
-VPS. Output is a running stack of:
+VPS. The default path is Docker so existing host services are not disturbed.
+Output is a running stack of:
 
 - sing-box (VLESS Reality + Hysteria2 templates)
-- proxybox-admin (FastAPI dashboard at port 8080)
+- proxybox-admin (FastAPI dashboard on an auto-selected host port)
 - proxybox-traffic-worker (per-device byte accounting)
-- fail2ban (manual IP ban jail)
 - Optional: proxybox-bot (Telegram control)
 
 ## Inputs to gather before starting
@@ -58,8 +58,7 @@ SSH=(
 
 For the **first** SSH after the user gave us VPS credentials, do a minimal
 in-line check first. The repo may not exist yet, so do not try to run
-`/opt/proxybox/deploy/check-prereqs.sh` until after Step 2 has cloned or
-updated the source.
+repo scripts until after Step 2 has cloned or updated the source.
 
 ```bash
 "${SSH[@]}" "$USER@$HOST" bash -s <<'EOF'
@@ -80,8 +79,8 @@ Bail out if any of:
 
 ### Step 2 — Get the source onto the VPS
 
-A minimal Debian image typically ships *without* `git` or `curl`, so
-preamble the clone with an apt install. The package list is tiny and
+A minimal Debian image typically ships *without* `git`, `curl`, or Docker, so
+preamble the clone with an apt install. The package list is small and
 idempotent — re-running it on a fully-provisioned host is a no-op. Existing
 checkouts must be updated from `origin/main` explicitly so a stale
 `/opt/proxybox` cannot keep serving an old installer.
@@ -94,7 +93,8 @@ checkouts must be updated from `origin/main` explicitly so a stale
 
   # bootstrap tools that may be missing on a minimal Debian / Ubuntu cloud image
   $SUDO apt-get update -qq
-  $SUDO apt-get install -y -qq git curl ca-certificates
+  $SUDO apt-get install -y -qq git curl ca-certificates docker.io docker-compose-plugin \
+    || $SUDO apt-get install -y -qq git curl ca-certificates docker.io docker-compose
 
   if [ -d /opt/proxybox/.git ]; then
     $SUDO git -C /opt/proxybox remote set-url origin https://github.com/carlos0xx/proxybox
@@ -107,7 +107,7 @@ checkouts must be updated from `origin/main` explicitly so a stale
     $SUDO git -C /opt/proxybox pull --ff-only origin main
   elif [ -d /opt/proxybox ] && [ -n "$(ls -A /opt/proxybox 2>/dev/null)" ]; then
     echo "[skip] /opt/proxybox exists but is not a git checkout — leaving it alone"
-    echo "       remove or move /opt/proxybox, then re-run; install.sh --fresh handles runtime state"
+    echo "       remove or move /opt/proxybox, then re-run; Docker fresh mode handles runtime state"
     exit 1
   else
     $SUDO git clone https://github.com/carlos0xx/proxybox /opt/proxybox
@@ -115,119 +115,78 @@ checkouts must be updated from `origin/main` explicitly so a stale
 '
 ```
 
-### Step 3 — Full repo pre-flight
+### Step 3 — Docker pre-flight
 
-Now that `/opt/proxybox/deploy/check-prereqs.sh` exists on the host, run the
-bundled checker — it's exhaustive (9 categories) and returns a clean exit
-code:
-
-```bash
-LANG_FLAG=zh  # use en if the user is not writing in Chinese
-"${SSH[@]}" "$USER@$HOST" "
-  cd /opt/proxybox
-  if [ \"\$(id -u)\" = \"0\" ]; then
-    bash deploy/check-prereqs.sh --install --lang $LANG_FLAG
-  else
-    sudo bash deploy/check-prereqs.sh --install --lang $LANG_FLAG
-  fi
-"
-```
-
-If it exits non-zero, paste the output back to the user and **stop** —
-don't try to "fix" their environment unless they explicitly ask.
-
-### Step 4 — Run install.sh
+Now that `/opt/proxybox` exists, verify Docker is available. Do not run the
+native `check-prereqs.sh` for the default Docker path; that script is for the
+host-systemd installer.
 
 ```bash
-LANG_FLAG=zh  # use en if the user is not writing in Chinese
-"${SSH[@]}" "$USER@$HOST" "
+"${SSH[@]}" "$USER@$HOST" '
   cd /opt/proxybox
-  if [ \"\$(id -u)\" = \"0\" ]; then
-    bash deploy/install.sh --fresh --lang $LANG_FLAG
-  else
-    sudo bash deploy/install.sh --fresh --lang $LANG_FLAG
-  fi
-"
+  docker info >/dev/null
+  docker compose version >/dev/null
+  ss -H -ltn >/dev/null 2>&1 || true
+  ss -H -lun >/dev/null 2>&1 || true
+'
 ```
 
-`$LANG_FLAG` is `zh` if the user has been writing to you in Chinese, else
-`en`. The script also auto-detects from the VPS's `$LANG` if you omit
-`--lang`, but explicit is better so the output language matches the user's
-conversation language rather than the server locale.
+If Docker is not running, paste the error back to the user and stop.
 
-`install.sh` itself checks for root at the top; the wrapper above just picks
-the right invocation (`sudo` or not) without assuming `sudo` is installed
-(Debian minimal images don't ship it by default).
+### Step 4 — Run Docker installer
 
-The default skill path is for fresh/template VPS installs and passes
-`--fresh`, so old ProxyBox config, devices, subscription files, systemd units,
-and managed HTTPS config are cleared before new credentials are generated. If
-the user explicitly asks to preserve an existing ProxyBox install, omit
-`--fresh` and say that the install will reuse existing state. Relay the final
-summary verbatim — Step 6 / Step 8 below explain why the full admin URL is okay
-to quote in this context.
+```bash
+"${SSH[@]}" "$USER@$HOST" '
+  cd /opt/proxybox
+  bash deploy/docker-install.sh
+'
+```
+
+`deploy/docker-install.sh` scans host ports and writes `.env`. If `.env`
+already exists, it reuses the existing ports; use
+`PROXYBOX_FRESH=1 PROXYBOX_REWRITE_ENV=1 bash deploy/docker-install.sh` only
+when the user explicitly wants a clean reinstall and port rescan.
 
 ### Step 5 — Verify
 
 ```bash
 "${SSH[@]}" "$USER@$HOST" '
-  for svc in sing-box proxybox-admin proxybox-traffic-worker fail2ban; do
-    state=$(systemctl is-active "$svc" 2>/dev/null)
-    printf "%-30s %s\n" "$svc" "$state"
-  done
+  cd /opt/proxybox
+  docker compose ps
+  docker compose logs --tail=80 bootstrap
+  docker compose logs --tail=80 sing-box proxybox-admin proxybox-traffic-worker
 '
 ```
 
-All four should be `active`. If any is not, fetch its `journalctl -u <svc> -n
-30 --no-pager` and triage.
+The three core long-running services should be `Up`: `sing-box`,
+`proxybox-admin`, and `proxybox-traffic-worker`. If any restarts repeatedly,
+triage with `docker compose logs --tail=200 <service>`.
 
-### Step 6 — Relay the install.sh summary
+### Step 6 — Relay the Docker handoff
 
 As of v0.1.6 the admin panel uses **username + password login**, not a
-URL-token in the address bar. `install.sh` ends with a self-contained
-handoff block:
+URL-token in the address bar. The Docker bootstrap logs print the one-shot
+handoff block with:
 
-- **🛡 后台登录凭据** — the user-must-save block in bold red:
-  - `登录地址  http://{public_host}:8080/login/{random_12char_suffix}`
-    (the random suffix is new in v0.1.11 — `/login` itself 404s, defends
-    against /login bot scans)
-  - `用户名    admin`
-  - `密  码    <16-char alnum>`
-- The auto-created first device (default name is 5 random lowercase letters,
-  override via env `PROXYBOX_FIRST_DEVICE=<name>` before running install.sh;
-  set it to an empty string to skip auto-creation)
-- All 5 per-device subscription URLs ready to copy
+- Login URL: `http://{public_host}:{admin_port}/login/{random_12char_suffix}`
+- Username: `admin`
+- Password: `<16-char alnum>`
 
-**Do not re-mask the credentials in chat output for this skill.** The
-whole point of the one-shot UX is to avoid making普通用户 SSH back in
-to recover files manually. The install.sh output is the user's private channel
-(same as if they ran the installer locally) — relay it verbatim.
+**Do not re-mask the credentials in chat output for this skill.** The user
+needs the first login URL and password to complete the install. The bootstrap
+output is the same private channel they would see when running the installer
+themselves.
 
-This rule is **scoped to install.sh output and this Step 6 / Step 8
-handoff.** Ad-hoc bash you author elsewhere in a session (e.g. for
-debugging or status checks) should still mask the password / token to
-first 8 chars, because that's chat-only output that doesn't have the
-same one-shot UX constraint.
-
-If the user needs the credentials re-printed later (e.g. they lost the
-chat backscroll), this fetches them from the live config and password file:
+If the user needs the credentials re-printed later, this fetches them from the
+live Docker volume:
 
 ```bash
 "${SSH[@]}" "$USER@$HOST" '
-  /opt/proxybox/.venv/bin/python -c "
-from pathlib import Path
-import yaml
-c = yaml.safe_load(open(\"/etc/proxybox/config.yaml\"))
-a = c[\"admin\"]
-host = c[\"server\"][\"public_host\"] or \"<your-vps-ip>\"
-proto = \"https\" if a.get(\"login_path\") and c[\"server\"].get(\"public_host\") else \"http\"
-port = \"\" if proto == \"https\" else \":8080\"
-path = a.get(\"login_path\", \"\")
-login_url = f\"{proto}://{host}{port}/login/{path}\" if path else f\"{proto}://{host}{port}/login\"
-print(f\"login URL: {login_url}\")
-print(f\"username:  {a[\\\"username\\\"]}\")
-print(f\"password:  {Path(\\\"/etc/proxybox/admin.password\\\").read_text().strip()}\")
-"
+  cd /opt/proxybox
+  docker compose exec proxybox-admin sh -c "
+    echo password: \$(cat /etc/proxybox/admin.password)
+    grep -E \"username|login_path|port:\" /etc/proxybox/config.yaml
+  "
 '
 ```
 
@@ -237,30 +196,36 @@ Only do this if the user explicitly provided bot credentials.
 
 ```bash
 "${SSH[@]}" "$USER@$HOST" "
-cat > /etc/proxybox/bot.env <<ENV
+cd /opt/proxybox
+ADMIN_TOKEN=\$(docker compose exec -T proxybox-admin python - <<'PY'
+import yaml
+print(yaml.safe_load(open('/etc/proxybox/config.yaml'))['admin']['token'])
+PY
+)
+cat > bot.env <<ENV
 BOT_TOKEN=$BOT_TOKEN
 TG_ALLOWED_USERS=$ALLOWED_USERS
-ADMIN_TOKEN=\$(/opt/proxybox/.venv/bin/python -c \"import yaml; print(yaml.safe_load(open('/etc/proxybox/config.yaml'))['admin']['token'])\")
+ADMIN_TOKEN=\$ADMIN_TOKEN
 ENV
-chmod 600 /etc/proxybox/bot.env
-systemctl enable --now proxybox-bot
+chmod 600 bot.env
+docker compose --profile bot up -d proxybox-bot
 "
 ```
 
-Verify with `systemctl is-active proxybox-bot`. If it crashed, check
-`journalctl -u proxybox-bot -n 20` — most common cause is malformed bot
-token format.
+Verify with `docker compose ps proxybox-bot`. If it crashed, check
+`docker compose logs --tail=80 proxybox-bot` — most common cause is malformed
+bot token format.
 
 ### Step 8 — Hand off to the user
 
-The install.sh summary block already lays everything out. Just relay it
+The Docker bootstrap summary block already lays everything out. Just relay it
 to the user with a one-line cover sentence — something like:
 
 > "装好了。下面四块全部直接能用：登录凭据（账号 + 密码 + 加随机后缀的
-> 登录地址,粘进浏览器就行）、5 个订阅 URL（任挑一个粘进客户端就翻墙）、
+> 登录地址,粘进浏览器就行）、首台设备（进后台订阅链接页复制 URL）、
 > 服务状态、可选功能。"
 
-Then paste install.sh's output (or summarize it) — do not re-format, do not
+Then paste the Docker bootstrap output (or summarize it) — do not re-format, do not
 hide the password / login URL. Do not include SSH host-key material in the
 handoff.
 
@@ -278,7 +243,7 @@ Concretely, the user can:
    client device shows the VPS IP, not the home ISP.
 
 The default first device name is 5 random lowercase letters. Override via env
-`PROXYBOX_FIRST_DEVICE=tablet-1 bash deploy/install.sh ...` before install, or
+`PROXYBOX_FIRST_DEVICE=tablet-1 bash deploy/docker-install.sh` before install, or
 rename in the admin UI afterwards. `PROXYBOX_FIRST_DEVICE=` skips auto-creation.
 `PROXYBOX_FIRST_DEVICE=local-user` is supported only when the user explicitly
 asks for it; it uses `PROXYBOX_LOCAL_USERNAME` if provided, else the remote
@@ -289,11 +254,9 @@ shell user, sanitized to the device-name format.
 Mention any of these only when the user asks — don't dump them all at
 handoff. v0.1.6+ exposes a lot in the panel:
 
-- **HTTPS (v0.1.10):** `HTTPS · 域名` page. User enters a domain that
-  resolves to the VPS, clicks 启用 HTTPS. Server auto-installs Caddy
-  from Cloudsmith repo, requests Let's Encrypt, updates `config.yaml`,
-  reloads. ~30 seconds. New login URL becomes `https://{domain}/login/
-  {login_path}`. Caddy auto-renews the cert.
+- **HTTPS:** Docker installs should use a host reverse proxy, gateway, or
+  Cloudflare Tunnel. The in-panel Caddy provisioner is only for the advanced
+  native `install.sh` path.
 - **Change username / password (v0.1.11):** `安全` page → `🔐 登录设置`
   card. Password change requires the current password (session-hijack
   defense).
@@ -309,21 +272,14 @@ handoff. v0.1.6+ exposes a lot in the panel:
   HTTP too (v0.1.12 patched the textarea fallback that newer browsers
   refused). If a user reports "复制按钮没反应", they're on a SPA
   shipped before v0.1.12 — `git pull` in `/opt/proxybox` then
-  `systemctl restart proxybox-admin` to upgrade.
+  `docker compose up -d --build proxybox-admin` to upgrade Docker installs.
 - **Live throughput + per-device history:** 总览 / 设备历史 / 总流量.
   Host categorisation populates within ~10 s of any client browsing
   (v0.1.9 default-on).
 - **Re-print credentials:** if user lost the install summary, the SSH
   fetcher in Step 6 prints login URL + username + password.
-- **Switch panel language (v0.2.0):** small `中 / EN` toggle in the
-  topbar, next to the theme switcher. Click → page reloads in the other
-  language. Choice persists via `localStorage` + a `proxybox-lang`
-  cookie, so the login page picks up the same language on next visit.
-  Coverage is ~80% — uncovered phrases gracefully fall back to Chinese.
-  The login form itself also honours `?lang=en|zh` for the bare URL.
-  Note: `install.sh --lang en|zh` only affects the installer OUTPUT;
-  the running panel always starts in Chinese and respects the user's
-  in-panel toggle from there.
+- **Panel language:** the web panel is Chinese-only. Do not promise an
+  English toggle.
 
 ### Subscription URL formats
 
@@ -345,7 +301,7 @@ phones and laptops — Clash YAML is mainly for routers and Stash power-users.
 
 ## Anti-patterns (do NOT do these)
 
-- **The install.sh output IS the user's handoff** — relay it verbatim
+- **The Docker bootstrap output IS the user's handoff** — relay it verbatim
   including the login URL + username + password (bold red in the
   summary). Re-masking defeats v0.1.6+'s one-shot UX. But ad-hoc bash
   you author later in the same session for status checks / debugging
@@ -356,14 +312,12 @@ phones and laptops — Clash YAML is mainly for routers and Stash power-users.
   work around a rebuilt VPS. Use the session-local `PROXYBOX_KNOWN_HOSTS`
   file from the SSH setup step, let the `trap` delete it, and do not report
   or persist host fingerprints.
-- **Never** run `install.sh` on a host that already runs unrelated services
-  on port 8080, 11000-11050, or 21000-21050 — check `ss -tlnp` first
+- **Never** bypass Docker port detection on a host that already runs unrelated
+  services. Let `deploy/docker-install.sh` write `.env`.
 - **Never** commit the generated `config.yaml`, `bot.env`, or `session-secret`
   to any git repository
-- **Don't** omit `--fresh` for a fresh/template install — otherwise old
-  `/etc/proxybox/`, `/etc/sing-box/`, DB, subscription files, or systemd unit
-  state can be reused. Only omit `--fresh` when the user explicitly asks to
-  preserve an existing ProxyBox install.
+- **Don't** force `PROXYBOX_FRESH=1` unless the user asked for a no-trace
+  reinstall. Default Docker upgrades reuse named volumes.
 
 ## Reporting failures
 

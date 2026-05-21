@@ -24,9 +24,11 @@ COPY pyproject.toml README.md ./
 COPY app/ ./app/
 COPY bot/ ./bot/
 COPY static/ ./static/
+COPY deploy/docker/ ./deploy/docker/
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -e .
+    && pip install --no-cache-dir -e . \
+    && chmod +x deploy/docker/*.sh
 
 ENV PROXYBOX_CONFIG=/etc/proxybox/config.yaml
 

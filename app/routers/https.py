@@ -47,6 +47,7 @@ async def get_status() -> dict:
         "public_host": s.public_host,
         "using_https": s.using_https,
         "notes": s.notes,
+        "docker_runtime": s.docker_runtime,
     }
 
 

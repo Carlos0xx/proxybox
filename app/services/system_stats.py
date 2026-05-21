@@ -5,13 +5,64 @@ Linux-only — every probe degrades gracefully on missing files / tools.
 
 from __future__ import annotations
 
+import json
+import os
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from app.services.shell import run
 
 
+def runtime_is_docker() -> bool:
+    return os.environ.get("PROXYBOX_RUNTIME") == "docker"
+
+
 def systemctl_is_active(unit: str) -> str:
+    if runtime_is_docker():
+        return _docker_service_state(unit)
     return run(["systemctl", "is-active", unit]).strip() or "unknown"
+
+
+def _docker_service_state(unit: str) -> str:
+    if unit == "proxybox-admin":
+        return "active"
+    if unit == "proxybox-traffic-worker":
+        return _heartbeat_state()
+    if unit == "sing-box":
+        return _clash_api_state()
+    return "unknown"
+
+
+def _heartbeat_state() -> str:
+    raw_path = os.environ.get("PROXYBOX_TRAFFIC_HEARTBEAT")
+    if not raw_path:
+        return "unknown"
+    path = Path(raw_path)
+    try:
+        age = time.time() - path.stat().st_mtime
+    except OSError:
+        return "activating"
+    return "active" if age <= 45 else "failed"
+
+
+def _clash_api_state() -> str:
+    try:
+        from app.config import get_settings
+
+        settings = get_settings()
+        headers: dict[str, str] = {}
+        if settings.clash.api_secret:
+            headers["Authorization"] = f"Bearer {settings.clash.api_secret}"
+        req = urllib.request.Request(f"{settings.clash.api_url}/connections", headers=headers)
+        with urllib.request.urlopen(req, timeout=2) as r:
+            json.load(r)
+        return "active"
+    except urllib.error.HTTPError as e:
+        return "active" if e.code in {401, 403} else "failed"
+    except Exception:
+        return "failed"
 
 
 def loadavg() -> list[str]:

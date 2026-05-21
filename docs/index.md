@@ -4,7 +4,7 @@ layout: home
 hero:
   name: ProxyBox
   text: Per-device isolated proxy panel
-  tagline: VLESS Reality + Hysteria2 · byte-level accounting · 1-click HTTPS · MIT
+  tagline: VLESS Reality + Hysteria2 · byte-level accounting · Docker-first install · MIT
   actions:
     - theme: brand
       text: Get started →
@@ -30,24 +30,24 @@ features:
     details: Login form at /login/{random-12-char-suffix}; /login itself 404s. URL-path token is opt-in for automation. Change creds + rotate the login path from the panel — no SSH.
 
   - icon: 🔒
-    title: 1-click HTTPS
-    details: Enter your domain, click Enable HTTPS. The panel installs Caddy, fetches a Let's Encrypt cert, and reloads — ~30 seconds end to end.
+    title: HTTPS options
+    details: Docker installs stay isolated and expect an external reverse proxy or tunnel. Native installs can still enable Caddy + Let's Encrypt from the panel.
 
   - icon: 📲
     title: 5 subscription formats
     details: URI list (default) · clash.yaml · merlin.yaml · shadowrocket.conf · sub.txt. All generated on the fly per device — sing-box · Shadowrocket · Stash · Clash · Hiddify all work.
 
-  - icon: 🌏
-    title: Bilingual UI
-    details: Topbar language switcher between English and Chinese. ~80% English coverage with graceful Chinese fallback. Login form also localised via ?lang=.
+  - icon: 🐳
+    title: Docker-first install
+    details: Bridge-network stack with automatically selected free host ports. Existing services keep their ports; ProxyBox only publishes the chosen Admin, VLESS, and Hy2 ports.
 
   - icon: 🤖
     title: Telegram bot (optional)
     details: /status · /devices · /traffic · /pause · /resume · /bans from your phone. Opt-in, runs as its own systemd service.
 
   - icon: 🚀
-    title: Three deploy paths
-    details: install.sh on Debian / Ubuntu, docker-compose anywhere, or let Claude Code drive the install via the bundled skill.
+    title: Multiple deploy paths
+    details: Docker is the default path. Native install.sh remains available for clean VPS installs that need host fail2ban and Caddy integration.
 
   - icon: 🏠
     title: Self-hosted, no SaaS

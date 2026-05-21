@@ -3740,7 +3740,12 @@ async function loadHttpsView() {
     const s = await api('/api/https/status');
     const badge = $('https-status-badge');
     const sub = $('https-status-sub');
-    if (s.using_https) {
+    const enableBtn = $('https-enable-btn');
+    if (s.docker_runtime) {
+      badge.innerHTML = '<span class="badge badge-warn"><span class="dot dot-warn"></span> Docker 模式</span>';
+      sub.innerHTML = 'Docker 默认安装不在容器内安装 Caddy。请在宿主机反向代理、网关或 Cloudflare Tunnel 配置 HTTPS';
+      if (enableBtn) enableBtn.disabled = true;
+    } else if (s.using_https) {
       badge.innerHTML = '<span class="badge badge-accent" style="font-size:var(--text-sm);"><span class="dot dot-ok dot-pulse"></span> ✓ 已启用</span>';
       sub.innerHTML = `当前后台运行在 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;color:var(--accent);">https://${escapeHtml(s.configured_domain)}/</code>,证书由 Let's Encrypt 自动维护`;
     } else if (s.configured_domain && !s.caddy_active) {
@@ -3749,6 +3754,7 @@ async function loadHttpsView() {
     } else {
       badge.innerHTML = '<span class="badge"><span class="dot dot-bad"></span> 未启用 · HTTP only</span>';
       sub.innerHTML = '当前后台是明文 HTTP。生产环境强烈建议启用 HTTPS — 跟着下面 4 步走,30 秒搞定';
+      if (enableBtn) enableBtn.disabled = false;
     }
   } catch (e) {
     $('https-status-sub').innerHTML = '<span style="color:var(--danger);">加载状态失败: ' + escapeHtml(e.message) + '</span>';
@@ -3814,6 +3820,7 @@ async function _httpsEnableSubmit() {
           'invalid_domain': '域名格式不对 (例: proxybox.example.com,需要至少一个点)',
           'dns_no_answer': '域名解析不到 IP (DNS 还没生效,等 1-10 分钟重试)',
           'dns_mismatch': '域名解析到的 IP 不是本机 (检查 DNS A 记录)',
+          'docker_unsupported': 'Docker 模式不支持内置 Caddy,请用宿主机反向代理或 Cloudflare Tunnel',
           'cmd_failed': 'apt / systemctl / curl 命令失败',
         };
         msg = codeMap[code] || code || msg;

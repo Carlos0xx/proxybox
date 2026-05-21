@@ -29,10 +29,10 @@ It accounts traffic per device, classifies destination hosts (Video / Social / A
 
 | Requirement | Detail |
 | --- | --- |
-| **OS** | Debian 12/13 or Ubuntu 22.04/24.04/26.04 — clean install. |
-| **Access** | Root SSH (the installer uses `apt` + `systemctl`). |
+| **OS** | Debian/Ubuntu VPS. Docker path can run on an existing host; native path still expects a clean VPS. |
+| **Access** | Root SSH, Docker, and Docker Compose for the default path. |
 | **Resources** | ≥ 1 GB RAM · ≥ 5 GB free disk. |
-| **Required ports** | `8080/tcp` (admin) · `11000-11050/tcp` (VLESS) · `21000-21050/udp` (Hysteria2). |
+| **Required ports** | Docker installer auto-selects free Admin, VLESS, and Hy2 ports and writes them to `.env`. |
 | **For HTTPS later** | A domain pointing at the VPS · `80/tcp` + `443/tcp` open. **Optional but recommended.** |
 
 ---
@@ -41,11 +41,23 @@ It accounts traffic per device, classifies destination hosts (Video / Social / A
 
 | Path | Best for | Reference |
 | --- | --- | --- |
-| **A · Claude Code / Codex** *(recommended)* | Users with an AI coding agent | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
-| **B · `install.sh`** | Fresh Debian/Ubuntu VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
-| **C · Docker Compose** | Anywhere with Docker | [`deploy/docker.md`](./deploy/docker.md) |
+| **A · Docker install** *(recommended)* | Existing VPS or clean VPS with Docker | [`deploy/docker.md`](./deploy/docker.md) |
+| **B · Claude Code / Codex** | Users with an AI coding agent | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
+| **C · `install.sh`** | Clean Debian/Ubuntu VPS needing host fail2ban/Caddy | [`deploy/install-sh.md`](./deploy/install-sh.md) |
 
-#### Path A — Claude Code / Codex *(recommended)*
+#### Path A — Docker install *(recommended)*
+
+```bash
+ssh root@<your-vps>
+apt-get update && (apt-get install -y git curl ca-certificates docker.io docker-compose-plugin || apt-get install -y git curl ca-certificates docker.io docker-compose)
+git clone https://github.com/carlos0xx/proxybox /opt/proxybox
+cd /opt/proxybox
+bash deploy/docker-install.sh
+```
+
+The installer checks Docker/Compose, scans host ports, writes `.env`, and starts an isolated bridge-network stack. It does not install Python 3.11, write systemd units, enable fail2ban, configure Caddy, or touch SSH known_hosts on the host.
+
+#### Path B — Claude Code / Codex
 
 For Claude Code, install the bundled skill once:
 
@@ -58,9 +70,9 @@ Then ask in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-The agent walks auto-deleted temporary SSH `known_hosts` → minimal VPS check → `git clone` / update → full pre-flight with Python 3.11 provisioning → `install.sh --fresh` → verification → relays the credentials back. For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) directly.
+The agent walks auto-deleted temporary SSH `known_hosts` → minimal VPS check → `git clone` / update → Docker port pre-flight → `deploy/docker-install.sh` → verification → relays the credentials back. For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) directly.
 
-#### Path B — `install.sh`
+#### Path C — `install.sh`
 
 ```bash
 ssh root@<your-vps>
@@ -75,25 +87,12 @@ Fresh mode clears old ProxyBox-managed state before generating new credentials. 
 > [!IMPORTANT]
 > Copy the credentials into a password manager **before closing the terminal**. Recovery via SSH: `cat /etc/proxybox/admin.password` (mode 0400) for the password; the rest is in `/etc/proxybox/config.yaml`.
 
-#### Path C — Docker Compose
-
-```bash
-git clone https://github.com/carlos0xx/proxybox && cd proxybox
-docker compose up -d
-docker compose exec proxybox-admin \
-    sh -c 'cat /etc/proxybox/admin.password; grep -E "username|login_path" /etc/proxybox/config.yaml'
-```
-
-Bootstrap container generates the config on first start. For reused named volumes, stop the stack first, then run `PROXYBOX_FRESH=1 docker compose up -d` to clear old ProxyBox state. No fail2ban, no HTTPS UI on this path — pair with Caddy + a host firewall for production.
-
----
-
 ### 4 · First-time login
 
 Open the **login URL** the installer printed:
 
 ```text
-http://<your-vps>:8080/login/<random-12-char-suffix>
+http://<your-vps>:<admin-port>/login/<random-12-char-suffix>
 ```
 
 > [!NOTE]
@@ -120,7 +119,7 @@ Paste the matching URL into your client's "Add subscription" dialog. Then verify
 
 ### 5 · Day-to-day operations
 
-All from the panel — no SSH needed for anything below.
+Mostly from the panel. Docker installs should handle HTTPS with an external reverse proxy or tunnel.
 
 | Task | Where | Notes |
 | --- | --- | --- |
@@ -129,7 +128,7 @@ All from the panel — no SSH needed for anything below.
 | **Pause a device** | Devices → ⏸ Pause | Indefinite or until a timestamp. Inbound removed; traffic history preserved. |
 | **Change password / username** | Security → Login → Edit | Requires the current password (defends against session-hijack re-auth). |
 | **Rotate login-path suffix** | Security → Login → 🎲 Rotate | Old `/login/{old}` 404s immediately. Existing sessions stay valid. |
-| **Enable HTTPS** | HTTPS → Enable | ~30 s: DNS check → Caddy + Let's Encrypt → config update + reload. |
+| **Enable HTTPS** | External proxy / native HTTPS page | Docker: use host reverse proxy, gateway, or Cloudflare Tunnel. Native: HTTPS page provisions Caddy. |
 | **Watch live traffic** | Overview | Real-time bps + connection count from sing-box's Clash API. |
 | **Per-device drilldown** | History | KPIs · daily chart · 24h heatmap · per-app category · per-host table. |
 | **Ban / unban an IP** | Security → Bans | Wraps fail2ban. |
@@ -141,13 +140,13 @@ All from the panel — no SSH needed for anything below.
 | Symptom | Try this |
 | --- | --- |
 | Every page says "refresh failed" | Hard refresh (Cmd+Shift+R / Ctrl+F5). v0.1.6+ sends `Cache-Control: no-store` so fresh installs shouldn't hit this. |
-| Copy button does nothing | Pre-v0.1.12 SPA. `cd /opt/proxybox && git pull && systemctl restart proxybox-admin`. |
+| Copy button does nothing | Pre-v0.1.12 SPA. `cd /opt/proxybox && git pull && docker compose up -d --build proxybox-admin`. |
 | Service shows "unknown" on Services page | Not in `services.monitored` or not installed (e.g. `caddy` before HTTPS is on — normal). |
 | HTTPS provisioning → `dns_mismatch` | Your domain doesn't resolve to this VPS. Update the A record and retry. |
-| Traffic page shows 0 while browsing | The worker took its first sample but no buckets are flushed yet. Check `journalctl -u proxybox-traffic-worker -n 20`. |
-| Forgot login URL or password | `ssh root@<VPS>` → `cat /etc/proxybox/admin.password; grep -E "username\|login_path" /etc/proxybox/config.yaml`. |
+| Traffic page shows 0 while browsing | The worker took its first sample but no buckets are flushed yet. Check `cd /opt/proxybox && docker compose logs --tail=80 proxybox-traffic-worker`. |
+| Forgot login URL or password | `cd /opt/proxybox && docker compose exec proxybox-admin sh -c 'cat /etc/proxybox/admin.password; grep -E "username\|login_path" /etc/proxybox/config.yaml'`. |
 
-Logs for any tracked service are live on the **Logs** page.
+Logs for Docker services are available with `docker compose logs`.
 
 ---
 
@@ -178,10 +177,10 @@ ProxyBox 是跑在单台 VPS 上的 sing-box 管理后台。给**每台设备独
 
 | 要求 | 详情 |
 | --- | --- |
-| **系统** | Debian 12/13 或 Ubuntu 22.04/24.04/26.04 — 干净安装。 |
-| **访问** | root SSH (安装器用 `apt` + `systemctl`)。 |
+| **系统** | Debian/Ubuntu VPS。Docker 路径可跑在已有服务的机器上;裸机路径仍建议干净 VPS。 |
+| **访问** | 默认路径需要 root SSH、Docker、Docker Compose。 |
 | **资源** | ≥ 1 GB 内存 · ≥ 5 GB 空闲磁盘。 |
-| **必开端口** | `8080/tcp` (后台) · `11000-11050/tcp` (VLESS) · `21000-21050/udp` (Hysteria2)。 |
+| **必开端口** | Docker 安装器会自动挑空闲的 Admin、VLESS、Hy2 端口并写入 `.env`。 |
 | **想开 HTTPS** | 域名解析到 VPS · `80/tcp` + `443/tcp` 开放。**可选但推荐。** |
 
 ---
@@ -190,11 +189,23 @@ ProxyBox 是跑在单台 VPS 上的 sing-box 管理后台。给**每台设备独
 
 | 方式 | 适合 | 详细 |
 | --- | --- | --- |
-| **A · Claude Code / Codex** *(推荐)* | 手边有 AI 代理的用户 | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
-| **B · `install.sh`** | 干净的 Debian/Ubuntu VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
-| **C · Docker Compose** | 任何带 Docker 的环境 | [`deploy/docker.md`](./deploy/docker.md) |
+| **A · Docker 安装** *(推荐)* | 已有 VPS 或干净 VPS,只要求 Docker | [`deploy/docker.md`](./deploy/docker.md) |
+| **B · Claude Code / Codex** | 手边有 AI 代理的用户 | [`deploy/claude-skill.md`](./deploy/claude-skill.md) |
+| **C · `install.sh`** | 需要宿主 fail2ban/Caddy 的干净 VPS | [`deploy/install-sh.md`](./deploy/install-sh.md) |
 
-#### 方式 A — Claude Code / Codex *(推荐)*
+#### 方式 A — Docker 安装 *(推荐)*
+
+```bash
+ssh root@<你的-vps>
+apt-get update && (apt-get install -y git curl ca-certificates docker.io docker-compose-plugin || apt-get install -y git curl ca-certificates docker.io docker-compose)
+git clone https://github.com/carlos0xx/proxybox /opt/proxybox
+cd /opt/proxybox
+bash deploy/docker-install.sh
+```
+
+安装器检查 Docker/Compose,扫描宿主机端口,写 `.env`,然后启动 bridge 网络隔离的 Docker stack。它不会在宿主机安装 Python 3.11、写 systemd unit、启用 fail2ban、配置 Caddy 或触碰 SSH known_hosts。
+
+#### 方式 B — Claude Code / Codex
 
 Claude Code 用户先把 skill 复制过去一次:
 
@@ -207,9 +218,9 @@ cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 
 > 帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519
 
-代理走自动删除的临时 SSH `known_hosts` → 最小 VPS 检查 → `git clone` / 更新 → 带 Python 3.11 安装的完整 pre-flight → `install.sh --fresh` → 验证服务 → 把凭据发给你。Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) 喂给它即可。
+代理走自动删除的临时 SSH `known_hosts` → 最小 VPS 检查 → `git clone` / 更新 → Docker 端口预检 → `deploy/docker-install.sh` → 验证服务 → 把凭据发给你。Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) 喂给它即可。
 
-#### 方式 B — `install.sh`
+#### 方式 C — `install.sh`
 
 ```bash
 ssh root@<你的-vps>
@@ -224,25 +235,12 @@ fresh 模式会先清掉 ProxyBox 管理的旧状态,再生成新凭据。端到
 > [!IMPORTANT]
 > **关闭终端前**先把凭据抄到密码管理器。SSH 找回:密码在 `/etc/proxybox/admin.password` (0400),其余 (用户名 / login_path / token) 在 `/etc/proxybox/config.yaml`。
 
-#### 方式 C — Docker Compose
-
-```bash
-git clone https://github.com/carlos0xx/proxybox && cd proxybox
-docker compose up -d
-docker compose exec proxybox-admin \
-    sh -c 'cat /etc/proxybox/admin.password; grep -E "username|login_path" /etc/proxybox/config.yaml'
-```
-
-`bootstrap` 容器首次启动时生成 config。复用过的 named volume 先停掉 stack,再用 `PROXYBOX_FRESH=1 docker compose up -d` 清掉旧 ProxyBox 状态。这个路径不带 fail2ban 和 HTTPS UI —— 生产环境请配 Caddy + 主机防火墙。
-
----
-
 ### 4 · 第一次登录
 
-打开 install.sh 打印的**登录地址**:
+打开安装器打印的**登录地址**:
 
 ```text
-http://<你的-VPS>:8080/login/<12 位随机串>
+http://<你的-VPS>:<admin-port>/login/<12 位随机串>
 ```
 
 > [!NOTE]
@@ -266,7 +264,7 @@ http://<你的-VPS>:8080/login/<12 位随机串>
 
 ### 5 · 日常操作
 
-下面全在后台做 —— 不用再 SSH。
+大多数操作都在后台做。Docker 安装的 HTTPS 建议用外部反代或 Tunnel。
 
 | 任务 | 在哪 | 说明 |
 | --- | --- | --- |
@@ -275,7 +273,7 @@ http://<你的-VPS>:8080/login/<12 位随机串>
 | **暂停设备** | 设备管理 → ⏸ 暂停 | 选无限期或定时间。inbound 移除,历史流量保留。 |
 | **改密码 / 用户名** | 安全 → 登录设置 → 修改 | 改密码需先输当前密码 (防 session 被劫后立刻被改密)。 |
 | **轮换登录路径后缀** | 安全 → 登录设置 → 🎲 轮换 | 老的 `/login/{老后缀}` 立刻 404。已登录 session 不受影响。 |
-| **开 HTTPS** | HTTPS · 域名 → 启用 HTTPS | ~30 秒:DNS 校验 → Caddy + Let's Encrypt → config 更新 + 重载。 |
+| **开 HTTPS** | 外部反代 / 裸机 HTTPS 页 | Docker:用宿主反代、网关或 Cloudflare Tunnel。裸机:HTTPS 页配置 Caddy。 |
 | **看实时流量** | 总览 | 实时 bps + 连接数,从 sing-box Clash API 取。 |
 | **单设备下钻** | 设备历史 | KPI · 每日柱状 · 24h 热力图 · 按 App 分类 · 按域名细表。 |
 | **封禁 / 解封 IP** | 安全 → 封禁 | 包装 fail2ban。 |
@@ -287,13 +285,13 @@ http://<你的-VPS>:8080/login/<12 位随机串>
 | 现象 | 试试 |
 | --- | --- |
 | 每页报 "刷新失败" | 硬刷新 (Cmd+Shift+R / Ctrl+F5)。v0.1.6+ 加了 `Cache-Control: no-store`,新装实例不该出。 |
-| "复制" 按钮没反应 | v0.1.12 之前的 SPA。`cd /opt/proxybox && git pull && systemctl restart proxybox-admin`。 |
+| "复制" 按钮没反应 | v0.1.12 之前的 SPA。`cd /opt/proxybox && git pull && docker compose up -d --build proxybox-admin`。 |
 | 服务页某服务 "unknown" | 不在 `services.monitored` 或没装 (比如还没开 HTTPS 的 caddy —— 正常)。 |
 | HTTPS 启用报 `dns_mismatch` | 域名解析的不是这台 VPS。改 DNS A 记录后重试。 |
-| 流量页一直 0 但你在过墙 | worker 抓了第一拍但还没写桶。`journalctl -u proxybox-traffic-worker -n 20`。 |
-| 忘了登录地址 / 密码 | `ssh root@VPS` → `cat /etc/proxybox/admin.password; grep -E "username\|login_path" /etc/proxybox/config.yaml`。 |
+| 流量页一直 0 但你在过墙 | worker 抓了第一拍但还没写桶。`cd /opt/proxybox && docker compose logs --tail=80 proxybox-traffic-worker`。 |
+| 忘了登录地址 / 密码 | `cd /opt/proxybox && docker compose exec proxybox-admin sh -c 'cat /etc/proxybox/admin.password; grep -E "username\|login_path" /etc/proxybox/config.yaml'`。 |
 
-后台的「日志」页有每个服务的实时 `journalctl -u` 输出。
+Docker 服务日志用 `docker compose logs` 查看。
 
 ---
 

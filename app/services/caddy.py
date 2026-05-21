@@ -74,11 +74,26 @@ class HTTPSStatus:
     public_host: str
     using_https: bool
     notes: list[str] = field(default_factory=list)
+    docker_runtime: bool = False
+
+
+def runtime_is_docker() -> bool:
+    return os.environ.get("PROXYBOX_RUNTIME") == "docker"
 
 
 def status() -> HTTPSStatus:
     s = get_settings()
     public_host = s.server.public_host or ""
+    if runtime_is_docker():
+        return HTTPSStatus(
+            caddy_installed=False,
+            caddy_active=False,
+            configured_domain=None,
+            public_host=public_host,
+            using_https=False,
+            notes=["Docker 模式不在容器内安装 Caddy; 请在宿主机或网关配置反向代理"],
+            docker_runtime=True,
+        )
     caddy_bin = shutil.which("caddy") is not None
     caddy_active = False
     if caddy_bin:
@@ -278,6 +293,11 @@ def _reload_caddy() -> None:
 def run(domain: str) -> dict[str, str]:
     """Full enablement. Raises HTTPSEnableError on failure with a short
     ``code`` the SPA can branch on. Returns the new state on success."""
+    if runtime_is_docker():
+        raise HTTPSEnableError(
+            "docker_unsupported",
+            "Docker 默认安装不在容器内安装 Caddy; 请在宿主机、网关或 Cloudflare Tunnel 配置 HTTPS",
+        )
     _validate_domain(domain)
 
     vps_ip = _public_ip()

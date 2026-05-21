@@ -43,6 +43,17 @@ def write_config(cfg: dict[str, Any], *, defer_reload: bool = False) -> None:
         reload_singbox()
 
 
+def signal_reload() -> bool:
+    """Ask the Docker sing-box wrapper to reload via a shared flag file."""
+    flag = os.environ.get("PROXYBOX_SINGBOX_RELOAD_FILE")
+    if not flag:
+        return False
+    path = Path(flag)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+    return True
+
+
 def reload_singbox() -> None:
     """SIGHUP first (preserves connections), fall back to restart on failure.
 
@@ -50,6 +61,8 @@ def reload_singbox() -> None:
     client through the same sing-box proxy before sing-box itself restarts.
     """
     time.sleep(5)
+    if signal_reload():
+        return
     with contextlib.suppress(subprocess.SubprocessError, OSError):
         result = subprocess.run(
             ["systemctl", "reload", "sing-box"],

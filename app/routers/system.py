@@ -55,4 +55,9 @@ async def logs(name: SvcInPath, n: LinesQuery = 50) -> str:
             f"service {name!r} not in monitored allowlist — only services in "
             f"config.services.monitored can be inspected",
         )
+    if system_stats.runtime_is_docker():
+        return (
+            "Docker 模式不读取宿主机 journalctl。\n"
+            f"请在项目目录运行: docker compose logs --tail={n} {name}\n"
+        )
     return shell.run(["journalctl", "-u", name, "-n", str(n), "--no-pager"], timeout=10)

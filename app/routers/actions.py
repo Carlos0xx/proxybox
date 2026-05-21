@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from app.auth.token import admin_auth
 from app.config import get_settings, reset_settings_cache
 from app.db.connection import connection
-from app.services import shell, singbox, subscriptions
+from app.services import shell, singbox, subscriptions, system_stats
 
 router = APIRouter(
     prefix="/admin/{token}/action",
@@ -44,7 +44,7 @@ class ConfirmBody(BaseModel):
 
 @router.post("/restart/{svc}")
 async def restart_service(svc: SvcInPath) -> dict:
-    """systemctl restart {svc}, gated by config.services.monitored allowlist."""
+    """Restart or reload a monitored service for the current runtime."""
     settings = get_settings()
     if svc not in settings.services.monitored:
         raise HTTPException(
@@ -52,8 +52,27 @@ async def restart_service(svc: SvcInPath) -> dict:
             f"service {svc!r} not in monitored allowlist — only services listed "
             f"under config.services.monitored can be restarted",
         )
+    if system_stats.runtime_is_docker():
+        return _docker_restart_service(svc)
     shell.run(["systemctl", "restart", "--no-block", svc], timeout=5)
     return {"service": svc, "action": "restarted"}
+
+
+def _docker_restart_service(svc: str) -> dict:
+    if svc == "sing-box" and singbox.signal_reload():
+        return {"service": svc, "action": "reload_requested"}
+    if svc == "proxybox-traffic-worker":
+        flag = os.environ.get("PROXYBOX_WORKER_RESTART_FILE")
+        if flag:
+            path = FilePath(flag)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+            return {"service": svc, "action": "restart_requested"}
+    raise HTTPException(
+        501,
+        f"service {svc!r} cannot be restarted from inside the Docker sandbox; "
+        "use docker compose restart for that service",
+    )
 
 
 @router.post("/rotate")
