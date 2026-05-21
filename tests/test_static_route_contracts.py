@@ -25,6 +25,12 @@ def test_admin_token_rotation_dialog_uses_returned_contract() -> None:
     assert "不带 token" not in STATIC_HTML
 
 
+def test_sidebar_brand_uses_current_product_version_only() -> None:
+    assert '<span class="brand-name">ProxyBox</span>' in STATIC_HTML
+    assert '<span class="brand-sub">v1.0</span>' in STATIC_HTML
+    assert "v2.0 · LOS ANGELES" not in STATIC_HTML
+
+
 def test_service_restart_button_uses_css_pseudo_icon() -> None:
     assert "btn-svc-restart" in STATIC_HTML
     assert "svc-restart-icon" not in STATIC_HTML
