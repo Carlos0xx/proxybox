@@ -5,6 +5,26 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Installation reliability — Codex install follow-up
+
+- **Fresh installs keep URL-token-only admin access disabled from first boot.**
+  `install.sh` now logs in with the generated username/password and uses the
+  resulting session cookie for first-device bootstrap instead of temporarily
+  enabling `features.url_token_bypass`.
+- **Re-runs can bootstrap through the current auth model.** Existing installs
+  with `features.url_token_bypass=false` can still list or create the first
+  device during `install.sh` because the installer authenticates through
+  `/login/{login_path}` first.
+- **Existing fail2ban config is preserved.** The installer appends the
+  ProxyBox `[manual]` jail only when missing instead of overwriting
+  `/etc/fail2ban/jail.local`.
+- **Deploy skill now updates stale VPS checkouts from `origin/main`.** The
+  agent path performs a minimal host check, installs bootstrap tools, clones or
+  fast-forwards `/opt/proxybox`, then runs the full repo pre-flight.
+- **Ubuntu 22.04 installs no longer fail the package metadata gate.** The
+  package now declares Python `>=3.10`, matching the oldest supported VPS OS
+  in the install docs.
+
 ### Security — Codex audit follow-up #6
 
 - **Sensitive runtime rewrites keep private permissions.** `sing-box` config,
@@ -444,9 +464,9 @@ on.
 - `app/routers/ui.py` no longer uses the `admin_auth` dependency — does
   its own auth check inline so it can `RedirectResponse(303 → /login)`
   instead of returning JSON 401 for the SPA HTML route.
-- install.sh writes `url_token_bypass: true` initially so the auto-
-  device-creation curl can authenticate, then flips it to `false` and
-  restarts `proxybox-admin` before printing the summary.
+- install.sh logs in with the generated username/password and uses the
+  session cookie for auto device creation while keeping
+  `url_token_bypass: false`.
 
 ### Why
 User feedback (2026-05-20): "默认使用账户密码登录, 关闭默认 token 登录

@@ -35,11 +35,11 @@ def _run_scan() -> dict:
                 "detect-secrets",
                 "scan",
                 "--all-files",
-                # Skip git internals (.git/FETCH_HEAD etc. carry high-entropy
-                # hex strings that aren't secrets) and lockfile-like blobs
-                # that change every CI run.
+                # Skip git internals, local agent worktrees, virtualenvs, and
+                # cache dirs at any depth. These can carry high-entropy
+                # housekeeping strings that are not repository secrets.
                 "--exclude-files",
-                r"^(\.git/|\.ruff_cache/|\.pytest_cache/|node_modules/)",
+                r"(^|/)(\.git|\.claude|\.ruff_cache|\.pytest_cache|node_modules|\.venv|venv)/",
             ],
             capture_output=True,
             text=True,

@@ -33,7 +33,7 @@ Then in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-The agent runs `deploy/check-prereqs.sh`, `git clone`s the repo on the VPS, executes `install.sh`, verifies the four core services, and relays the **login URL, username, password, and 5 subscription URLs** back to you.
+The agent runs a minimal VPS check, clones or updates the repo on the VPS, runs `deploy/check-prereqs.sh`, executes `install.sh`, verifies the four core services, and relays the **login URL, username, password, and 5 subscription URLs** back to you.
 
 For **Codex** or other coding agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
 

@@ -31,21 +31,12 @@ the path).
 
 ## Execution
 
-### Step 1 — Pre-flight
+### Step 1 — Minimal host pre-flight
 
-After Step 2 has run (so `/opt/proxybox/deploy/check-prereqs.sh` exists on
-the host), use the bundled checker — it's exhaustive (9 categories) and
-returns a clean exit code:
-
-```bash
-ssh "$USER@$HOST" 'bash /opt/proxybox/deploy/check-prereqs.sh'
-```
-
-If it exits non-zero, paste the output back to the user and **stop** —
-don't try to "fix" their environment unless they explicitly ask.
-
-For the **first** SSH after the user gave us VPS credentials (before
-Step 2 has cloned the repo), do a minimal in-line check first:
+For the **first** SSH after the user gave us VPS credentials, do a minimal
+in-line check first. The repo may not exist yet, so do not try to run
+`/opt/proxybox/deploy/check-prereqs.sh` until after Step 2 has cloned or
+updated the source.
 
 ```bash
 ssh -o BatchMode=yes "$USER@$HOST" bash -s <<'EOF'
@@ -68,39 +59,72 @@ Bail out if any of:
 
 A minimal Debian image typically ships *without* `git` or `curl`, so
 preamble the clone with an apt install. The package list is tiny and
-idempotent — re-running it on a fully-provisioned host is a no-op.
+idempotent — re-running it on a fully-provisioned host is a no-op. Existing
+checkouts must be updated from `origin/main` explicitly so a stale
+`/opt/proxybox` cannot keep serving an old installer.
 
 ```bash
 ssh "$USER@$HOST" '
+  set -e
+  SUDO=""
+  if [ "$(id -u)" != "0" ]; then SUDO="sudo"; fi
+
   # bootstrap tools that may be missing on a minimal Debian / Ubuntu cloud image
-  apt-get update -qq && apt-get install -y -qq git curl ca-certificates
+  $SUDO apt-get update -qq
+  $SUDO apt-get install -y -qq git curl ca-certificates
 
   if [ -d /opt/proxybox/.git ]; then
-    cd /opt/proxybox && git pull --ff-only
+    $SUDO git -C /opt/proxybox remote set-url origin https://github.com/carlos0xx/proxybox
+    $SUDO git -C /opt/proxybox fetch --prune origin main
+    if $SUDO git -C /opt/proxybox show-ref --verify --quiet refs/heads/main; then
+      $SUDO git -C /opt/proxybox checkout main
+    else
+      $SUDO git -C /opt/proxybox checkout -b main --track origin/main
+    fi
+    $SUDO git -C /opt/proxybox pull --ff-only origin main
   elif [ -d /opt/proxybox ] && [ -n "$(ls -A /opt/proxybox 2>/dev/null)" ]; then
     echo "[skip] /opt/proxybox exists but is not a git checkout — leaving it alone"
     echo "       if you want a fresh start, ssh in and: rm -rf /opt/proxybox, then re-run"
+    exit 1
   else
-    git clone https://github.com/carlos0xx/proxybox /opt/proxybox
+    $SUDO git clone https://github.com/carlos0xx/proxybox /opt/proxybox
   fi
 '
 ```
 
-If the user is on Ubuntu's minimal image and the SSH session is not root,
-prefix the `apt-get` lines with `sudo`. The git-clone itself runs as the
-SSH user — clone into `/opt/proxybox` will need root anyway on most images.
+### Step 3 — Full repo pre-flight
 
-### Step 3 — Run install.sh
+Now that `/opt/proxybox/deploy/check-prereqs.sh` exists on the host, run the
+bundled checker — it's exhaustive (9 categories) and returns a clean exit
+code:
 
 ```bash
-ssh "$USER@$HOST" '
+LANG_FLAG=zh  # use en if the user is not writing in Chinese
+ssh "$USER@$HOST" "
   cd /opt/proxybox
-  if [ "$(id -u)" = "0" ]; then
+  if [ \"\$(id -u)\" = \"0\" ]; then
+    bash deploy/check-prereqs.sh --lang $LANG_FLAG
+  else
+    sudo bash deploy/check-prereqs.sh --lang $LANG_FLAG
+  fi
+"
+```
+
+If it exits non-zero, paste the output back to the user and **stop** —
+don't try to "fix" their environment unless they explicitly ask.
+
+### Step 4 — Run install.sh
+
+```bash
+LANG_FLAG=zh  # use en if the user is not writing in Chinese
+ssh "$USER@$HOST" "
+  cd /opt/proxybox
+  if [ \"\$(id -u)\" = \"0\" ]; then
     bash deploy/install.sh --lang $LANG_FLAG
   else
     sudo bash deploy/install.sh --lang $LANG_FLAG
   fi
-'
+"
 ```
 
 `$LANG_FLAG` is `zh` if the user has been writing to you in Chinese, else
@@ -114,10 +138,10 @@ the right invocation (`sudo` or not) without assuming `sudo` is installed
 
 This is idempotent — re-running on an already-installed system reuses
 the existing first device instead of creating a duplicate. Relay the
-final summary verbatim — Step 5 / Step 7 below explain why the full
+final summary verbatim — Step 6 / Step 8 below explain why the full
 admin URL is okay to quote in this context.
 
-### Step 4 — Verify
+### Step 5 — Verify
 
 ```bash
 ssh "$USER@$HOST" '
@@ -131,7 +155,7 @@ ssh "$USER@$HOST" '
 All four should be `active`. If any is not, fetch its `journalctl -u <svc> -n
 30 --no-pager` and triage.
 
-### Step 5 — Relay the install.sh summary
+### Step 6 — Relay the install.sh summary
 
 As of v0.1.6 the admin panel uses **username + password login**, not a
 URL-token in the address bar. `install.sh` ends with a self-contained
@@ -152,7 +176,7 @@ whole point of the one-shot UX is to avoid making普通用户 SSH back in
 to recover files manually. The install.sh output is the user's private channel
 (same as if they ran the installer locally) — relay it verbatim.
 
-This rule is **scoped to install.sh output and this Step 5 / Step 7
+This rule is **scoped to install.sh output and this Step 6 / Step 8
 handoff.** Ad-hoc bash you author elsewhere in a session (e.g. for
 debugging or status checks) should still mask the password / token to
 first 8 chars, because that's chat-only output that doesn't have the
@@ -180,7 +204,7 @@ print(f\"password:  {Path(\\\"/etc/proxybox/admin.password\\\").read_text().stri
 '
 ```
 
-### Step 6 — Optional: Telegram bot
+### Step 7 — Optional: Telegram bot
 
 Only do this if the user explicitly provided bot credentials.
 
@@ -200,7 +224,7 @@ Verify with `systemctl is-active proxybox-bot`. If it crashed, check
 `journalctl -u proxybox-bot -n 20` — most common cause is malformed bot
 token format.
 
-### Step 7 — Hand off to the user
+### Step 8 — Hand off to the user
 
 The install.sh summary block already lays everything out. Just relay it
 to the user with a one-line cover sentence — something like:
@@ -259,7 +283,7 @@ handoff. v0.1.6+ exposes a lot in the panel:
   Host categorisation populates within ~10 s of any client browsing
   (v0.1.9 default-on).
 - **Re-print credentials:** if user lost the install summary, the SSH
-  fetcher in Step 5 prints login URL + username + password.
+  fetcher in Step 6 prints login URL + username + password.
 - **Switch panel language (v0.2.0):** small `中 / EN` toggle in the
   topbar, next to the theme switcher. Click → page reloads in the other
   language. Choice persists via `localStorage` + a `proxybox-lang`

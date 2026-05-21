@@ -12,8 +12,8 @@
 #   2  bad invocation
 #
 # This script is invoked by install.sh before any destructive operation, and
-# referenced by the Claude Code deploy skill as Step 1. Designed to give the
-# operator a complete go/no-go view in <5 seconds.
+# by the Claude Code deploy skill after the repo has been cloned/updated.
+# Designed to give the operator a complete go/no-go view in <5 seconds.
 
 set -uo pipefail
 

@@ -16,6 +16,10 @@ cd /opt/proxybox
 bash deploy/install.sh --lang en        # --lang zh for Chinese output
 ```
 
+If you connect as a non-root user with passwordless `sudo`, run the same
+command; `install.sh` re-executes itself through `sudo` before making system
+changes.
+
 | Flag | Effect |
 | --- | --- |
 | `--lang en` / `--lang zh` | Force language. Default: auto-detect from `$LANG`. |
@@ -33,8 +37,8 @@ Invoked automatically before any destructive step. Nine categories — exits non
 | --- | --- | --- |
 | 1 | **OS** | Debian 12/13 or Ubuntu 22.04/24.04/26.04 — `/etc/os-release` match. |
 | 2 | **Architecture** | `x86_64` or `aarch64`. |
-| 3 | **Privilege** | Effective UID 0 (root). |
-| 4 | **Memory** | `MemTotal` ≥ 1 GB. |
+| 3 | **Privilege** | Effective UID 0 (root) or passwordless `sudo`. |
+| 4 | **Memory** | `MemTotal` ≥ 512 MB passes; 256-511 MB warns; below 256 MB blocks. |
 | 5 | **Disk** | `/` has ≥ 5 GB free. |
 | 6 | **Network** | DNS resolves `github.com`; outbound HTTPS reaches `api.github.com`. |
 | 7 | **systemd** | PID 1 is `systemd`. |
@@ -60,11 +64,11 @@ sudo bash deploy/check-prereqs.sh --install  # also apt-install missing apt deps
 | 4 | **sing-box systemd unit** — `/etc/systemd/system/sing-box.service`. |
 | 5 | **Reality keypair** (X25519), **Hy2 self-signed cert**, random **SNI** picked per install, `experimental.clash_api` enabled. |
 | 6 | **Python venv** at `/opt/proxybox/.venv` + `pip install -e .`. |
-| 7 | **`/etc/proxybox/config.yaml`** — random `admin.token` (24 bytes), random `admin.login_path` (12 alnum), `server.public_host` auto-detected via `ifconfig.me` / `ipify.org`. Mode 0600, root-owned. **The password lives separately** at `/etc/proxybox/admin.password` (mode 0400, root-owned) so a casual `cat config.yaml` cannot leak it. |
-| 8 | **fail2ban `[manual]` jail** with `backend=systemd` (Debian 13 has no `/var/log/auth.log`). |
+| 7 | **`/etc/proxybox/config.yaml`** — random `admin.token` (24 bytes), random `admin.login_path` (12 alnum), `features.url_token_bypass: false`, and `server.public_host` auto-detected via `ifconfig.me` / `ipify.org`. Mode 0600, root-owned. **The password lives separately** at `/etc/proxybox/admin.password` (mode 0400, root-owned) so a casual `cat config.yaml` cannot leak it. |
+| 8 | **fail2ban `[manual]` jail** with `backend=systemd` (Debian 13 has no `/var/log/auth.log`); appended only if missing, preserving any existing `jail.local` content. |
 | 9 | **Four systemd units** — `proxybox-admin`, `proxybox-traffic-worker`, `proxybox-bot` (disabled by default). |
 | 10 | `systemctl enable --now` for core services. |
-| 11 | **Auto-creates the first device** (`phone-1` by default; override with `PROXYBOX_FIRST_DEVICE`). |
+| 11 | **Auto-creates the first device** (`phone-1` by default; override with `PROXYBOX_FIRST_DEVICE`) by logging in with the generated username/password and using that session cookie. |
 | 12 | **Self-contained handoff** — login URL, username, password, 5 subscription URLs in a single coloured block. |
 
 > [!IMPORTANT]

@@ -6,7 +6,7 @@ Trigger in any Claude Code session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-Claude then runs the pre-flight, `git clone`s the repo, executes `install.sh`, verifies the services, and hands back the login URL + credentials.
+Claude then checks the VPS, clones or updates the repo, runs the full pre-flight, executes `install.sh`, verifies the services, and hands back the login URL + credentials.
 
 ---
 
@@ -26,13 +26,14 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | # | Step |
 | --- | --- |
 | 1 | Asks for SSH user / auth method if missing from the prompt. |
-| 2 | Runs `deploy/check-prereqs.sh` over SSH — aborts on a blocking failure. |
-| 3 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox` (or `git pull` if present). |
-| 4 | `apt-get install -y git curl ca-certificates` if the host is missing them. |
-| 5 | Runs `bash deploy/install.sh --lang <auto-detected>`. |
-| 6 | Verifies `sing-box`, `proxybox-admin`, `proxybox-traffic-worker` are `active (running)`. |
-| 7 | Relays the **login URL + full password + 5 subscription URLs** back to the user. |
-| 8 | *(optional)* Writes `/etc/proxybox/bot.env` + enables `proxybox-bot` if Telegram details were supplied. |
+| 2 | Runs a minimal inline VPS check before the repo exists. |
+| 3 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
+| 4 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or updates an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
+| 5 | Runs `deploy/check-prereqs.sh` over SSH — aborts on a blocking failure. |
+| 6 | Runs `bash deploy/install.sh --lang <auto-detected>`. |
+| 7 | Verifies `sing-box`, `proxybox-admin`, `proxybox-traffic-worker`, and `fail2ban` are `active`. |
+| 8 | Relays the **login URL + full password + 5 subscription URLs** back to the user. |
+| 9 | *(optional)* Writes `/etc/proxybox/bot.env` + enables `proxybox-bot` if Telegram details were supplied. |
 
 ---
 

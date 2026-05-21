@@ -45,7 +45,7 @@ mkdir -p ~/.claude/skills/proxybox-deploy
 cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 ```
 
-Then in any session: *"deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519"*. The agent runs pre-flight → `git clone` → `install.sh` → service verification → hands back the login URL + credentials.
+Then in any session: *"deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519"*. The agent runs a minimal VPS check → `git clone` / update → full pre-flight → `install.sh` → service verification → hands back the login URL + credentials.
 
 For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](./deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
 

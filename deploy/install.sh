@@ -11,6 +11,7 @@
 # only fills in missing pieces. Safe to run repeatedly.
 
 set -euo pipefail
+ORIG_ARGS=("$@")
 
 # ─── argv: --lang en|zh + pass-through to check-prereqs.sh ────────
 LANG_CHOICE="${PROXYBOX_LANG:-auto}"
@@ -41,6 +42,8 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_EXPECT_PYPROJECT="       预期 \$PROXYBOX_DIR/ 下有 pyproject.toml"
     M_PREFLIGHT_FAIL="错误: 环境检查失败, 修复上方问题后重跑."
     M_PREFLIGHT_HINT="       (自动装缺失 apt 包请跑: sudo bash %s --install --lang %s)"
+    M_ESCALATE="==> 检测到非 root, 使用 sudo 重新运行安装器..."
+    M_NEED_ROOT="错误: install.sh 需要 root 或免密 sudo"
     M_INSTALLER="==> ProxyBox 安装器"
     M_INSTALLER_SRC="    源码:   %s"
     M_INSTALLER_CFG="    配置:   %s"
@@ -86,6 +89,8 @@ else
     M_EXPECT_PYPROJECT="       expected pyproject.toml at \$PROXYBOX_DIR/"
     M_PREFLIGHT_FAIL="ERROR: pre-flight check failed. fix the issues above and re-run."
     M_PREFLIGHT_HINT="       (to install missing apt packages automatically: sudo bash %s --install --lang %s)"
+    M_ESCALATE="==> not running as root; re-running installer with sudo..."
+    M_NEED_ROOT="ERROR: install.sh needs root or passwordless sudo"
     M_INSTALLER="==> ProxyBox installer"
     M_INSTALLER_SRC="    source:     %s"
     M_INSTALLER_CFG="    config:     %s"
@@ -157,6 +162,24 @@ HR="━━━━━━━━━━━━━━━━━━━━━━━━━�
 : "${LOG_DIR:=/var/log/proxybox}"
 : "${SUB_DIR:=/var/www/proxybox-sub}"
 : "${SINGBOX_DIR:=/etc/sing-box}"
+
+# ─── privilege: install needs root; auto-escalate when safe ────────
+if [ "$(id -u)" != "0" ]; then
+    if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+        echo "$M_ESCALATE"
+        exec sudo env \
+            PROXYBOX_LANG="$LANG_CHOICE" \
+            PROXYBOX_DIR="$PROXYBOX_DIR" \
+            CONFIG_DIR="$CONFIG_DIR" \
+            DATA_DIR="$DATA_DIR" \
+            LOG_DIR="$LOG_DIR" \
+            SUB_DIR="$SUB_DIR" \
+            SINGBOX_DIR="$SINGBOX_DIR" \
+            bash "$0" "${ORIG_ARGS[@]}"
+    fi
+    echo "$M_NEED_ROOT" >&2
+    exit 1
+fi
 
 # ─── sentinel: this looks like a ProxyBox checkout ─────────────────
 if [ ! -f "$PROXYBOX_DIR/pyproject.toml" ]; then
@@ -361,18 +384,19 @@ passkey:
 features:
   passkey: false
   bot: false
-  # url_token_bypass starts TRUE for the duration of install.sh's auto-
-  # device-creation step (the curl to /api/devices/new needs to authenticate
-  # without a session cookie). Step 15 flips this to false before printing
-  # the summary, so the running config matches the documented default.
-  url_token_bypass: true
+  # URL-token-only admin API access is disabled from first boot. install.sh
+  # logs in with the generated username/password and uses that session cookie
+  # for its one-shot first-device bootstrap.
+  url_token_bypass: false
 YAML
     chmod 600 "$CONFIG_DIR/config.yaml"
 fi
 
 # ─── 8. fail2ban [manual] jail ─────────────────────────────────────
 if ! grep -q '^\[manual\]' /etc/fail2ban/jail.local 2>/dev/null; then
-    cat > /etc/fail2ban/jail.local <<'JAIL'
+    touch /etc/fail2ban/jail.local
+    [ -s /etc/fail2ban/jail.local ] && printf '\n' >> /etc/fail2ban/jail.local
+    cat >> /etc/fail2ban/jail.local <<'JAIL'
 # ProxyBox manual ban jail — explicit ban via /action/block.
 # backend=systemd avoids /var/log/auth.log dependency (Debian 13 = journald-only).
 [manual]
@@ -431,6 +455,16 @@ sleep 3
 ADMIN_TOKEN=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin']['token'])")
 PUBLIC_HOST=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['server']['public_host'])")
 ADMIN_BASE="http://${PUBLIC_HOST:-<your-vps-ip>}:8080"
+ADMIN_LOCAL="http://127.0.0.1:8080"
+ADMIN_USER=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('username', 'admin'))")
+# Password lives in its own 0400 file, not in YAML — see app/services/admin_password.py.
+ADMIN_PASSWORD=$(cat "$CONFIG_DIR/admin.password" 2>/dev/null || true)
+ADMIN_LOGIN_PATH=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('login_path', ''))")
+if [ -n "$ADMIN_LOGIN_PATH" ]; then
+    LOGIN_PATH="/login/$ADMIN_LOGIN_PATH"
+else
+    LOGIN_PATH="/login"
+fi
 
 # ─── 13. auto-create first device (one-shot UX) ────────────────────
 # Wait for proxybox-admin to be reachable on localhost (sleep 3 above
@@ -438,15 +472,55 @@ ADMIN_BASE="http://${PUBLIC_HOST:-<your-vps-ip>}:8080"
 DEFAULT_DEVICE_NAME="${PROXYBOX_FIRST_DEVICE:-phone-1}"
 SUB_TOKEN=""
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/admin/$ADMIN_TOKEN/api/status" 2>/dev/null | grep -q '^200$'; then
+    if curl -s -o /dev/null -w "%{http_code}" "$ADMIN_LOCAL$LOGIN_PATH" 2>/dev/null | grep -q '^200$'; then
         break
     fi
     sleep 1
 done
 
+COOKIE_JAR=$(mktemp "${TMPDIR:-/tmp}/proxybox-install-cookie.XXXXXX")
+cleanup_cookie() { rm -f "$COOKIE_JAR"; }
+trap cleanup_cookie EXIT
+
+LOGIN_OK=0
+if [ -n "$ADMIN_PASSWORD" ]; then
+    if curl -fsS -c "$COOKIE_JAR" -o /dev/null \
+        -X POST \
+        --data-urlencode "username=$ADMIN_USER" \
+        --data-urlencode "password=$ADMIN_PASSWORD" \
+        "$ADMIN_LOCAL$LOGIN_PATH" 2>/dev/null; then
+        LOGIN_OK=1
+    fi
+fi
+
+api_get() {
+    local path="$1"
+    if [ "$LOGIN_OK" = "1" ]; then
+        curl -fsS -b "$COOKIE_JAR" "$ADMIN_LOCAL/admin/$ADMIN_TOKEN$path" 2>/dev/null
+    else
+        curl -fsS "$ADMIN_LOCAL/admin/$ADMIN_TOKEN$path" 2>/dev/null
+    fi
+}
+
+api_post_json() {
+    local path="$1"
+    local body="$2"
+    if [ "$LOGIN_OK" = "1" ]; then
+        curl -fsS -b "$COOKIE_JAR" -X POST \
+            -H "Content-Type: application/json" \
+            -d "$body" \
+            "$ADMIN_LOCAL/admin/$ADMIN_TOKEN$path" 2>/dev/null
+    else
+        curl -fsS -X POST \
+            -H "Content-Type: application/json" \
+            -d "$body" \
+            "$ADMIN_LOCAL/admin/$ADMIN_TOKEN$path" 2>/dev/null
+    fi
+}
+
 # Check if device already exists (re-install on a host that already has one)
-EXISTING=$(curl -s "http://localhost:8080/admin/$ADMIN_TOKEN/api/devices/list" 2>/dev/null \
-    | .venv/bin/python -c "
+EXISTING_JSON=$(api_get "/api/devices/list" || true)
+EXISTING=$(printf '%s' "$EXISTING_JSON" | .venv/bin/python -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -462,11 +536,13 @@ if [ -n "$EXISTING" ]; then
     SUB_TOKEN=$(echo "$EXISTING" | cut -f2)
 else
     printf "$M_BOOTSTRAP_DEVICE\n" "$DEFAULT_DEVICE_NAME"
-    RESPONSE=$(curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -d "{\"name\":\"$DEFAULT_DEVICE_NAME\",\"kind\":\"mobile\",\"label\":\"$DEFAULT_DEVICE_NAME\"}" \
-        "http://localhost:8080/admin/$ADMIN_TOKEN/api/devices/new" 2>/dev/null)
-    SUB_TOKEN=$(echo "$RESPONSE" | .venv/bin/python -c "
+    CREATE_BODY=$(DEFAULT_DEVICE_NAME="$DEFAULT_DEVICE_NAME" .venv/bin/python -c "
+import json, os
+name = os.environ['DEFAULT_DEVICE_NAME']
+print(json.dumps({'name': name, 'kind': 'mobile', 'label': name}))
+")
+    RESPONSE=$(api_post_json "/api/devices/new" "$CREATE_BODY" || true)
+    SUB_TOKEN=$(printf '%s' "$RESPONSE" | .venv/bin/python -c "
 import json, sys
 try:
     print(json.load(sys.stdin)['device']['sub_token'])
@@ -481,9 +557,9 @@ except Exception:
 fi
 
 # ─── 14. lock down: disable URL-token bypass + restart admin ───────
-# install.sh's auto-device step is done; flip url_token_bypass to false
-# so /admin/{token}/ now requires a /login session cookie. Restart so the
-# @lru_cache'd settings reload. ~3s, harmless.
+# Enforce the documented default after bootstrap and after any re-run from an
+# older install: /admin/{token}/ requires a /login session cookie. Restart so
+# the @lru_cache'd settings reload. ~3s, harmless.
 .venv/bin/python -c "
 import os, yaml, pathlib
 p = pathlib.Path('$CONFIG_DIR/config.yaml')
@@ -500,10 +576,6 @@ systemctl restart proxybox-admin >/dev/null 2>&1 || true
 
 # Read credentials for the summary block. Read AFTER the lock-down so we
 # show the user the actual state of the running config.
-ADMIN_USER=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('username', 'admin'))")
-# Password lives in its own 0400 file, not in YAML — see app/services/admin_password.py.
-ADMIN_PASSWORD=$(cat "$CONFIG_DIR/admin.password" 2>/dev/null || true)
-ADMIN_LOGIN_PATH=$(.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$CONFIG_DIR/config.yaml'))['admin'].get('login_path', ''))")
 if [ -n "$ADMIN_LOGIN_PATH" ]; then
     LOGIN_URL="$ADMIN_BASE/login/$ADMIN_LOGIN_PATH"
 else
