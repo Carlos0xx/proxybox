@@ -72,7 +72,7 @@ curl -X POST \
 
 The old token immediately returns 404 on every format. The new URL points at the same device — UUID, ports, and Reality keypair are unchanged. The client re-imports once and is back online.
 
-From the SPA: **Devices → 设备 → "重新生成订阅"** button on each row.
+From the SPA: **Devices → Regenerate sub** button on each row.
 
 ---
 

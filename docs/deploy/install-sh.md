@@ -92,9 +92,9 @@ Two entry points; same flow underneath.
 ### From the admin UI *(recommended)*
 
 1. Log in.
-2. Side nav → **HTTPS · 域名**.
+2. Side nav → **HTTPS**.
 3. Enter the domain that already points at the VPS.
-4. Click **启用 HTTPS / Enable HTTPS**.
+4. Click **Enable HTTPS**.
 
 Server-side: validates DNS → apt-installs Caddy from the Cloudsmith stable repo → requests a Let's Encrypt cert → writes a reverse-proxy `Caddyfile` → rewrites `server.public_host`, `passkey.rp_id`, `passkey.origin` in `config.yaml` → reloads. End-to-end ~30 s.
 

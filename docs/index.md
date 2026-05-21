@@ -31,7 +31,7 @@ features:
 
   - icon: 🔒
     title: 1-click HTTPS
-    details: Enter your domain, click 启用 HTTPS. The panel installs Caddy, fetches a Let's Encrypt cert, and reloads — ~30 seconds end to end.
+    details: Enter your domain, click Enable HTTPS. The panel installs Caddy, fetches a Let's Encrypt cert, and reloads — ~30 seconds end to end.
 
   - icon: 📲
     title: 5 subscription formats
@@ -39,7 +39,7 @@ features:
 
   - icon: 🌏
     title: Bilingual UI
-    details: Topbar 中 / EN toggle. ~80% English coverage with graceful Chinese fallback. Login form also localised via ?lang=.
+    details: Topbar language switcher between English and Chinese. ~80% English coverage with graceful Chinese fallback. Login form also localised via ?lang=.
 
   - icon: 🤖
     title: Telegram bot (optional)

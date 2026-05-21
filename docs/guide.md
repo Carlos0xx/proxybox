@@ -97,7 +97,7 @@ http://<your-vps>:8080/login/<random-12-char-suffix>
 
 Enter `admin` + the printed password. A 30-day session cookie is set; you land in the SPA.
 
-The auto-created **`phone-1`** device is already in **设备管理 / Devices**. The five subscription URLs are in **订阅链接 / Endpoints**:
+The auto-created **`phone-1`** device is already in the **Devices** page. The five subscription URLs are in **Endpoints**:
 
 | Format | Best for |
 | --- | --- |
@@ -109,6 +109,9 @@ The auto-created **`phone-1`** device is already in **设备管理 / Devices**. 
 
 Paste the matching URL into your client's "Add subscription" dialog. Then verify on the client device: `https://ifconfig.me` should now report your VPS's IP.
 
+> [!TIP]
+> The SPA ships bilingual — every UI label below also exists in Chinese. Flip the language with the topbar switcher if you prefer.
+
 ---
 
 ### 5 · Day-to-day operations
@@ -117,15 +120,15 @@ All from the panel — no SSH needed for anything below.
 
 | Task | Where | Notes |
 | --- | --- | --- |
-| **Add a device** | 设备管理 → 生成 | Use generic names (`phone-1`, `tablet-1`, `home-router`). Avoid personal names — they bleed into sing-box config and sub files. |
-| **Rotate a leaked URL** | 设备管理 → 🔄 换 URL | `sub_token` rotates; UUID + ports unchanged. Client re-imports once. |
-| **Pause a device** | 设备管理 → ⏸ 暂停 | Indefinite or until a timestamp. Inbound removed; traffic history preserved. |
-| **Change password / username** | 安全 → 登录设置 → 修改 | Requires the current password (defends against session-hijack re-auth). |
-| **Rotate login-path suffix** | 安全 → 登录设置 → 🎲 轮换 | Old `/login/{old}` 404s immediately. Existing sessions stay valid. |
-| **Enable HTTPS** | HTTPS · 域名 → 启用 HTTPS | ~30 s: DNS check → Caddy + Let's Encrypt → config update + reload. |
-| **Watch live traffic** | 总览 | Real-time bps + connection count from sing-box's Clash API. |
-| **Per-device drilldown** | 设备历史 | KPIs · daily chart · 24h heatmap · per-app category · per-host table. |
-| **Ban / unban an IP** | 安全 → 封禁 | Wraps fail2ban. |
+| **Add a device** | Devices → New | Use generic names (`phone-1`, `tablet-1`, `home-router`). Avoid personal names — they bleed into sing-box config and sub files. |
+| **Rotate a leaked URL** | Devices → 🔄 New URL | `sub_token` rotates; UUID + ports unchanged. Client re-imports once. |
+| **Pause a device** | Devices → ⏸ Pause | Indefinite or until a timestamp. Inbound removed; traffic history preserved. |
+| **Change password / username** | Security → Login → Edit | Requires the current password (defends against session-hijack re-auth). |
+| **Rotate login-path suffix** | Security → Login → 🎲 Rotate | Old `/login/{old}` 404s immediately. Existing sessions stay valid. |
+| **Enable HTTPS** | HTTPS → Enable | ~30 s: DNS check → Caddy + Let's Encrypt → config update + reload. |
+| **Watch live traffic** | Overview | Real-time bps + connection count from sing-box's Clash API. |
+| **Per-device drilldown** | History | KPIs · daily chart · 24h heatmap · per-app category · per-host table. |
+| **Ban / unban an IP** | Security → Bans | Wraps fail2ban. |
 
 ---
 
@@ -133,14 +136,14 @@ All from the panel — no SSH needed for anything below.
 
 | Symptom | Try this |
 | --- | --- |
-| Every page says "刷新失败" | Hard refresh (Cmd+Shift+R / Ctrl+F5). v0.1.6+ sends `Cache-Control: no-store` so fresh installs shouldn't hit this. |
-| "复制" button does nothing | Pre-v0.1.12 SPA. `cd /opt/proxybox && git pull && systemctl restart proxybox-admin`. |
-| Service shows "unknown" on 服务 page | Not in `services.monitored` or not installed (e.g. `caddy` before HTTPS is on — normal). |
+| Every page says "refresh failed" | Hard refresh (Cmd+Shift+R / Ctrl+F5). v0.1.6+ sends `Cache-Control: no-store` so fresh installs shouldn't hit this. |
+| Copy button does nothing | Pre-v0.1.12 SPA. `cd /opt/proxybox && git pull && systemctl restart proxybox-admin`. |
+| Service shows "unknown" on Services page | Not in `services.monitored` or not installed (e.g. `caddy` before HTTPS is on — normal). |
 | HTTPS provisioning → `dns_mismatch` | Your domain doesn't resolve to this VPS. Update the A record and retry. |
 | Traffic page shows 0 while browsing | The worker took its first sample but no buckets are flushed yet. Check `journalctl -u proxybox-traffic-worker -n 20`. |
 | Forgot login URL or password | `ssh root@<VPS>` → `grep -E "username\|password\|login_path" /etc/proxybox/config.yaml`. |
 
-Logs for any tracked service are live in **日志 / Logs**.
+Logs for any tracked service are live on the **Logs** page.
 
 ---
 

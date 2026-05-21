@@ -44,7 +44,7 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | HTTPS provisioning from the UI | v0.1.10 | Tells the user they can switch to HTTPS later from the panel — no SSH required. |
 | Account self-service | v0.1.11 | Mentions the rotation options in the *Security* page. |
 | Per-line copy buttons | v0.1.12 | Confirms the SPA's copy buttons work over HTTP. |
-| Bilingual SPA + login form | v0.2.0 | Picks `--lang` based on the user's prompt language; mentions the topbar `中 / EN` toggle. |
+| Bilingual SPA + login form | v0.2.0 | Picks `--lang` based on the user's prompt language; mentions the topbar language toggle. |
 
 ---
 

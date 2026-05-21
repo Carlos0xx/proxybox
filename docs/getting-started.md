@@ -99,7 +99,7 @@ Claude runs the same pre-flight checks, `git clone`s the repo, runs `install.sh`
 
 2. **Enter `admin` + the printed password.** A session cookie is set for 30 days; you land in the SPA.
 
-3. **The first device is already created** (`phone-1` by default). Open **订阅链接 / Endpoints** in the side nav. Five URLs are listed:
+3. **The first device is already created** (`phone-1` by default). Open the **Endpoints** page from the side nav. Five URLs are listed:
 
    | Format | Best for |
    | --- | --- |
@@ -118,9 +118,9 @@ Claude runs the same pre-flight checks, `git clone`s the repo, runs `install.sh`
 ## Next steps
 
 - **Day-to-day operations** — add devices, rotate URLs, pause a device, change credentials: [`guide.md`](./guide.md).
-- **Turn on HTTPS** — paste a domain into the panel's "HTTPS · 域名" page: [`deploy/install-sh.md`](./deploy/install-sh.md#https-with-caddy).
+- **Turn on HTTPS** — paste a domain into the panel's *HTTPS* page: [`deploy/install-sh.md`](./deploy/install-sh.md#https-with-caddy).
 - **Wire up Telegram** — control devices from your phone: [`deploy/install-sh.md`](./deploy/install-sh.md#telegram-bot).
-- **Switch UI language** — `中 / EN` toggle in the topbar.
+- **Switch UI language** — language toggle in the topbar.
 
 ---
 

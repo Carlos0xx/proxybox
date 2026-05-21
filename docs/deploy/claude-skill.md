@@ -44,7 +44,7 @@ The bundled `SKILL.md` carries instructions for:
 - **v0.1.10+** HTTPS UI — how to mention it in the handoff so users know they can switch to HTTPS without SSH.
 - **v0.1.11+** account self-service — how to mention rotation options in the handoff.
 - **v0.1.12** copy-button fix — the SPA now has per-line copy buttons on the subscription page.
-- **v0.2.0** bilingual UI — topbar `中 / EN` toggle, login form also bilingual via `?lang=`.
+- **v0.2.0** bilingual UI — topbar language toggle, login form also bilingual via `?lang=`.
 
 ---
 

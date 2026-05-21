@@ -28,8 +28,8 @@
 | 📲 &nbsp; **5 subscription formats** | URI list · `clash.yaml` · `merlin.yaml` · `shadowrocket.conf` · `sub.txt` — generated server-side per device. |
 | 📊 &nbsp; **Real traffic accounting** | Worker polls sing-box's Clash API every 10 s. SQLite buckets bytes per device × hour and tags hosts (Video / Social / AI / CDN / …). |
 | 🔑 &nbsp; **Username + password login** | Form at `/login/{12-char-suffix}`; bare `/login` 404s. Rotate password + login path from the panel — no SSH. |
-| 🔒 &nbsp; **1-click HTTPS** | Enter a domain → click 启用 → Caddy + Let's Encrypt provisioned in ~30 s. |
-| 🌏 &nbsp; **Bilingual UI** | Topbar `中 / EN` toggle. Login form also bilingual via `?lang=`. |
+| 🔒 &nbsp; **1-click HTTPS** | Enter a domain → click *Enable* → Caddy + Let's Encrypt provisioned in ~30 s. |
+| 🌏 &nbsp; **Bilingual UI** | Topbar language switcher (Chinese / English). Login form also bilingual via `?lang=`. |
 | 🤖 &nbsp; **Optional Telegram bot** | `/status` · `/devices` · `/traffic` · `/pause` · `/resume` · `/bans` from your phone. |
 
 ---
