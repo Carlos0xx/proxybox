@@ -22,6 +22,186 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from app.config import get_settings
 from app.services import singbox
 
+POLICY_PROXY = "PROXY"
+POLICY_AUTO = "AUTO"
+POLICY_AI = "AI"
+POLICY_STREAMING = "Streaming"
+POLICY_CHINA = "China"
+POLICY_FINAL = "Final"
+_BLOCKED_REFERENCE_RULE_KEYWORDS = ("binance", "bnbstatic", "bnbchain", "bsc-dataseed")
+
+_APPLE_PUSH_PROXY_RULES = [
+    "DOMAIN-SUFFIX,push.apple.com,{proxy}",
+    "DOMAIN-SUFFIX,gateway.push.apple.com,{proxy}",
+    "DOMAIN-SUFFIX,api.push.apple.com,{proxy}",
+    "DOMAIN-SUFFIX,courier.push.apple.com,{proxy}",
+    "DOMAIN,identity.apple.com,{proxy}",
+    "DOMAIN-KEYWORD,apple.com.edgekey.net,{proxy}",
+    "DOMAIN-KEYWORD,push-apple.com.akadns.net,{proxy}",
+    "IP-CIDR,17.249.0.0/16,{proxy},no-resolve",
+    "IP-CIDR,17.252.0.0/16,{proxy},no-resolve",
+    "IP-CIDR,17.57.144.0/22,{proxy},no-resolve",
+    "IP-CIDR,17.188.128.0/18,{proxy},no-resolve",
+    "IP-CIDR,17.188.20.0/23,{proxy},no-resolve",
+    "IP-CIDR6,2620:149:a44::/48,{proxy},no-resolve",
+    "IP-CIDR6,2403:300:a42::/48,{proxy},no-resolve",
+    "IP-CIDR6,2403:300:a51::/48,{proxy},no-resolve",
+    "IP-CIDR6,2a01:b740:a42::/48,{proxy},no-resolve",
+]
+
+_DIRECT_RULES = [
+    "DOMAIN-SUFFIX,smtp,DIRECT",
+    "DOMAIN-KEYWORD,aria2,DIRECT",
+    "DOMAIN-SUFFIX,acl4.ssr,DIRECT",
+    "DOMAIN-SUFFIX,ip6-localhost,DIRECT",
+    "DOMAIN-SUFFIX,ip6-loopback,DIRECT",
+    "DOMAIN-SUFFIX,local,DIRECT",
+    "DOMAIN-SUFFIX,localhost,DIRECT",
+    "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+    "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
+    "IP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
+    "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
+    "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
+    "IP-CIDR,198.18.0.0/16,DIRECT,no-resolve",
+    "IP-CIDR6,::1/128,DIRECT,no-resolve",
+    "IP-CIDR6,fc00::/7,DIRECT,no-resolve",
+    "IP-CIDR6,fe80::/10,DIRECT,no-resolve",
+    "IP-CIDR6,fd00::/8,DIRECT,no-resolve",
+    "DOMAIN,instant.arubanetworks.com,DIRECT",
+    "DOMAIN,setmeup.arubanetworks.com,DIRECT",
+    "DOMAIN,router.asus.com,DIRECT",
+    "DOMAIN-SUFFIX,hiwifi.com,DIRECT",
+    "DOMAIN-SUFFIX,leike.cc,DIRECT",
+    "DOMAIN-SUFFIX,miwifi.com,DIRECT",
+    "DOMAIN-SUFFIX,my.router,DIRECT",
+    "DOMAIN-SUFFIX,p.to,DIRECT",
+    "DOMAIN-SUFFIX,peiluyou.com,DIRECT",
+    "DOMAIN-SUFFIX,phicomm.me,DIRECT",
+    "DOMAIN-SUFFIX,router.ctc,DIRECT",
+    "DOMAIN-SUFFIX,routerlogin.com,DIRECT",
+    "DOMAIN-SUFFIX,tendawifi.com,DIRECT",
+    "DOMAIN-SUFFIX,zte.home,DIRECT",
+]
+
+_REJECT_RULES = [
+    "DOMAIN-KEYWORD,admarvel,REJECT",
+    "DOMAIN-KEYWORD,admaster,REJECT",
+    "DOMAIN-KEYWORD,adsage,REJECT",
+    "DOMAIN-KEYWORD,adsensor,REJECT",
+    "DOMAIN-KEYWORD,adservice,REJECT",
+    "DOMAIN-KEYWORD,adsmogo,REJECT",
+    "DOMAIN-KEYWORD,adsrvmedia,REJECT",
+    "DOMAIN-KEYWORD,adsserving,REJECT",
+    "DOMAIN-KEYWORD,adsystem,REJECT",
+    "DOMAIN-KEYWORD,adwords,REJECT",
+    "DOMAIN-KEYWORD,applovin,REJECT",
+    "DOMAIN-KEYWORD,appsflyer,REJECT",
+    "DOMAIN-KEYWORD,domob,REJECT",
+    "DOMAIN-KEYWORD,duomeng,REJECT",
+    "DOMAIN-KEYWORD,dwtrack,REJECT",
+    "DOMAIN-KEYWORD,guanggao,REJECT",
+    "DOMAIN-KEYWORD,omgmta,REJECT",
+    "DOMAIN-KEYWORD,omniture,REJECT",
+    "DOMAIN-KEYWORD,openx,REJECT",
+    "DOMAIN-KEYWORD,partnerad,REJECT",
+    "DOMAIN-KEYWORD,pingfore,REJECT",
+    "DOMAIN-KEYWORD,socdm,REJECT",
+    "DOMAIN-KEYWORD,supersonicads,REJECT",
+    "DOMAIN-KEYWORD,wlmonitor,REJECT",
+    "DOMAIN-SUFFIX,amazon-adsystem.com,REJECT",
+    "DOMAIN-SUFFIX,appsflyer.com,REJECT",
+    "DOMAIN-SUFFIX,doubleclick.net,REJECT",
+]
+
+_AI_SUFFIXES = [
+    "openai.com",
+    "chatgpt.com",
+    "oaiusercontent.com",
+    "anthropic.com",
+    "claude.ai",
+    "perplexity.ai",
+    "gemini.google.com",
+    "midjourney.com",
+    "huggingface.co",
+]
+
+_STREAMING_SUFFIXES = [
+    "youtube.com",
+    "youtu.be",
+    "googlevideo.com",
+    "ytimg.com",
+    "youtube-nocookie.com",
+    "netflix.com",
+    "nflxvideo.net",
+    "nflximg.net",
+    "nflxso.net",
+    "tiktok.com",
+    "tiktokcdn.com",
+    "muscdn.com",
+    "hulu.com",
+    "twitch.tv",
+    "ttvnw.net",
+    "vimeo.com",
+    "disneyplus.com",
+    "hbomax.com",
+    "primevideo.com",
+]
+
+_CHINA_DIRECT_RULES = [
+    "DOMAIN-SUFFIX,cn,{china}",
+    "DOMAIN-SUFFIX,中国,{china}",
+    "DOMAIN-SUFFIX,公司,{china}",
+    "DOMAIN-SUFFIX,网络,{china}",
+    "DOMAIN-SUFFIX,qq.com,{china}",
+    "DOMAIN-SUFFIX,wechat.com,{china}",
+    "DOMAIN-SUFFIX,weixin.qq.com,{china}",
+    "DOMAIN-SUFFIX,taobao.com,{china}",
+    "DOMAIN-SUFFIX,tmall.com,{china}",
+    "DOMAIN-SUFFIX,jd.com,{china}",
+    "DOMAIN-SUFFIX,alicdn.com,{china}",
+    "DOMAIN-SUFFIX,alipay.com,{china}",
+    "DOMAIN-SUFFIX,baidu.com,{china}",
+    "DOMAIN-SUFFIX,bilibili.com,{china}",
+    "DOMAIN-SUFFIX,biliapi.net,{china}",
+    "DOMAIN-SUFFIX,douyin.com,{china}",
+    "DOMAIN-SUFFIX,amap.com,{china}",
+    "DOMAIN-SUFFIX,163.com,{china}",
+    "DOMAIN-SUFFIX,126.com,{china}",
+    "DOMAIN-SUFFIX,mi.com,{china}",
+    "DOMAIN-SUFFIX,xiaomi.com,{china}",
+    "GEOIP,CN,{china}",
+]
+
+
+def _routing_rules(*, final_rule: str) -> list[str]:
+    rules: list[str] = []
+    rules.extend(_APPLE_PUSH_PROXY_RULES)
+    rules.extend(_DIRECT_RULES)
+    rules.extend(_REJECT_RULES)
+    rules.extend(f"DOMAIN-SUFFIX,{suffix},{{ai}}" for suffix in _AI_SUFFIXES)
+    rules.extend(f"DOMAIN-SUFFIX,{suffix},{{streaming}}" for suffix in _STREAMING_SUFFIXES)
+    rules.extend(_CHINA_DIRECT_RULES)
+    rules.append(final_rule)
+    return [
+        rule.format(
+            proxy=POLICY_PROXY,
+            ai=POLICY_AI,
+            streaming=POLICY_STREAMING,
+            china=POLICY_CHINA,
+            final=POLICY_FINAL,
+        )
+        for rule in rules
+        if not any(keyword in rule.lower() for keyword in _BLOCKED_REFERENCE_RULE_KEYWORDS)
+    ]
+
+
+def _clash_rules() -> list[str]:
+    return _routing_rules(final_rule="MATCH,{final}")
+
+
+def _shadowrocket_rules() -> list[str]:
+    return _routing_rules(final_rule="FINAL,{final}")
+
 
 def derive_reality_public_key(private_b64: str) -> str:
     """Derive Reality X25519 public key (base64url, no padding) from private."""
@@ -97,8 +277,10 @@ def build_clash_yaml(
 ) -> str:
     """Mihomo / Clash for iOS / Stash / Clash Verge YAML config.
 
-    Single-proxy + select group + GeoIP-CN-direct rules. ``with_tun=True``
-    enables transparent routing for AsusWRT-Merlin (clash-tun on the router).
+    Built-in split rules are adapted from the operator reference template:
+    local networks stay direct, ads are rejected, AI/streaming/CN traffic get
+    separate policy groups, and Binance-specific rules are intentionally
+    omitted. ``with_tun=True`` enables transparent routing for AsusWRT-Merlin.
     """
     if sb_cfg is None:
         sb_cfg = singbox.read_config()
@@ -139,16 +321,40 @@ def build_clash_yaml(
             },
         ],
         "proxy-groups": [
-            {"name": "PROXY", "type": "select", "proxies": [name_v, name_h, "DIRECT"]},
             {
-                "name": "AUTO",
+                "name": POLICY_PROXY,
+                "type": "select",
+                "proxies": [POLICY_AUTO, name_v, name_h, "DIRECT"],
+            },
+            {
+                "name": POLICY_AUTO,
                 "type": "url-test",
                 "proxies": [name_v, name_h],
                 "url": "http://www.gstatic.com/generate_204",
                 "interval": 300,
             },
+            {
+                "name": POLICY_AI,
+                "type": "select",
+                "proxies": [POLICY_PROXY, name_v, name_h, "DIRECT"],
+            },
+            {
+                "name": POLICY_STREAMING,
+                "type": "select",
+                "proxies": [POLICY_PROXY, POLICY_AUTO, name_v, name_h, "DIRECT"],
+            },
+            {
+                "name": POLICY_CHINA,
+                "type": "select",
+                "proxies": ["DIRECT", POLICY_PROXY],
+            },
+            {
+                "name": POLICY_FINAL,
+                "type": "select",
+                "proxies": [POLICY_PROXY, "DIRECT"],
+            },
         ],
-        "rules": ["GEOIP,LAN,DIRECT", "GEOIP,CN,DIRECT", "MATCH,PROXY"],
+        "rules": _clash_rules(),
     }
     if with_tun:
         cfg["tun"] = {
@@ -193,6 +399,17 @@ def build_shadowrocket_conf(device: dict[str, Any], sb_cfg: dict[str, Any] | Non
     ]
     vless_line = ", ".join(vless_parts)
     hy2_line = ", ".join(hy2_parts)
+    proxy_groups = [
+        f"{POLICY_AUTO} = url-test, {name_v}, {name_h}, "
+        "url=http://www.gstatic.com/generate_204, interval=300",
+        f"{POLICY_PROXY} = select, {POLICY_AUTO}, {name_v}, {name_h}, DIRECT",
+        f"{POLICY_AI} = select, {POLICY_PROXY}, {name_v}, {name_h}, DIRECT",
+        f"{POLICY_STREAMING} = select, {POLICY_PROXY}, {POLICY_AUTO}, {name_v}, {name_h}, DIRECT",
+        f"{POLICY_CHINA} = select, DIRECT, {POLICY_PROXY}",
+        f"{POLICY_FINAL} = select, {POLICY_PROXY}, DIRECT",
+    ]
+    proxy_groups_text = "\n".join(proxy_groups)
+    rules_text = "\n".join(_shadowrocket_rules())
     return f"""[General]
 bypass-system = true
 skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local
@@ -203,11 +420,10 @@ dns-server = system
 {hy2_line}
 
 [Proxy Group]
-PROXY = select, {name_v}, {name_h}, DIRECT
+{proxy_groups_text}
 
 [Rule]
-GEOIP,CN,DIRECT
-FINAL,PROXY
+{rules_text}
 """
 
 

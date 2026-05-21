@@ -1,11 +1,16 @@
 """Unit tests for subscription URI builders (pure functions, no DB / no FS)."""
 
 import base64
+from types import SimpleNamespace
 
+import yaml
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
+from app.services import subscriptions
 from app.services.subscriptions import (
+    build_clash_yaml,
     build_hysteria2_uri,
+    build_shadowrocket_conf,
     build_vless_uri,
     derive_reality_public_key,
 )
@@ -58,13 +63,24 @@ def _fake_sb_cfg(priv_b64: str) -> dict:
     }
 
 
-def test_build_vless_uri_shape():
-    priv_b64, pub_b64 = _gen_keypair()
-    device = {
+def _fake_device() -> dict:
+    return {
         "name": "test-phone",
         "vless_uuid": "00000000-0000-0000-0000-000000000001",
         "vless_port": 11001,
+        "hy2_password": "fake-hy2-pw",  # pragma: allowlist secret
+        "hy2_port": 21001,
     }
+
+
+def _stub_public_host(monkeypatch, host: str = "1.2.3.4") -> None:
+    settings = SimpleNamespace(server=SimpleNamespace(public_host=host))
+    monkeypatch.setattr(subscriptions, "get_settings", lambda: settings)
+
+
+def test_build_vless_uri_shape():
+    priv_b64, pub_b64 = _gen_keypair()
+    device = _fake_device()
     uri = build_vless_uri(device, _fake_sb_cfg(priv_b64), "1.2.3.4")
     assert uri.startswith("vless://00000000-0000-0000-0000-000000000001@1.2.3.4:11001?")
     assert "security=reality" in uri
@@ -77,11 +93,7 @@ def test_build_vless_uri_shape():
 
 def test_build_hysteria2_uri_shape():
     priv_b64, _ = _gen_keypair()
-    device = {
-        "name": "test-phone",
-        "hy2_password": "fake-hy2-pw",  # pragma: allowlist secret
-        "hy2_port": 21001,
-    }
+    device = _fake_device()
     uri = build_hysteria2_uri(device, _fake_sb_cfg(priv_b64), "1.2.3.4")
     assert uri.startswith("hysteria2://fake-hy2-pw@1.2.3.4:21001?")
     assert "sni=www.example.com" in uri
@@ -89,3 +101,67 @@ def test_build_hysteria2_uri_shape():
     assert "obfs-password=obfs-pw-hex" in uri
     assert "insecure=1" in uri
     assert uri.endswith("#ProxyBox-test-phone-hy2")
+
+
+def test_clash_yaml_uses_split_rules_without_binance(monkeypatch):
+    _stub_public_host(monkeypatch)
+    priv_b64, _ = _gen_keypair()
+
+    text = build_clash_yaml(_fake_device(), _fake_sb_cfg(priv_b64))
+    cfg = yaml.safe_load(text)
+
+    group_names = {group["name"] for group in cfg["proxy-groups"]}
+    assert group_names >= {"PROXY", "AUTO", "AI", "Streaming", "China", "Final"}
+    assert "DOMAIN-SUFFIX,push.apple.com,PROXY" in cfg["rules"]
+    assert "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve" in cfg["rules"]
+    assert "DOMAIN-SUFFIX,openai.com,AI" in cfg["rules"]
+    assert "DOMAIN-SUFFIX,netflix.com,Streaming" in cfg["rules"]
+    assert "DOMAIN-SUFFIX,qq.com,China" in cfg["rules"]
+    assert "GEOIP,CN,China" in cfg["rules"]
+    assert cfg["rules"][-1] == "MATCH,Final"
+    assert "binance" not in text.lower()
+    assert "bnbstatic" not in text.lower()
+    assert "bsc-dataseed" not in text.lower()
+    assert "Binance-SG" not in text
+
+
+def test_merlin_yaml_keeps_tun_and_split_rules(monkeypatch):
+    _stub_public_host(monkeypatch)
+    priv_b64, _ = _gen_keypair()
+
+    text = build_clash_yaml(_fake_device(), _fake_sb_cfg(priv_b64), with_tun=True)
+    cfg = yaml.safe_load(text)
+
+    assert cfg["tun"]["enable"] is True
+    assert cfg["rules"][-1] == "MATCH,Final"
+    assert "DOMAIN-SUFFIX,openai.com,AI" in cfg["rules"]
+    assert "binance" not in text.lower()
+    assert "bnbstatic" not in text.lower()
+    assert "bsc-dataseed" not in text.lower()
+
+
+def test_shadowrocket_conf_uses_split_rules_without_binance(monkeypatch):
+    _stub_public_host(monkeypatch)
+    priv_b64, _ = _gen_keypair()
+
+    text = build_shadowrocket_conf(_fake_device(), _fake_sb_cfg(priv_b64))
+
+    assert "[Proxy Group]" in text
+    assert "AUTO = url-test," in text
+    assert "PROXY = select, AUTO," in text
+    assert "AI = select, PROXY," in text
+    assert "Streaming = select, PROXY, AUTO," in text
+    assert "China = select, DIRECT, PROXY" in text
+    assert "Final = select, PROXY, DIRECT" in text
+    assert "[Rule]" in text
+    assert "DOMAIN-SUFFIX,push.apple.com,PROXY" in text
+    assert "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve" in text
+    assert "DOMAIN-SUFFIX,openai.com,AI" in text
+    assert "DOMAIN-SUFFIX,netflix.com,Streaming" in text
+    assert "DOMAIN-SUFFIX,qq.com,China" in text
+    assert "GEOIP,CN,China" in text
+    assert "FINAL,Final" in text
+    assert "binance" not in text.lower()
+    assert "bnbstatic" not in text.lower()
+    assert "bsc-dataseed" not in text.lower()
+    assert "Binance-SG" not in text

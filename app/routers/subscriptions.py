@@ -16,6 +16,8 @@ Format selection:
 
 For non-URI formats the device row is re-queried by sub_token and the file
 is built on the fly (no extra disk writes on device create / regen).
+The YAML/.conf formats include built-in split rules; the plain URI list formats
+only carry nodes because the URI subscription format has no routing-rule syntax.
 """
 
 from __future__ import annotations

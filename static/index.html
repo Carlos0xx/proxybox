@@ -2421,9 +2421,9 @@ const REFRESH_RATES = {
 };
 
 const CLIENT_NAMES = {
-  'clash.yaml':              ['Stash / Clash',  '推荐 · 完整规则'],
-  'merlin.yaml':             ['Merlin 路由器',  '完整规则'],
-  'shadowrocket.conf':       ['Shadowrocket',   '精简版'],
+  'clash.yaml':              ['Stash / Clash',  '推荐 · 分流规则'],
+  'merlin.yaml':             ['Merlin 路由器',  '分流规则'],
+  'shadowrocket.conf':       ['Shadowrocket',   '分流规则'],
   'shadowrocket-full.conf':  ['Shadowrocket 完整版', '备份'],
   'sub':                     ['SR URI 订阅',    'base64'],
   'sub.txt':                 ['SR URI 明文',    'plain'],
@@ -3295,9 +3295,9 @@ async function loadSubs() {
   // Same 5 formats install.sh's summary block prints; tag/desc kept in sync.
   const formats = [
     {file: '',                   tag: '[推荐]',   desc: 'sing-box · Shadowrocket · Hiddify (Type: Subscribe)', prefer: true},
-    {file: '/clash.yaml',        tag: '[Clash 系]', desc: 'Stash · Clash for iOS · Clash Verge'},
-    {file: '/merlin.yaml',       tag: '[路由器]', desc: 'AsusWRT-Merlin · Clash 透明代理'},
-    {file: '/shadowrocket.conf', tag: '[备用]',   desc: 'Shadowrocket .conf · Surge 格式'},
+    {file: '/clash.yaml',        tag: '[Clash 系]', desc: 'Stash · Clash for iOS · AI/流媒体/CN 分流'},
+    {file: '/merlin.yaml',       tag: '[路由器]', desc: 'AsusWRT-Merlin · 透明代理分流'},
+    {file: '/shadowrocket.conf', tag: '[备用]',   desc: 'Shadowrocket .conf · 内置分流规则'},
     {file: '/sub.txt',           tag: '[别名]',   desc: 'URI 列表 · .txt 扩展名'},
   ];
   list.innerHTML = devices.map(dev => {
@@ -4302,9 +4302,9 @@ async function showDeviceSubs(name) {
   // Built on-the-fly by the subscription router, no extra files on disk.
   const urls = [
     { file: '',                   label: 'sing-box / Shadowrocket (推荐)', hint: '📱 iOS · Type: Subscribe · 通用 URI 列表',  prefer: true },
-    { file: '/clash.yaml',        label: 'Stash / Clash for iOS',          hint: '📱 iOS · macOS · Android',                  prefer: false },
-    { file: '/merlin.yaml',       label: 'Merlin Clash 路由器',             hint: '🌐 路由器 · 内置 tun: enable: true',         prefer: false },
-    { file: '/shadowrocket.conf', label: 'Shadowrocket .conf (备用)',      hint: '⚠️ Surge 格式, Reality 解析依赖客户端版本',  prefer: false },
+    { file: '/clash.yaml',        label: 'Stash / Clash for iOS',          hint: '📱 内置 AI/流媒体/CN 分流规则',              prefer: false },
+    { file: '/merlin.yaml',       label: 'Merlin Clash 路由器',             hint: '🌐 内置 tun + 分流规则',                    prefer: false },
+    { file: '/shadowrocket.conf', label: 'Shadowrocket .conf (备用)',      hint: '⚠️ 内置分流, Reality 解析依赖客户端版本',   prefer: false },
     { file: '/sub.txt',           label: 'URI 列表 (.txt 别名)',           hint: '👀 与默认链接同内容, 部分客户端按扩展名识别',   prefer: false },
   ];
 
