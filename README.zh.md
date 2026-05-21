@@ -78,32 +78,16 @@ docker compose up -d
 
 ```text
 .
-├── app/                       FastAPI 管理服务
-│   ├── main.py                  入口 —— 装载 router、挂 SPA、初始化 schema
-│   ├── bootstrap.py             一次性配置生成器 (Docker 用)
-│   ├── config.py                YAML 加载 + 原子写
-│   ├── auth/                    session cookie · URL-path token · passkey
-│   ├── db/                      SQLite —— schema.sql + 连接池
-│   ├── models/                  pydantic —— device row
-│   ├── routers/                 HTTP —— devices · subscriptions · traffic ·
-│   │                              history · https · account · bans · login · …
-│   ├── services/                业务逻辑 —— singbox · caddy · fail2ban ·
-│   │                              host_classify · system_stats · subscriptions
-│   └── workers/                 traffic.py —— 每 10 秒拉一次 Clash API
-├── bot/                       Telegram bot (可选) —— handlers + API client
-├── static/index.html          单文件 SPA —— I18N_DICT 双语
-├── deploy/
-│   ├── install.sh               幂等 Bash 安装器
-│   ├── check-prereqs.sh         9 类环境预检
-│   ├── enable-https.sh          Caddy + Let's Encrypt 的 CLI 封装
-│   ├── claude-skill/            AI 驱动安装的 SKILL.md + skill README
-│   └── systemd/                 bot + traffic-worker 的 unit 文件
-├── docs/                      Markdown 文档 —— guide · architecture · api · deploy
-├── scripts/                   release-audit.sh · pii-check.sh
-├── tests/                     pytest —— 配置加载 · 订阅 · traffic worker
+├── app/                  FastAPI 管理服务 —— routers · services · workers · db
+├── bot/                  Telegram bot (可选)
+├── static/               单文件 SPA (双语)
+├── deploy/               install.sh · check-prereqs · enable-https · claude-skill · systemd
+├── docs/                 Markdown 文档
+├── scripts/              release-audit · pii-check
+├── tests/                pytest 测试
 ├── docker-compose.yml
 ├── Dockerfile
-├── config.example.yaml        每个配置项 + 行内注释
+├── config.example.yaml
 ├── pyproject.toml
 └── CHANGELOG.md
 ```

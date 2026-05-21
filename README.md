@@ -78,32 +78,16 @@ Multi-arch images at `ghcr.io/carlos0xx/proxybox:latest`. No fail2ban or HTTPS U
 
 ```text
 .
-├── app/                       FastAPI admin service
-│   ├── main.py                  entry — wires routers, mounts SPA, init schema
-│   ├── bootstrap.py             one-shot config generator (used by Docker)
-│   ├── config.py                YAML loader + atomic writer
-│   ├── auth/                    session cookie · URL-path token · passkey
-│   ├── db/                      SQLite — schema.sql + connection pool
-│   ├── models/                  pydantic — device row
-│   ├── routers/                 HTTP — devices · subscriptions · traffic ·
-│   │                              history · https · account · bans · login · …
-│   ├── services/                business logic — singbox · caddy · fail2ban ·
-│   │                              host_classify · system_stats · subscriptions
-│   └── workers/                 traffic.py — polls Clash API every 10 s
-├── bot/                       Telegram bot (opt-in) — handlers + API client
-├── static/index.html          Single-file SPA — bilingual via I18N_DICT
-├── deploy/
-│   ├── install.sh               idempotent Bash installer
-│   ├── check-prereqs.sh         9-category pre-flight
-│   ├── enable-https.sh          CLI wrapper for Caddy + Let's Encrypt
-│   ├── claude-skill/            SKILL.md + skill README for AI-driven install
-│   └── systemd/                 unit files for bot + traffic-worker
-├── docs/                      Markdown docs — guide · architecture · api · deploy
-├── scripts/                   release-audit.sh · pii-check.sh
-├── tests/                     pytest — config loader · subs · traffic worker
+├── app/                  FastAPI admin service — routers · services · workers · db
+├── bot/                  Telegram bot (opt-in)
+├── static/               Single-file SPA (bilingual)
+├── deploy/               install.sh · check-prereqs · enable-https · claude-skill · systemd
+├── docs/                 Markdown documentation
+├── scripts/              release-audit · pii-check
+├── tests/                pytest suite
 ├── docker-compose.yml
 ├── Dockerfile
-├── config.example.yaml        every config knob, with inline comments
+├── config.example.yaml
 ├── pyproject.toml
 └── CHANGELOG.md
 ```
