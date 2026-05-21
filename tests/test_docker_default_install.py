@@ -8,7 +8,7 @@ import yaml
 from fastapi import HTTPException
 
 from app import bootstrap
-from app.routers import connections, system
+from app.routers import actions, connections, system
 from app.services import caddy, fail2ban, singbox, system_stats
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,6 +121,43 @@ def test_singbox_reload_uses_docker_flag_before_systemctl(monkeypatch, tmp_path:
     monkeypatch.setattr(singbox.subprocess, "run", fail_run)
     singbox.reload_singbox()
     assert flag.exists()
+
+
+def test_docker_service_restart_actions_stay_inside_docker(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    reload_flag = tmp_path / "sing-box" / "reload.flag"
+    worker_flag = tmp_path / "worker.restart"
+    monitored = ["sing-box", "proxybox-traffic-worker", "caddy"]
+    monkeypatch.setenv("PROXYBOX_RUNTIME", "docker")
+    monkeypatch.setenv("PROXYBOX_SINGBOX_RELOAD_FILE", str(reload_flag))
+    monkeypatch.setenv("PROXYBOX_WORKER_RESTART_FILE", str(worker_flag))
+    monkeypatch.setattr(
+        actions,
+        "get_settings",
+        lambda: SimpleNamespace(services=SimpleNamespace(monitored=monitored)),
+    )
+
+    def fail_shell_run(*_args, **_kwargs):
+        raise AssertionError("Docker service actions must not call host systemctl")
+
+    monkeypatch.setattr(actions.shell, "run", fail_shell_run)
+
+    singbox_result = asyncio.run(actions.restart_service("sing-box"))
+    worker_result = asyncio.run(actions.restart_service("proxybox-traffic-worker"))
+
+    assert singbox_result == {"service": "sing-box", "action": "reload_requested"}
+    assert worker_result == {
+        "service": "proxybox-traffic-worker",
+        "action": "restart_requested",
+    }
+    assert reload_flag.exists()
+    assert worker_flag.exists()
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(actions.restart_service("caddy"))
+    assert exc.value.status_code == 501
 
 
 def test_docker_status_uses_internal_runtime_probes(monkeypatch, tmp_path: Path) -> None:
