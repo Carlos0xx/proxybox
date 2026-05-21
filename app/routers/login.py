@@ -6,8 +6,8 @@ signed session cookie issued by /login (or by the passkey-login endpoint,
 when that feature is enabled).
 
 The cookie itself reuses the existing passkey-session machinery in
-``app.auth.passkey`` (same itsdangerous serializer, same cookie name,
-same max-age), so the two login paths are interchangeable from
+``app.auth.passkey`` (same itsdangerous serializer, same per-instance
+cookie name, same max-age), so the two login paths are interchangeable from
 admin_auth's perspective.
 
 The form is a single self-contained HTML page — no JS framework, no
@@ -27,9 +27,9 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from app.auth.passkey import (
-    SESSION_COOKIE_NAME,
     SESSION_MAX_AGE,
     issue_session_cookie,
+    session_cookie_name,
 )
 from app.config import get_settings
 from app.services import login_rate_limit
@@ -321,7 +321,7 @@ async def _do_login(
     target = _post_login_destination(next_path, settings.admin.token)
     resp = RedirectResponse(target, status_code=303)
     resp.set_cookie(
-        SESSION_COOKIE_NAME,
+        session_cookie_name(),
         issue_session_cookie(),
         max_age=SESSION_MAX_AGE,
         path="/",
@@ -371,7 +371,7 @@ async def login_submit_secret(
 @router.post("/logout", include_in_schema=False)
 async def logout() -> RedirectResponse:
     resp = RedirectResponse(_login_url(), status_code=303)
-    resp.delete_cookie(SESSION_COOKIE_NAME, samesite="lax")
+    resp.delete_cookie(session_cookie_name(), samesite="lax")
     return resp
 
 

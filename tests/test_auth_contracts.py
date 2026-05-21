@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
+from app.auth import passkey
 from app.auth import token as token_auth
 from app.config import reset_settings_cache
 from app.db.connection import connection
@@ -41,6 +42,26 @@ def test_bot_token_only_auth_is_loopback_only(monkeypatch: pytest.MonkeyPatch) -
 
     with pytest.raises(HTTPException):
         asyncio.run(token_auth.admin_auth(_request("198.51.100.10"), "test-token"))
+
+
+def test_session_cookie_name_is_scoped_per_instance(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        passkey,
+        "get_settings",
+        lambda: SimpleNamespace(admin=SimpleNamespace(token="native-token")),
+    )
+    native_name = passkey.session_cookie_name()
+    monkeypatch.setattr(
+        passkey,
+        "get_settings",
+        lambda: SimpleNamespace(admin=SimpleNamespace(token="docker-token")),
+    )
+    docker_name = passkey.session_cookie_name()
+
+    assert native_name.startswith("proxybox_admin_session_")
+    assert docker_name.startswith("proxybox_admin_session_")
+    assert native_name != docker_name
+    assert native_name != "proxybox_admin_session"
 
 
 def _write_config(tmp_path: Path, *, passkey: bool = False) -> Path:
@@ -145,6 +166,35 @@ def test_login_page_exposes_passkey_login_when_enabled(
     assert "Passkey / Touch ID" in res.text
     assert "const opts = d1.options;" in res.text
     assert "/auth/webauthn/login/complete" in res.text
+
+
+def test_password_login_sets_instance_scoped_cookie(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg_path = _write_config(tmp_path)
+    password_file = tmp_path / "admin.password"
+    password_file.write_text("secret-password", encoding="utf-8")
+    password_file.chmod(0o400)
+    monkeypatch.setenv("PROXYBOX_CONFIG", str(cfg_path))
+    reset_settings_cache()
+    from app.main import create_app
+
+    try:
+        app = create_app()
+        expected_cookie_name = passkey.session_cookie_name()
+        with TestClient(app, follow_redirects=False) as client:
+            res = client.post(
+                "/login/login-secret",
+                data={"username": "admin", "password": "secret-password"},
+            )
+    finally:
+        reset_settings_cache()
+
+    assert res.status_code == 303
+    set_cookie = res.headers["set-cookie"]
+    assert f"{expected_cookie_name}=" in set_cookie
+    assert "proxybox_admin_session=" not in set_cookie
 
 
 def test_login_page_is_chinese_only(

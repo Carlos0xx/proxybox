@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import hashlib
 import json
 import os
 import secrets
@@ -33,7 +34,7 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.db.connection import connection
 
-SESSION_COOKIE_NAME = "proxybox_admin_session"
+SESSION_COOKIE_BASE_NAME = "proxybox_admin_session"
 SESSION_MAX_AGE = 30 * 24 * 3600
 CHALLENGE_TTL = 300
 MAX_CHALLENGES = 256
@@ -67,6 +68,20 @@ def _signer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(_load_or_create_secret(), salt="proxybox-admin-session-v1")
 
 
+def session_cookie_name() -> str:
+    """Return a per-instance cookie name.
+
+    Browsers scope cookies by host/path, not by port. A native install and a
+    Docker install on the same VPS IP can therefore overwrite each other's
+    session if they share a fixed cookie name. Hash the per-install admin
+    token into the name so sibling ProxyBox instances stay logged in
+    independently without exposing the token itself.
+    """
+    token = get_settings().admin.token
+    suffix = hashlib.sha256(token.encode("utf-8")).hexdigest()[:12]
+    return f"{SESSION_COOKIE_BASE_NAME}_{suffix}"
+
+
 def issue_session_cookie() -> str:
     return _signer().dumps({"iat": int(time.time()), "n": secrets.token_urlsafe(6)})
 
@@ -82,7 +97,9 @@ def validate_session_cookie(cookie: str | None) -> bool:
 
 
 def request_has_session(request: Request) -> bool:
-    return validate_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
+    if not request.cookies:
+        return False
+    return validate_session_cookie(request.cookies.get(session_cookie_name()))
 
 
 # ─── base64url helpers ──────────────────────────────────────────
@@ -229,7 +246,7 @@ def make_public_router() -> APIRouter:
             )
             conn.commit()
         response.set_cookie(
-            SESSION_COOKIE_NAME,
+            session_cookie_name(),
             issue_session_cookie(),
             max_age=SESSION_MAX_AGE,
             httponly=True,
@@ -241,7 +258,7 @@ def make_public_router() -> APIRouter:
 
     @router.post("/logout")
     async def logout(response: Response) -> dict:
-        response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+        response.delete_cookie(session_cookie_name(), path="/")
         return {"ok": True}
 
     return router
