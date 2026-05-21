@@ -25,11 +25,13 @@ def test_admin_token_rotation_dialog_uses_returned_contract() -> None:
     assert "不带 token" not in STATIC_HTML
 
 
-def test_service_restart_icon_has_explicit_size_guard() -> None:
-    assert "svc-restart-icon" in STATIC_HTML
-    assert '<span class="svc-restart-icon" aria-hidden="true">↻</span>' in STATIC_HTML
+def test_service_restart_button_is_text_only() -> None:
+    assert "btn-svc-restart" in STATIC_HTML
+    assert "svc-restart-icon" not in STATIC_HTML
     assert '<svg class="svc-restart-icon"' not in STATIC_HTML
-    assert ".btn-svc-restart .svc-restart-icon" in STATIC_HTML
-    assert "max-width: 12px" in STATIC_HTML
-    assert "min-height: 12px" in STATIC_HTML
-    assert "font-size: 12px" in STATIC_HTML
+    start = STATIC_HTML.index('<button class="btn btn-sm btn-warn btn-svc-restart"')
+    button_fragment = STATIC_HTML[start : STATIC_HTML.index("</button>", start)]
+    assert "<span" not in button_fragment
+    assert "<svg" not in button_fragment
+    assert "重启服务</button>" in STATIC_HTML
+    assert '.btn-svc-restart [class*="icon"]' in STATIC_HTML
