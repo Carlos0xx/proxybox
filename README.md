@@ -46,7 +46,7 @@ git clone https://github.com/carlos0xx/proxybox "$INSTALL_DIR"
 cd "$INSTALL_DIR" && bash deploy/install.sh
 ```
 
-Running `deploy/install.sh` without arguments shows a Chinese mode picker for **Docker install** or **native install**. Press Enter for Docker: container isolation, automatic port selection, and no host systemd/fail2ban/Caddy writes. If the VPS already runs websites, panels, or production services, use Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
+Running `deploy/install.sh` without arguments shows a Chinese mode picker for **Docker install** or **native install** and requires an explicit `1` or `2` choice. Pick Docker for container isolation, automatic port selection, and no host systemd/fail2ban/Caddy writes. If the VPS already runs websites, panels, or production services, use Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
 
 Direct mode selection:
 
@@ -71,7 +71,7 @@ mkdir -p ~/.claude/skills/proxybox-deploy
 cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 ```
 
-Then in any session: *"deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519"*. The agent uses an auto-deleted temporary SSH `known_hosts` → runs a minimal VPS check → clones into a new install directory → Docker port pre-flight → `deploy/docker-install.sh` → service verification → hands back the login URL + credentials.
+Then in any session: *"deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519"*. The agent must ask you to choose Docker or native first, then uses an auto-deleted temporary SSH `known_hosts` → runs a minimal VPS check → clones into a new install directory → runs `deploy/install.sh --docker` or `deploy/install.sh --native --fresh` → service verification → hands back the login URL + credentials.
 
 For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](./deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
 

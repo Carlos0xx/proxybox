@@ -46,7 +46,7 @@ git clone https://github.com/carlos0xx/proxybox "$INSTALL_DIR"
 cd "$INSTALL_DIR" && bash deploy/install.sh
 ```
 
-无参数运行 `deploy/install.sh` 会用中文提示选择 **Docker 安装** 或 **宿主机安装**。默认回车选择 Docker:容器隔离、自动避开已占用端口、不写宿主机 systemd/fail2ban/Caddy。如果 VPS 里已经有其他服务、网站、面板或生产系统,强烈推荐 Docker。宿主机安装会直接安装 Python、sing-box、systemd unit、fail2ban,仅建议用于干净、专用、不跑其他生产服务的 VPS。
+无参数运行 `deploy/install.sh` 会用中文提示选择 **Docker 安装** 或 **宿主机安装**,并强制用户输入 `1` 或 `2`。推荐选 Docker:容器隔离、自动避开已占用端口、不写宿主机 systemd/fail2ban/Caddy。如果 VPS 里已经有其他服务、网站、面板或生产系统,强烈推荐 Docker。宿主机安装会直接安装 Python、sing-box、systemd unit、fail2ban,仅建议用于干净、专用、不跑其他生产服务的 VPS。
 
 直接指定方式:
 
@@ -71,7 +71,7 @@ mkdir -p ~/.claude/skills/proxybox-deploy
 cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 ```
 
-然后在对话里:*"帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519"*。代理走自动删除的临时 SSH `known_hosts` → 最小 VPS 检查 → 克隆到新的安装目录 → Docker 端口预检 → `deploy/docker-install.sh` → 验证服务 → 把登录地址 + 凭据发给你。
+然后在对话里:*"帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519"*。代理必须先让你选择 Docker 或宿主机安装,再走自动删除的临时 SSH `known_hosts` → 最小 VPS 检查 → 克隆到新的安装目录 → 运行 `deploy/install.sh --docker` 或 `deploy/install.sh --native --fresh` → 验证服务 → 把登录地址 + 凭据发给你。
 
 Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](./deploy/claude-skill/SKILL.md) 喂给它 —— 指令是通用的,不绑 Claude Code。
 

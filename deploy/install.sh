@@ -53,15 +53,17 @@ dispatch_install_mode() {
     echo "     直接安装 Python、sing-box、systemd unit、fail2ban，可在面板内配置 Caddy/HTTPS。"
     echo "     仅建议用于干净、专用、不会跑其他生产服务的 VPS。"
     echo
-    echo "直接回车默认选择 Docker。"
+    echo "必须明确选择 1 或 2；推荐选择 1(Docker)。"
     local choice
     if [ -t 0 ] && [ -t 1 ]; then
         read -r -p "请选择 [1/2]: " choice
     else
-        choice="${PROXYBOX_INSTALL_DEFAULT:-1}"
-        echo "非交互环境，默认选择 Docker。"
+        echo "错误: 非交互环境不能自动选择安装方式。" >&2
+        echo "请显式运行: bash deploy/install.sh --docker" >&2
+        echo "或: bash deploy/install.sh --native --fresh --lang zh" >&2
+        exit 2
     fi
-    case "${choice:-1}" in
+    case "$choice" in
         1|d|D|docker|Docker|DOCKER)
             exec bash "$ROOT_DIR/deploy/docker-install.sh"
             ;;

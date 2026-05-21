@@ -1,6 +1,6 @@
 # `deploy/install.sh`
 
-> Native host installer. Running `deploy/install.sh` without arguments now opens the Docker/native chooser; use `--native` for this host-level path.
+> Native host installer. Running `deploy/install.sh` without arguments opens the Docker/native chooser on an interactive terminal; non-interactive runs must pass `--docker` or `--native` explicitly. Use `--native` for this host-level path.
 
 For the high-level walkthrough, see [Getting started · Path 1](../getting-started.md#path-1--interactive-install-docker-recommended).
 
@@ -23,7 +23,7 @@ changes.
 
 | Flag | Effect |
 | --- | --- |
-| `--native` | Use the host-level installer instead of the default Docker chooser. |
+| `--native` | Use the host-level installer instead of the Docker/native chooser. |
 | `--fresh` / `PROXYBOX_FRESH=1` | Stop ProxyBox services, remove ProxyBox-managed config/data/subscriptions/systemd units/managed Caddyfile, then generate a new identity. |
 | `--reuse` / `--no-fresh` | Keep existing ProxyBox state. This is the default for manual reruns and upgrades. |
 | `--lang en` / `--lang zh` | Force language. Default: auto-detect from `$LANG`. |

@@ -56,7 +56,7 @@ cd "$INSTALL_DIR"
 bash deploy/install.sh
 ```
 
-The installer shows a Chinese mode picker. Press Enter for Docker, which checks Docker/Compose and `ss`/`iproute2`, installs missing runtime packages, starts Docker, scans host ports, prints/writes a fresh isolated Compose project to `.env`, and starts a bridge-network stack. If the VPS already runs websites, panels, or production services, choose Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
+The installer shows a Chinese mode picker and requires an explicit `1` or `2` choice. Pick Docker to check Docker/Compose and `ss`/`iproute2`, install missing runtime packages, start Docker, scan host ports, print/write a fresh isolated Compose project to `.env`, and start a bridge-network stack. If the VPS already runs websites, panels, or production services, choose Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
 
 > **Installation red line:** never delete, modify, overwrite, or reuse files/services on the user's VPS outside this install. Even if `/opt/proxybox` or another same-name directory already exists, leave it untouched and clone into a new `proxybox-<timestamp>-<suffix>` directory.
 
@@ -73,7 +73,7 @@ Then ask in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-The agent walks auto-deleted temporary SSH `known_hosts` → minimal VPS check → clone into a fresh install directory → Docker port pre-flight → `deploy/docker-install.sh` → verification → relays the credentials back. For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) directly.
+The agent must ask you to choose Docker or native first, then walks auto-deleted temporary SSH `known_hosts` → minimal VPS check → clone into a fresh install directory → `deploy/install.sh --docker` or `deploy/install.sh --native --fresh` → verification → relays the credentials back. For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) directly.
 
 #### Path C — `install.sh`
 
@@ -208,7 +208,7 @@ cd "$INSTALL_DIR"
 bash deploy/install.sh
 ```
 
-安装器会用中文提示选择 Docker 或宿主机。直接回车默认 Docker:容器隔离、自动避开已占用端口、不写宿主机 systemd/fail2ban/Caddy。如果 VPS 已经跑了其他服务、网站、面板或生产系统,强烈推荐 Docker。宿主机安装会直接安装 Python、sing-box、systemd unit、fail2ban,仅建议用于干净、专用、不跑其他生产服务的 VPS。
+安装器会用中文提示选择 Docker 或宿主机,并强制输入 `1` 或 `2`。推荐选 Docker:容器隔离、自动避开已占用端口、不写宿主机 systemd/fail2ban/Caddy。如果 VPS 已经跑了其他服务、网站、面板或生产系统,强烈推荐 Docker。宿主机安装会直接安装 Python、sing-box、systemd unit、fail2ban,仅建议用于干净、专用、不跑其他生产服务的 VPS。
 
 > **安装红线:** 不要删除、修改、覆盖或复用用户 VPS 上本次安装以外的任何文件和服务。即便宿主机已经存在 `/opt/proxybox` 或同名目录,也必须保留不动,改用新的 `proxybox-<时间戳>-<后缀>` 目录。
 
@@ -225,7 +225,7 @@ cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 
 > 帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519
 
-代理走自动删除的临时 SSH `known_hosts` → 最小 VPS 检查 → 克隆到新的安装目录 → Docker 端口预检 → `deploy/docker-install.sh` → 验证服务 → 把凭据发给你。Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) 喂给它即可。
+代理必须先让你选择 Docker 或宿主机安装,再走自动删除的临时 SSH `known_hosts` → 最小 VPS 检查 → 克隆到新的安装目录 → `deploy/install.sh --docker` 或 `deploy/install.sh --native --fresh` → 验证服务 → 把凭据发给你。Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) 喂给它即可。
 
 #### 方式 C — `install.sh`
 

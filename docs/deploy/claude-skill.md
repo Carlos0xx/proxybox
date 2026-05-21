@@ -1,6 +1,6 @@
 # Claude Code skill
 
-> A bundled Claude Code skill that drives the Docker-first install over SSH — minimal VPS check, clone into a new install directory, Docker runtime provisioning via `deploy/docker-install.sh`, verification, credential handoff.
+> A bundled Claude Code skill that drives an explicitly selected install mode over SSH — minimal VPS check, clone into a new install directory, `deploy/install.sh --docker` or `deploy/install.sh --native --fresh`, verification, credential handoff.
 
 For the high-level walkthrough, see [Getting started · Path 3](../getting-started.md#path-3--claude-code).
 
@@ -29,12 +29,12 @@ Claude will:
 | --- | --- |
 | 1 | Ask for SSH user / auth method if missing from the prompt. |
 | 2 | Use a temporary session-local `known_hosts` file that is deleted on shell exit instead of editing your normal SSH trust store. |
-| 3 | Run a minimal inline VPS check before the repo exists. |
-| 4 | Install bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
-| 5 | Clone `https://github.com/carlos0xx/proxybox` into a new `/opt/proxybox-<timestamp>-<suffix>` directory and refuse to touch existing directories. |
-| 6 | Run `bash deploy/docker-install.sh`, which checks/installs Docker + Compose, starts Docker, and scans free host ports. |
-| 7 | Start the isolated Docker stack. |
-| 8 | Verify the Docker services are `Up`. |
+| 3 | Require an explicit Docker/native install-mode choice before running remote install commands. |
+| 4 | Run a minimal inline VPS check before the repo exists. |
+| 5 | Install bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
+| 6 | Clone `https://github.com/carlos0xx/proxybox` into a new `/opt/proxybox-<timestamp>-<suffix>` directory and refuse to touch existing directories. |
+| 7 | Run `bash deploy/install.sh --docker` or `bash deploy/install.sh --native --fresh`; Docker mode checks/installs Docker + Compose, starts Docker, and scans free host ports. |
+| 8 | Verify the core services are healthy. |
 | 9 | Relay the login URL, username, password, and first device status back to you. |
 
 ---
@@ -47,7 +47,7 @@ The bundled `SKILL.md` carries instructions for:
 - **HTTPS options** — Docker users should put Admin UI behind a host reverse proxy, gateway, or Cloudflare Tunnel.
 - **v0.1.11+** account self-service — how to mention rotation options in the handoff.
 - **v0.1.12** copy-button fix — the SPA now has per-line copy buttons on the subscription page.
-- **Docker-first install** — bridge network, auto-selected ports, no host systemd/fail2ban writes.
+- **Explicit install-mode choice** — Docker remains recommended; native is advanced and host-level.
 
 ---
 
@@ -62,7 +62,7 @@ The skill explicitly instructs Claude to:
 The credentials live only in the ProxyBox Docker volume: username/login path in `/etc/proxybox/config.yaml`, password in `/etc/proxybox/admin.password`. The skill never persists them locally.
 
 > [!IMPORTANT]
-> The skill assumes you trust your local Claude Code session. If you'd rather Claude never see the credentials, run `deploy/docker-install.sh` over SSH yourself — the skill is a convenience, not a hard requirement.
+> The skill assumes you trust your local Claude Code session. If you'd rather Claude never see the credentials, run `deploy/install.sh` over SSH yourself — the skill is a convenience, not a hard requirement.
 
 ---
 

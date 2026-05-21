@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,10 +19,29 @@ def test_unified_installer_prompts_for_docker_or_native() -> None:
     assert "Docker 安装（推荐）" in INSTALL_SH
     assert "VPS 已经跑了其他服务、网站、面板或生产系统" in INSTALL_SH
     assert "仅建议用于干净、专用、不会跑其他生产服务的 VPS" in INSTALL_SH
-    assert "直接回车默认选择 Docker" in INSTALL_SH
+    assert "必须明确选择 1 或 2" in INSTALL_SH
+    assert "非交互环境不能自动选择安装方式" in INSTALL_SH
+    assert "PROXYBOX_INSTALL_DEFAULT" not in INSTALL_SH
     assert "--docker" in INSTALL_SH
     assert "--native" in INSTALL_SH
     assert "PROXYBOX_INSTALL_MODE" in INSTALL_SH
+
+
+def test_unified_installer_refuses_noninteractive_implicit_mode() -> None:
+    proc = subprocess.run(
+        ["bash", str(ROOT / "deploy" / "install.sh")],
+        cwd=ROOT,
+        input="",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined = proc.stdout + proc.stderr
+    assert proc.returncode == 2
+    assert "ProxyBox 安装方式选择" in combined
+    assert "非交互环境不能自动选择安装方式" in combined
+    assert "bash deploy/install.sh --docker" in combined
+    assert "bash deploy/install.sh --native --fresh --lang zh" in combined
 
 
 def test_installer_bootstraps_first_device_with_login_session() -> None:
@@ -102,7 +122,7 @@ def test_deploy_skill_clones_new_directory_without_reusing_checkout() -> None:
     assert "PROXYBOX_UPGRADE=1" not in DEPLOY_SKILL
     assert "no reuse of an old `.env`" in DEPLOY_SKILL
     assert "existing Docker volumes" in DEPLOY_SKILL
-    assert "bash deploy/docker-install.sh" in DEPLOY_SKILL
+    assert "bash deploy/install.sh --docker" in DEPLOY_SKILL
     assert "installs Docker / Compose" in DEPLOY_SKILL
     assert "deploy/check-prereqs.sh --install --lang $LANG_FLAG" not in DEPLOY_SKILL
     assert "deploy/install.sh --fresh --lang $LANG_FLAG" not in DEPLOY_SKILL

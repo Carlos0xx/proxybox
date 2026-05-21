@@ -5,8 +5,9 @@ description: Deploy ProxyBox (per-device isolated home proxy panel) on a Debian 
 
 # ProxyBox · One-shot VPS deploy
 
-This skill drives a non-interactive install of ProxyBox onto a user-supplied
-VPS. The default path is Docker so existing host services are not disturbed.
+This skill drives a selected install mode of ProxyBox onto a user-supplied
+VPS. It must not silently pick a mode for the user. Docker is recommended so
+existing host services are not disturbed.
 Output is a running stack of:
 
 - sing-box (VLESS Reality + Hysteria2 templates)
@@ -22,7 +23,12 @@ Ask the user for, in order:
 2. **SSH user** — must be root OR have passwordless sudo
 3. **SSH auth** — key path (preferred) or password (worse — record in
    blocklist, rotate after install)
-4. **Optional bot config**: Telegram bot token + allowed user ID(s) if the
+4. **Install mode** — ask explicitly unless the user already stated it:
+   - Docker install (recommended): isolated containers, auto-selected ports,
+     no host Python/systemd/fail2ban/Caddy writes.
+   - Native host install (advanced): writes Python, sing-box, systemd units,
+     and fail2ban directly to the VPS; only for a clean dedicated VPS.
+5. **Optional bot config**: Telegram bot token + allowed user ID(s) if the
    user wants `/proxybox-bot` enabled. Skip otherwise.
 
 **Never** ask the user to paste these into the chat if a safer channel
@@ -53,6 +59,9 @@ SSH=(
   -o LogLevel=ERROR
 )
 REMOTE_INSTALL_DIR="/opt/proxybox-$(date +%Y%m%d-%H%M%S)-$RANDOM"
+# Set this only after the user explicitly chooses: docker or native.
+PROXYBOX_INSTALL_MODE="${PROXYBOX_INSTALL_MODE:?choose docker or native first}"
+case "$PROXYBOX_INSTALL_MODE" in docker|native) ;; *) echo "invalid install mode"; exit 2 ;; esac
 ```
 
 ### Step 1 — Minimal host pre-flight
@@ -83,8 +92,9 @@ Bail out if any of:
 
 A minimal Debian image typically ships *without* `git` or `curl`, so
 preamble the clone with an apt install. Docker itself is checked and installed
-by `deploy/docker-install.sh` in Step 4. The package list is small and
-idempotent — re-running it on a fully-provisioned host is a no-op.
+by `deploy/install.sh --docker` in Step 4 when Docker mode was selected. The
+package list is small and idempotent — re-running it on a fully-provisioned
+host is a no-op.
 
 Every install must clone into a brand-new directory such as
 `/opt/proxybox-20260522-131500-12345`. Do not update, overwrite, delete, move,
@@ -116,15 +126,20 @@ the existing directory.
 EOF
 ```
 
-### Step 3 — Docker pre-flight
+### Step 3 — Mode-specific pre-flight
 
-Now that the fresh install directory exists, do only a lightweight host probe.
-Do not run the native `check-prereqs.sh` for the default Docker path; that
-script is for the host-systemd installer. Missing Docker / Compose / daemon
-startup is handled by `deploy/docker-install.sh` in the next step.
+Now that the fresh install directory exists, do only a lightweight host probe
+for Docker mode. Do not run the native `check-prereqs.sh` for Docker; missing
+Docker / Compose / daemon startup is handled by `deploy/install.sh --docker`
+in the next step. If native mode was selected, skip this lightweight probe and
+let `deploy/install.sh --native --fresh` run the full native pre-flight.
 
 ```bash
-"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && bash -s" <<'EOF'
+"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && PROXYBOX_INSTALL_MODE='$PROXYBOX_INSTALL_MODE' bash -s" <<'EOF'
+  if [ "$PROXYBOX_INSTALL_MODE" != "docker" ]; then
+    echo "[preflight] native mode selected; native installer will run its own checks"
+    exit 0
+  fi
   ss -H -ltn >/dev/null 2>&1 || true
   ss -H -lun >/dev/null 2>&1 || true
 EOF
@@ -132,68 +147,94 @@ EOF
 
 If this basic probe fails, paste the error back to the user and stop.
 
-### Step 4 — Run Docker installer
+### Step 4 — Run the selected installer
 
 ```bash
-"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && bash -s" <<'EOF'
-  bash deploy/docker-install.sh
+"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && PROXYBOX_INSTALL_MODE='$PROXYBOX_INSTALL_MODE' bash -s" <<'EOF'
+  case "$PROXYBOX_INSTALL_MODE" in
+    docker)
+      bash deploy/install.sh --docker
+      ;;
+    native)
+      bash deploy/install.sh --native --fresh --lang zh
+      ;;
+    *)
+      echo "[error] invalid install mode: $PROXYBOX_INSTALL_MODE"
+      exit 2
+      ;;
+  esac
 EOF
 ```
 
-`deploy/docker-install.sh` checks Docker, installs Docker / Compose if
+`deploy/install.sh --docker` checks Docker, installs Docker / Compose if
 missing, starts the Docker service, scans host ports, and writes `.env`.
 Each installer run creates a new Compose project name and new Docker volumes.
 It must not stop, delete, or rewrite any older ProxyBox project or unrelated
-host service.
+host service. `deploy/install.sh --native --fresh` is the advanced host-level
+path and must only be run after the user explicitly chose native mode.
 
 ### Step 5 — Verify
 
 ```bash
-"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && bash -s" <<'EOF'
-  docker compose ps
-  docker compose logs --tail=80 bootstrap
-  docker compose logs --tail=80 sing-box proxybox-admin proxybox-traffic-worker
+"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && PROXYBOX_INSTALL_MODE='$PROXYBOX_INSTALL_MODE' bash -s" <<'EOF'
+  if [ "$PROXYBOX_INSTALL_MODE" = "docker" ]; then
+    docker compose ps
+    docker compose logs --tail=80 bootstrap
+    docker compose logs --tail=80 sing-box proxybox-admin proxybox-traffic-worker
+  else
+    systemctl is-active sing-box proxybox-admin proxybox-traffic-worker
+    journalctl -u sing-box -u proxybox-admin -u proxybox-traffic-worker -n 80 --no-pager
+  fi
 EOF
 ```
 
-The three core long-running services should be `Up`: `sing-box`,
-`proxybox-admin`, and `proxybox-traffic-worker`. If any restarts repeatedly,
-triage with `docker compose logs --tail=200 <service>`.
+The three core long-running services should be healthy: Docker mode shows them
+as `Up`; native mode shows them as `active`. If any restarts repeatedly, triage
+with Docker logs for Docker mode or `journalctl -u <service>` for native mode.
 
-### Step 6 — Relay the Docker handoff
+### Step 6 — Relay the install handoff
 
 As of v0.1.6 the admin panel uses **username + password login**, not a
-URL-token in the address bar. The Docker bootstrap logs print the one-shot
-handoff block with:
+URL-token in the address bar. The installer output prints the one-shot handoff
+block with:
 
 - Login URL: `http://{public_host}:{admin_port}/login/{random_12char_suffix}`
 - Username: `admin`
 - Password: `<16-char alnum>`
 
 **Do not re-mask the credentials in chat output for this skill.** The user
-needs the first login URL and password to complete the install. The bootstrap
-output is the same private channel they would see when running the installer
-themselves.
+needs the first login URL and password to complete the install. The installer
+output is the same private channel they would see when running it themselves.
 
 If the user needs the credentials re-printed later, this fetches them from the
-live Docker volume:
+live install:
 
 ```bash
-"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && bash -s" <<'EOF'
-  docker compose exec proxybox-admin sh -c "
-    echo password: \$(cat /etc/proxybox/admin.password)
-    grep -E \"username|login_path|port:\" /etc/proxybox/config.yaml
-  "
+"${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && PROXYBOX_INSTALL_MODE='$PROXYBOX_INSTALL_MODE' bash -s" <<'EOF'
+  if [ "$PROXYBOX_INSTALL_MODE" = "docker" ]; then
+    docker compose exec proxybox-admin sh -c "
+      echo password: \$(cat /etc/proxybox/admin.password)
+      grep -E \"username|login_path|port:\" /etc/proxybox/config.yaml
+    "
+  else
+    echo password: "$(cat /etc/proxybox/admin.password)"
+    grep -E "username|login_path|port:" /etc/proxybox/config.yaml
+  fi
 EOF
 ```
 
 ### Step 7 — Optional: Telegram bot
 
-Only do this if the user explicitly provided bot credentials.
+Only do this if the user explicitly provided bot credentials and selected
+Docker mode. Native mode has separate host-level bot configuration.
 
 ```bash
-"${SSH[@]}" "$USER@$HOST" "
-cd '$REMOTE_INSTALL_DIR'
+"${SSH[@]}" "$USER@$HOST" "REMOTE_INSTALL_DIR='$REMOTE_INSTALL_DIR' PROXYBOX_INSTALL_MODE='$PROXYBOX_INSTALL_MODE' BOT_TOKEN='$BOT_TOKEN' ALLOWED_USERS='$ALLOWED_USERS' bash -s" <<'EOF'
+if [ "$PROXYBOX_INSTALL_MODE" != "docker" ]; then
+  echo "[skip] Telegram bot automation in this skill is Docker-only"
+  exit 0
+fi
+cd "$REMOTE_INSTALL_DIR"
 ADMIN_TOKEN=\$(docker compose exec -T proxybox-admin python - <<'PY'
 import yaml
 print(yaml.safe_load(open('/etc/proxybox/config.yaml'))['admin']['token'])
@@ -206,7 +247,7 @@ ADMIN_TOKEN=\$ADMIN_TOKEN
 ENV
 chmod 600 bot.env
 docker compose --profile bot up -d proxybox-bot
-"
+EOF
 ```
 
 Verify with `docker compose ps proxybox-bot`. If it crashed, check
@@ -215,16 +256,15 @@ bot token format.
 
 ### Step 8 — Hand off to the user
 
-The Docker bootstrap summary block already lays everything out. Just relay it
-to the user with a one-line cover sentence — something like:
+The installer summary block already lays everything out. Just relay it to the
+user with a one-line cover sentence — something like:
 
 > "装好了。下面四块全部直接能用：登录凭据（账号 + 密码 + 加随机后缀的
 > 登录地址,粘进浏览器就行）、首台设备（进后台订阅链接页复制 URL）、
 > 服务状态、可选功能。"
 
-Then paste the Docker bootstrap output (or summarize it) — do not re-format, do not
-hide the password / login URL. Do not include SSH host-key material in the
-handoff.
+Then paste the installer output (or summarize it) — do not re-format, do not
+hide the password / login URL. Do not include SSH host-key material in the handoff.
 
 Concretely, the user can:
 
@@ -240,8 +280,8 @@ Concretely, the user can:
    client device shows the VPS IP, not the home ISP.
 
 The default first device name is 5 random lowercase letters. Override via env
-`PROXYBOX_FIRST_DEVICE=tablet-1 bash deploy/docker-install.sh` before install, or
-rename in the admin UI afterwards. `PROXYBOX_FIRST_DEVICE=` skips auto-creation.
+`PROXYBOX_FIRST_DEVICE=tablet-1 bash deploy/install.sh --docker` before a Docker
+install, or rename in the admin UI afterwards. `PROXYBOX_FIRST_DEVICE=` skips auto-creation.
 `PROXYBOX_FIRST_DEVICE=local-user` is supported only when the user explicitly
 asks for it; it uses `PROXYBOX_LOCAL_USERNAME` if provided, else the remote
 shell user, sanitized to the device-name format.

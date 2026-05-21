@@ -29,7 +29,7 @@ cd "$INSTALL_DIR"
 bash deploy/install.sh
 ```
 
-`deploy/install.sh` shows a Chinese mode picker. Press Enter for Docker, which checks Docker/Compose and `ss`/`iproute2`, installs missing runtime packages, starts Docker, scans host ports, writes `.env`, and starts an isolated bridge-network stack. Use Docker if the VPS already runs websites, panels, or production services. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
+`deploy/install.sh` shows a Chinese mode picker and requires an explicit `1` or `2` choice. Pick Docker to check Docker/Compose and `ss`/`iproute2`, install missing runtime packages, start Docker, scan host ports, write `.env`, and start an isolated bridge-network stack. Use Docker if the VPS already runs websites, panels, or production services. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
 
 > [!IMPORTANT]
 > Installation red line: never delete, modify, overwrite, or reuse files/services on the user's VPS outside this install. Even if `/opt/proxybox` or another same-name directory already exists, leave it untouched, clone into a new `proxybox-<timestamp>-<suffix>` directory, and only touch resources created for this run.
@@ -55,7 +55,7 @@ Then in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-The agent uses an auto-deleted temporary SSH `known_hosts`, runs a minimal VPS check, clones the repo into a fresh per-install directory on the VPS, runs the Docker port pre-flight, executes `deploy/docker-install.sh`, verifies the core services, and relays the **login URL, username, password, and first device status** back to you.
+The agent must ask you to choose Docker or native first. It then uses an auto-deleted temporary SSH `known_hosts`, runs a minimal VPS check, clones the repo into a fresh per-install directory on the VPS, executes `deploy/install.sh --docker` or `deploy/install.sh --native --fresh`, verifies the core services, and relays the **login URL, username, password, and first device status** back to you.
 
 For **Codex** or other coding agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
 

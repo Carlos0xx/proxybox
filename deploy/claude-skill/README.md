@@ -6,7 +6,7 @@ Trigger in any Claude Code session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-Claude then checks the VPS, clones the repo into a new per-install directory, lets `deploy/docker-install.sh` install/start Docker if needed, verifies the services, and hands back the login URL + credentials.
+Claude must ask you to choose Docker or native install first. It then checks the VPS, clones the repo into a new per-install directory, runs `deploy/install.sh --docker` or `deploy/install.sh --native --fresh`, verifies the services, and hands back the login URL + credentials.
 
 ---
 
@@ -28,13 +28,13 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | 1 | Asks for SSH user / auth method if missing from the prompt. |
 | 2 | Creates a temporary session-local `known_hosts` file, deletes it on shell exit, and leaves the user's normal SSH trust store untouched. |
 | 3 | Runs a minimal inline VPS check before the repo exists. |
-| 4 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
-| 5 | Clones `https://github.com/carlos0xx/proxybox` into a new `/opt/proxybox-<timestamp>-<suffix>` directory and refuses to touch existing directories. |
-| 6 | Runs `bash deploy/docker-install.sh`, which checks/installs Docker + Compose, starts Docker, and scans free host ports. |
-| 7 | Starts the isolated Docker stack. |
-| 8 | Verifies `sing-box`, `proxybox-admin`, and `proxybox-traffic-worker` are `Up`. |
+| 4 | Requires an explicit Docker/native install-mode choice before running remote install commands. |
+| 5 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
+| 6 | Clones `https://github.com/carlos0xx/proxybox` into a new `/opt/proxybox-<timestamp>-<suffix>` directory and refuses to touch existing directories. |
+| 7 | Runs `bash deploy/install.sh --docker` or `bash deploy/install.sh --native --fresh`; Docker mode checks/installs Docker + Compose, starts Docker, and scans free host ports. |
+| 8 | Verifies `sing-box`, `proxybox-admin`, and `proxybox-traffic-worker` are healthy. |
 | 9 | Relays the **login URL + full password + first device status** back to the user. |
-| 10 | *(optional)* Writes `bot.env` inside the new install directory + starts `proxybox-bot` profile if Telegram details were supplied. |
+| 10 | *(optional Docker mode)* Writes `bot.env` inside the new install directory + starts `proxybox-bot` profile if Telegram details were supplied. |
 
 ---
 
@@ -46,7 +46,7 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | HTTPS options | v1.0 | Tells Docker users to put Admin UI behind a host reverse proxy, gateway, or Cloudflare Tunnel. |
 | Account self-service | v0.1.11 | Mentions the rotation options in the *Security* page. |
 | Per-line copy buttons | v0.1.12 | Confirms the SPA's copy buttons work over HTTP. |
-| Docker-first install | v1.0 | Uses bridge networking, auto-selected ports, and no host systemd/fail2ban writes. |
+| Explicit install-mode choice | v1.0 | Requires Docker/native selection before remote install; Docker uses bridge networking, auto-selected ports, and no host systemd/fail2ban writes. |
 
 ---
 
