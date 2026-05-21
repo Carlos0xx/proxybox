@@ -59,9 +59,11 @@ def test_installer_bootstraps_first_device_with_login_session() -> None:
 
 def test_installer_distinguishes_shadowrocket_nodes_from_config() -> None:
     assert "/shadowrocket.txt" in INSTALL_SH
+    assert "/shadowrocket.yaml" in INSTALL_SH
     assert "/shadowrocket.conf" in INSTALL_SH
     assert "Shadowrocket Add Subscribe 节点订阅" in INSTALL_SH
-    assert "非节点订阅" in INSTALL_SH
+    assert "Shadowrocket 配置页导入 · 节点+规则" in INSTALL_SH
+    assert "规则文件, 需先添加节点订阅" in INSTALL_SH
 
 
 def test_installer_auto_escalates_when_passwordless_sudo_is_available() -> None:

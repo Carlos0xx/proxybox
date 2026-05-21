@@ -84,7 +84,9 @@ def test_services_view_renders_project_port_cards() -> None:
 
 def test_shadowrocket_node_subscription_is_not_conf_profile() -> None:
     assert "/shadowrocket.txt" in STATIC_HTML
+    assert "/shadowrocket.yaml" in STATIC_HTML
     assert "Shadowrocket Add Subscribe 节点订阅" in STATIC_HTML
-    assert "不要填到节点订阅" in STATIC_HTML
+    assert "Shadowrocket 分流配置" in STATIC_HTML
+    assert "规则文件 · 需先添加节点订阅" in STATIC_HTML
     assert "shadowrocket nodes:" in STATIC_HTML
     assert "shadowrocket rules:" in STATIC_HTML

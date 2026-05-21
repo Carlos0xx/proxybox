@@ -354,11 +354,13 @@ are generated on-the-fly from the same per-device row:
 | `/sub.txt`                | URI list        | Same as default — `.txt` alias for clients that key on extension |
 | `/shadowrocket.txt`       | URI list        | Explicit Shadowrocket node-subscription alias |
 | `/clash.yaml`             | Mihomo / Clash  | Stash, Clash for iOS, Clash Verge (macOS/Win), Clash for Android |
+| `/shadowrocket.yaml`      | Clash YAML      | Shadowrocket config import with nodes + rules |
 | `/merlin.yaml`            | Clash + `tun:`  | AsusWRT-Merlin with Clash on the router (transparent proxy) |
-| `/shadowrocket.conf`      | Config `.conf`  | Shadowrocket profile/config import with built-in rules; not a node subscription |
+| `/shadowrocket.conf`      | Rules `.conf`   | Shadowrocket rules only; add node subscription first |
 
 If the user is in doubt, the default (URI list) is the right choice for
-phones and laptops — Clash YAML is mainly for routers and Stash power-users.
+phones and laptops. For Shadowrocket with built-in split rules, use
+`/shadowrocket.yaml` from Shadowrocket's configuration page.
 
 ## Anti-patterns (do NOT do these)
 

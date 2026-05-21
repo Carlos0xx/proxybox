@@ -147,29 +147,27 @@ def test_merlin_yaml_keeps_tun_and_split_rules(monkeypatch):
     assert "bsc-dataseed" not in text.lower()
 
 
-def test_shadowrocket_conf_uses_split_rules_without_binance(monkeypatch):
+def test_shadowrocket_conf_is_rules_only_without_binance(monkeypatch):
     _stub_public_host(monkeypatch)
     priv_b64, _ = _gen_keypair()
 
     text = build_shadowrocket_conf(_fake_device(), _fake_sb_cfg(priv_b64))
 
-    assert "[Proxy Group]" in text
-    assert "AUTO = url-test," in text
-    assert "url=https://www.gstatic.com/generate_204" in text
-    assert "PROXY = select, AUTO," in text
-    assert "AI = select, PROXY," in text
-    assert "Streaming = select, PROXY, AUTO," in text
-    assert "China = select, DIRECT, PROXY" in text
-    assert "Final = select, PROXY, DIRECT" in text
+    assert "[Proxy]" not in text
+    assert "[Proxy Group]" not in text
+    assert "vless," not in text
+    assert "hysteria2," not in text
     assert "[Rule]" in text
     assert "DOMAIN-SUFFIX,push.apple.com,PROXY" in text
     assert "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve" in text
-    assert "DOMAIN-SUFFIX,openai.com,AI" in text
-    assert "DOMAIN-SUFFIX,netflix.com,Streaming" in text
-    assert "DOMAIN-SUFFIX,qq.com,China" in text
-    assert "GEOIP,CN,China" in text
-    assert "FINAL,Final" in text
-    assert "alpn=h3" in text
+    assert "DOMAIN-SUFFIX,openai.com,PROXY" in text
+    assert "DOMAIN-SUFFIX,netflix.com,PROXY" in text
+    assert "DOMAIN-SUFFIX,qq.com,DIRECT" in text
+    assert "GEOIP,CN,DIRECT" in text
+    assert "FINAL,PROXY" in text
+    assert ",AI" not in text
+    assert ",Streaming" not in text
+    assert ",Final" not in text
     assert "binance" not in text.lower()
     assert "bnbstatic" not in text.lower()
     assert "bsc-dataseed" not in text.lower()

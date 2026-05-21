@@ -11,15 +11,19 @@ Format selection:
                                            that look at extension
   /api/sub/{sub_token}/shadowrocket.txt — explicit Shadowrocket node
                                            subscription alias (URI list)
+  /api/sub/{sub_token}/shadowrocket.yaml — Clash YAML alias for Shadowrocket
+                                           config import (nodes + rules)
   /api/sub/{sub_token}/clash.yaml       — Mihomo / Clash for iOS / Stash YAML
   /api/sub/{sub_token}/merlin.yaml      — Clash YAML with tun: enable: true
                                            (AsusWRT-Merlin transparent proxy)
-  /api/sub/{sub_token}/shadowrocket.conf — Shadowrocket/Surge-style config
+  /api/sub/{sub_token}/shadowrocket.conf — Shadowrocket rules-only config
 
 For non-URI formats the device row is re-queried by sub_token and the file
 is built on the fly (no extra disk writes on device create / regen).
-The YAML/.conf formats include built-in split rules. The URI list formats only
+The YAML formats include nodes + built-in split rules. The URI list formats only
 carry nodes because the node-subscription format has no routing-rule syntax.
+The Shadowrocket .conf endpoint is rules-only and should be used after adding
+the node subscription.
 """
 
 from __future__ import annotations
@@ -74,6 +78,13 @@ async def get_shadowrocket_txt(sub_token: SubTokenInPath) -> str:
 
 @router.get("/{sub_token}/clash.yaml")
 async def get_clash_yaml(sub_token: SubTokenInPath) -> Response:
+    device = _device_by_sub_token(sub_token)
+    body = subscriptions.build_clash_yaml(device, singbox.read_config(), with_tun=False)
+    return Response(content=body, media_type="text/yaml")
+
+
+@router.get("/{sub_token}/shadowrocket.yaml")
+async def get_shadowrocket_yaml(sub_token: SubTokenInPath) -> Response:
     device = _device_by_sub_token(sub_token)
     body = subscriptions.build_clash_yaml(device, singbox.read_config(), with_tun=False)
     return Response(content=body, media_type="text/yaml")

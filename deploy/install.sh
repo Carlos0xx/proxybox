@@ -159,17 +159,19 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_LOGIN_USER_LABEL="用户名"
     M_LOGIN_PASS_LABEL="密  码"
     M_SECTION_SUBS_TITLE="📲 订阅 URL"
-    M_SECTION_SUBS_HINT="节点订阅用 [推荐]/[SR 节点]; .conf 请在配置页导入"
+    M_SECTION_SUBS_HINT="Shadowrocket 分流用 [SR 分流]; 节点订阅用 [推荐]/[SR 节点]"
     M_SUB_DEFAULT_TAG="[推荐]"
     M_SUB_DEFAULT_DESC="Shadowrocket 节点订阅 · sing-box · Hiddify"
     M_SUB_CLASH_TAG="[Clash 系]"
     M_SUB_CLASH_DESC="Stash · Clash for iOS · Clash Verge"
+    M_SUB_SR_YAML_TAG="[SR 分流]"
+    M_SUB_SR_YAML_DESC="Shadowrocket 配置页导入 · 节点+规则"
     M_SUB_MERLIN_TAG="[路由器]"
     M_SUB_MERLIN_DESC="AsusWRT-Merlin · Clash 透明代理"
     M_SUB_SR_NODE_TAG="[SR 节点]"
     M_SUB_SR_NODE_DESC="Shadowrocket Add Subscribe 节点订阅"
-    M_SUB_SR_TAG="[SR 配置]"
-    M_SUB_SR_DESC="Shadowrocket .conf · 配置页导入, 非节点订阅"
+    M_SUB_SR_TAG="[SR 规则]"
+    M_SUB_SR_DESC="Shadowrocket .conf · 规则文件, 需先添加节点订阅"
     M_SUB_TXT_TAG="[别名]"
     M_SUB_TXT_DESC="URI 列表 · .txt 扩展名"
     M_SECTION_SERVICES_TITLE="服务状态"
@@ -216,17 +218,19 @@ else
     M_LOGIN_USER_LABEL="username"
     M_LOGIN_PASS_LABEL="password"
     M_SECTION_SUBS_TITLE="📲 subscription URLs"
-    M_SECTION_SUBS_HINT="use [pick this]/[SR nodes] for node subscriptions; import .conf as config"
+    M_SECTION_SUBS_HINT="use [SR rules] for Shadowrocket split config; [pick this]/[SR nodes] for nodes"
     M_SUB_DEFAULT_TAG="[pick this]"
     M_SUB_DEFAULT_DESC="Shadowrocket nodes · sing-box · Hiddify"
     M_SUB_CLASH_TAG="[Clash]"
     M_SUB_CLASH_DESC="Stash · Clash for iOS · Clash Verge"
+    M_SUB_SR_YAML_TAG="[SR rules]"
+    M_SUB_SR_YAML_DESC="Shadowrocket config import · nodes + rules"
     M_SUB_MERLIN_TAG="[router]"
     M_SUB_MERLIN_DESC="AsusWRT-Merlin · Clash transparent proxy"
     M_SUB_SR_NODE_TAG="[SR nodes]"
     M_SUB_SR_NODE_DESC="Shadowrocket Add Subscribe node subscription"
-    M_SUB_SR_TAG="[SR config]"
-    M_SUB_SR_DESC="Shadowrocket .conf · import as config, not node subscription"
+    M_SUB_SR_TAG="[SR conf]"
+    M_SUB_SR_DESC="Shadowrocket .conf rules only · add node subscription first"
     M_SUB_TXT_TAG="[alias]"
     M_SUB_TXT_DESC="URI list · .txt extension"
     M_SECTION_SERVICES_TITLE="services"
@@ -852,6 +856,7 @@ if [ -n "$SUB_TOKEN" ]; then
     # Other formats — same tag-bold + URL-green pattern, no ✦, no bold on URL
     for entry in \
         "$M_SUB_CLASH_TAG|$M_SUB_CLASH_DESC|/clash.yaml" \
+        "$M_SUB_SR_YAML_TAG|$M_SUB_SR_YAML_DESC|/shadowrocket.yaml" \
         "$M_SUB_MERLIN_TAG|$M_SUB_MERLIN_DESC|/merlin.yaml" \
         "$M_SUB_SR_NODE_TAG|$M_SUB_SR_NODE_DESC|/shadowrocket.txt" \
         "$M_SUB_SR_TAG|$M_SUB_SR_DESC|/shadowrocket.conf" \

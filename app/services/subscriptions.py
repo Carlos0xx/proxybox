@@ -174,7 +174,15 @@ _CHINA_DIRECT_RULES = [
 ]
 
 
-def _routing_rules(*, final_rule: str) -> list[str]:
+def _routing_rules(
+    *,
+    final_rule: str,
+    proxy: str = POLICY_PROXY,
+    ai: str = POLICY_AI,
+    streaming: str = POLICY_STREAMING,
+    china: str = POLICY_CHINA,
+    final: str = POLICY_FINAL,
+) -> list[str]:
     rules: list[str] = []
     rules.extend(_APPLE_PUSH_PROXY_RULES)
     rules.extend(_DIRECT_RULES)
@@ -185,11 +193,11 @@ def _routing_rules(*, final_rule: str) -> list[str]:
     rules.append(final_rule)
     return [
         rule.format(
-            proxy=POLICY_PROXY,
-            ai=POLICY_AI,
-            streaming=POLICY_STREAMING,
-            china=POLICY_CHINA,
-            final=POLICY_FINAL,
+            proxy=proxy,
+            ai=ai,
+            streaming=streaming,
+            china=china,
+            final=final,
         )
         for rule in rules
         if not any(keyword in rule.lower() for keyword in _BLOCKED_REFERENCE_RULE_KEYWORDS)
@@ -201,7 +209,14 @@ def _clash_rules() -> list[str]:
 
 
 def _shadowrocket_rules() -> list[str]:
-    return _routing_rules(final_rule="FINAL,{final}")
+    return _routing_rules(
+        final_rule="FINAL,{final}",
+        proxy=POLICY_PROXY,
+        ai=POLICY_PROXY,
+        streaming=POLICY_PROXY,
+        china="DIRECT",
+        final=POLICY_PROXY,
+    )
 
 
 def derive_reality_public_key(private_b64: str) -> str:
@@ -373,59 +388,18 @@ def build_clash_yaml(
 
 
 def build_shadowrocket_conf(device: dict[str, Any], sb_cfg: dict[str, Any] | None = None) -> str:
-    """Shadowrocket / Surge .conf format. VLESS Reality syntax is Shadowrocket-specific."""
-    if sb_cfg is None:
-        sb_cfg = singbox.read_config()
-    vps_host = _require_public_host()
-    r = _reality_params(sb_cfg)
-    name_v = f"ProxyBox-{device['name']}-vless"
-    name_h = f"ProxyBox-{device['name']}-hy2"
-    obfs_pw = _hy2_obfs_password(sb_cfg)
-    # Surge .conf wants each proxy on a single physical line — build the
-    # two long lines piecewise so the literal string in the file stays
-    # readable and ruff E501 stays happy.
-    vless_parts = [
-        f"{name_v} = vless, {vps_host}, {device['vless_port']}",
-        f"username={device['vless_uuid']}",
-        "tls=true",
-        f"sni={r['sni']}",
-        f"flow={r['flow']}",
-        f"reality-pbk={r['public_b64']}",
-        f"reality-sid={r['short_id']}",
-        "fp=chrome",
-    ]
-    hy2_parts = [
-        f"{name_h} = hysteria2, {vps_host}, {device['hy2_port']}",
-        f"password={device['hy2_password']}",
-        f"sni={r['sni']}",
-        "obfs=salamander",
-        f"obfs-password={obfs_pw}",
-        "alpn=h3",
-        "skip-cert-verify=true",
-    ]
-    vless_line = ", ".join(vless_parts)
-    hy2_line = ", ".join(hy2_parts)
-    proxy_groups = [
-        f"{POLICY_AUTO} = url-test, {name_v}, {name_h}, url={PROBE_URL}, interval=300",
-        f"{POLICY_PROXY} = select, {POLICY_AUTO}, {name_v}, {name_h}, DIRECT",
-        f"{POLICY_AI} = select, {POLICY_PROXY}, {name_v}, {name_h}, DIRECT",
-        f"{POLICY_STREAMING} = select, {POLICY_PROXY}, {POLICY_AUTO}, {name_v}, {name_h}, DIRECT",
-        f"{POLICY_CHINA} = select, DIRECT, {POLICY_PROXY}",
-        f"{POLICY_FINAL} = select, {POLICY_PROXY}, DIRECT",
-    ]
-    proxy_groups_text = "\n".join(proxy_groups)
+    """Shadowrocket rules-only .conf.
+
+    Shadowrocket can import VLESS Reality / Hy2 reliably from URI subscriptions,
+    and it can import Clash YAML profiles with nodes + rules. Its native .conf
+    local-node syntax is less reliable for these newer protocols, so this file
+    deliberately contains rules only and relies on an already selected node.
+    """
     rules_text = "\n".join(_shadowrocket_rules())
     return f"""[General]
 bypass-system = true
 skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local
 dns-server = system
-
-[Proxy]
-{vless_line}
-{hy2_line}
-
-[Proxy Group]
-{proxy_groups_text}
 
 [Rule]
 {rules_text}
