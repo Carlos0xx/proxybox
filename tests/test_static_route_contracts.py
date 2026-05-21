@@ -33,6 +33,8 @@ def test_service_restart_button_uses_css_pseudo_icon() -> None:
     button_fragment = STATIC_HTML[start : STATIC_HTML.index("</button>", start)]
     assert "<span" not in button_fragment
     assert "<svg" not in button_fragment
+    assert "data-restart-svc=" in button_fragment
+    assert "data-svc=" not in button_fragment
     assert "重启服务</button>" in STATIC_HTML
     assert ".btn-svc-restart::before" in STATIC_HTML
     assert 'content: ""' in STATIC_HTML
@@ -43,4 +45,13 @@ def test_service_restart_button_uses_css_pseudo_icon() -> None:
     assert "width: 20px" in STATIC_HTML
     assert "height: 52px" in STATIC_HTML
     assert "color: #ea580c" in STATIC_HTML
+    assert "display: flex !important" in STATIC_HTML
+    assert "white-space: nowrap !important" in STATIC_HTML
+    assert "writing-mode: horizontal-tb !important" in STATIC_HTML
     assert '.btn-svc-restart [class*="icon"]' in STATIC_HTML
+
+
+def test_service_status_dots_do_not_clobber_restart_buttons() -> None:
+    assert "$$('.svc-dot[data-svc]').forEach" in STATIC_HTML
+    assert "$$('[data-svc]').forEach" not in STATIC_HTML
+    assert "restartSvc(btn.dataset.restartSvc)" in STATIC_HTML

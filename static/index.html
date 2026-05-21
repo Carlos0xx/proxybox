@@ -452,7 +452,12 @@ a:hover { color: var(--accent-hover); }
   margin-bottom: var(--space-2);
 }
 .btn-svc-restart {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
   width: 100%;
+  min-width: 0;
   height: 52px;
   margin-top: auto;
   margin-bottom: var(--space-3);
@@ -465,6 +470,9 @@ a:hover { color: var(--accent-hover); }
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
   line-height: 1;
+  white-space: nowrap !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
 }
 .btn-svc-restart::before {
   content: "";
@@ -3483,7 +3491,7 @@ async function loadStatus() {
   const d = await api('/api/status');
   lastStatus = d;
   $('t-uptime').textContent = shortUptime(d.uptime);
-  $$('[data-svc]').forEach(el => {
+  $$('.svc-dot[data-svc]').forEach(el => {
     const s = d.services[el.dataset.svc];
     el.className = 'svc-dot ' + (s === 'active' ? 'ok' : s === 'failed' ? 'bad' : 'off');
   });
@@ -3919,7 +3927,7 @@ document.addEventListener('click', (e) => {
 const DELEGATED_BUTTON_HANDLERS = [
   ['.btn-passkey-revoke', (btn) => revokePasskey(encodeURIComponent(btn.dataset.credId), btn.dataset.label || '')],
   ['.btn-ban-unblock',    (btn) => quickUnblock(btn.dataset.ip)],
-  ['.btn-svc-restart',    (btn) => restartSvc(btn.dataset.svc)],
+  ['.btn-svc-restart',    (btn) => restartSvc(btn.dataset.restartSvc)],
   ['.btn-history-jump',   (btn) => btn.dataset.name && jumpToHistory(btn.dataset.name)],
   ['.btn-rotate-in-dialog', (btn) => { closeDialog(); rotateDeviceToken(btn.dataset.name); }],
   ['.btn-copy-all-subs',  (btn) => copyAllSubUrls(btn.dataset.baseUrl)],
@@ -4195,7 +4203,7 @@ function renderServices() {
           ${ok ? '运行中' : escapeHtml(st)}
         </span>
       </div>
-      ${s.restart ? `<button class="btn btn-sm btn-warn btn-svc-restart" data-svc="${escapeHtml(s.name)}">重启服务</button>` : ''}
+      ${s.restart ? `<button class="btn btn-sm btn-warn btn-svc-restart" data-restart-svc="${escapeHtml(s.name)}">重启服务</button>` : ''}
     </div>`;
   }).join('');
 }
