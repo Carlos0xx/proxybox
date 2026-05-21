@@ -145,3 +145,30 @@ def test_login_page_exposes_passkey_login_when_enabled(
     assert "Passkey / Touch ID" in res.text
     assert "const opts = d1.options;" in res.text
     assert "/auth/webauthn/login/complete" in res.text
+
+
+def test_login_page_is_chinese_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg_path = _write_config(tmp_path)
+    monkeypatch.setenv("PROXYBOX_CONFIG", str(cfg_path))
+    reset_settings_cache()
+    from app.main import create_app
+
+    try:
+        app = create_app()
+        with TestClient(app) as client:
+            client.cookies.set("proxybox-lang", "en")
+            res = client.get("/login/login-secret?lang=en")
+    finally:
+        reset_settings_cache()
+
+    assert res.status_code == 200
+    assert '<html lang="zh-CN">' in res.text
+    assert "输入用户名 + 密码登录后台" in res.text
+    assert "登 录" in res.text
+    assert "lang-switch" not in res.text
+    assert "Log in" not in res.text
+    assert "Wrong username or password" not in res.text
+    assert "proxybox-lang" not in res.headers.get("set-cookie", "")

@@ -31,12 +31,14 @@ def test_sidebar_brand_uses_current_product_version_only() -> None:
     assert "v2.0 · LOS ANGELES" not in STATIC_HTML
 
 
-def test_language_switch_translation_observer_cannot_self_loop() -> None:
-    assert "function translateTextNode(node)" in STATIC_HTML
-    assert "if (next !== v) node.nodeValue = next" in STATIC_HTML
-    assert "if (next !== v) el.setAttribute(a, next)" in STATIC_HTML
-    assert "characterData: true" not in STATIC_HTML
-    assert "mo.observe(document.body, {childList: true, subtree: true})" in STATIC_HTML
+def test_admin_ui_is_chinese_only() -> None:
+    assert 'id="lang-toggle"' not in STATIC_HTML
+    assert "toggleLang" not in STATIC_HTML
+    assert "proxybox-lang" not in STATIC_HTML
+    assert "I18N_DICT" not in STATIC_HTML
+    assert "MutationObserver" not in STATIC_HTML
+    assert "document.documentElement.lang = 'zh-CN'" in STATIC_HTML
+    assert "function tr(s) { return s; }" in STATIC_HTML
 
 
 def test_service_restart_button_uses_css_pseudo_icon() -> None:
