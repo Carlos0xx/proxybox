@@ -28,6 +28,7 @@ POLICY_AI = "AI"
 POLICY_STREAMING = "Streaming"
 POLICY_CHINA = "China"
 POLICY_FINAL = "Final"
+PROBE_URL = "https://www.gstatic.com/generate_204"
 _BLOCKED_REFERENCE_RULE_KEYWORDS = ("binance", "bnbstatic", "bnbchain", "bsc-dataseed")
 
 _APPLE_PUSH_PROXY_RULES = [
@@ -317,6 +318,7 @@ def build_clash_yaml(
                 "sni": r["sni"],
                 "obfs": "salamander",
                 "obfs-password": _hy2_obfs_password(sb_cfg),
+                "alpn": ["h3"],
                 "skip-cert-verify": True,
             },
         ],
@@ -330,8 +332,11 @@ def build_clash_yaml(
                 "name": POLICY_AUTO,
                 "type": "url-test",
                 "proxies": [name_v, name_h],
-                "url": "http://www.gstatic.com/generate_204",
+                "url": PROBE_URL,
                 "interval": 300,
+                "tolerance": 50,
+                "lazy": False,
+                "timeout": 5000,
             },
             {
                 "name": POLICY_AI,
@@ -395,13 +400,13 @@ def build_shadowrocket_conf(device: dict[str, Any], sb_cfg: dict[str, Any] | Non
         f"sni={r['sni']}",
         "obfs=salamander",
         f"obfs-password={obfs_pw}",
+        "alpn=h3",
         "skip-cert-verify=true",
     ]
     vless_line = ", ".join(vless_parts)
     hy2_line = ", ".join(hy2_parts)
     proxy_groups = [
-        f"{POLICY_AUTO} = url-test, {name_v}, {name_h}, "
-        "url=http://www.gstatic.com/generate_204, interval=300",
+        f"{POLICY_AUTO} = url-test, {name_v}, {name_h}, url={PROBE_URL}, interval=300",
         f"{POLICY_PROXY} = select, {POLICY_AUTO}, {name_v}, {name_h}, DIRECT",
         f"{POLICY_AI} = select, {POLICY_PROXY}, {name_v}, {name_h}, DIRECT",
         f"{POLICY_STREAMING} = select, {POLICY_PROXY}, {POLICY_AUTO}, {name_v}, {name_h}, DIRECT",

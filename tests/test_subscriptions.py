@@ -112,6 +112,13 @@ def test_clash_yaml_uses_split_rules_without_binance(monkeypatch):
 
     group_names = {group["name"] for group in cfg["proxy-groups"]}
     assert group_names >= {"PROXY", "AUTO", "AI", "Streaming", "China", "Final"}
+    hy2_proxy = next(proxy for proxy in cfg["proxies"] if proxy["type"] == "hysteria2")
+    auto_group = next(group for group in cfg["proxy-groups"] if group["name"] == "AUTO")
+    assert hy2_proxy["alpn"] == ["h3"]
+    assert auto_group["url"] == "https://www.gstatic.com/generate_204"
+    assert auto_group["lazy"] is False
+    assert auto_group["tolerance"] == 50
+    assert auto_group["timeout"] == 5000
     assert "DOMAIN-SUFFIX,push.apple.com,PROXY" in cfg["rules"]
     assert "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve" in cfg["rules"]
     assert "DOMAIN-SUFFIX,openai.com,AI" in cfg["rules"]
@@ -148,6 +155,7 @@ def test_shadowrocket_conf_uses_split_rules_without_binance(monkeypatch):
 
     assert "[Proxy Group]" in text
     assert "AUTO = url-test," in text
+    assert "url=https://www.gstatic.com/generate_204" in text
     assert "PROXY = select, AUTO," in text
     assert "AI = select, PROXY," in text
     assert "Streaming = select, PROXY, AUTO," in text
@@ -161,6 +169,7 @@ def test_shadowrocket_conf_uses_split_rules_without_binance(monkeypatch):
     assert "DOMAIN-SUFFIX,qq.com,China" in text
     assert "GEOIP,CN,China" in text
     assert "FINAL,Final" in text
+    assert "alpn=h3" in text
     assert "binance" not in text.lower()
     assert "bnbstatic" not in text.lower()
     assert "bsc-dataseed" not in text.lower()

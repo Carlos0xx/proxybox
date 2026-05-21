@@ -295,7 +295,9 @@ Concretely, the user can:
    the install summary labels each line). Default URI list works for
    sing-box / Shadowrocket / Hiddify / Stash — pick `clash.yaml` for
    Clash family or `merlin.yaml` for routers.
-3. **Paste** into the client's "Add Subscription" dialog.
+3. **Paste** the default URL into the client's "Add Subscription" dialog.
+   Shadowrocket `.conf` URLs are configuration profiles; import them from
+   Shadowrocket's configuration/profile screen, not the node subscription form.
 4. **Traffic should flow** through the VPS — `ifconfig.me` from the
    client device shows the VPS IP, not the home ISP.
 
@@ -343,16 +345,17 @@ handoff. v0.1.6+ exposes a lot in the panel:
 
 Each device exposes its own URL prefix at `/api/sub/{sub_token}` (the
 `sub_token` is the per-device public auth — admin token is **not** in this
-URL, so it's safe to put in a router). Five extension-suffixed variants
+URL, so it's safe to put in a router). Extension-suffixed variants
 are generated on-the-fly from the same per-device row:
 
 | URL suffix                | Format          | Tested clients                                    |
 | ------------------------- | --------------- | ------------------------------------------------- |
 | *(none, default)*         | URI list        | sing-box-iOS, Shadowrocket (Type: Subscribe), Hiddify |
 | `/sub.txt`                | URI list        | Same as default — `.txt` alias for clients that key on extension |
+| `/shadowrocket.txt`       | URI list        | Explicit Shadowrocket node-subscription alias |
 | `/clash.yaml`             | Mihomo / Clash  | Stash, Clash for iOS, Clash Verge (macOS/Win), Clash for Android |
 | `/merlin.yaml`            | Clash + `tun:`  | AsusWRT-Merlin with Clash on the router (transparent proxy) |
-| `/shadowrocket.conf`      | Surge `.conf`   | Shadowrocket native parser (fallback when URI list misbehaves)   |
+| `/shadowrocket.conf`      | Config `.conf`  | Shadowrocket profile/config import with built-in rules; not a node subscription |
 
 If the user is in doubt, the default (URI list) is the right choice for
 phones and laptops — Clash YAML is mainly for routers and Stash power-users.

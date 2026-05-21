@@ -2423,7 +2423,8 @@ const REFRESH_RATES = {
 const CLIENT_NAMES = {
   'clash.yaml':              ['Stash / Clash',  '推荐 · 分流规则'],
   'merlin.yaml':             ['Merlin 路由器',  '分流规则'],
-  'shadowrocket.conf':       ['Shadowrocket',   '分流规则'],
+  'shadowrocket.conf':       ['Shadowrocket 配置', '规则配置文件'],
+  'shadowrocket.txt':        ['Shadowrocket 节点', '节点订阅'],
   'shadowrocket-full.conf':  ['Shadowrocket 完整版', '备份'],
   'sub':                     ['SR URI 订阅',    'base64'],
   'sub.txt':                 ['SR URI 明文',    'plain'],
@@ -3292,12 +3293,13 @@ async function loadSubs() {
     return;
   }
   const origin = window.location.origin;
-  // Same 5 formats install.sh's summary block prints; tag/desc kept in sync.
+  // Same formats install.sh's summary block prints; tag/desc kept in sync.
   const formats = [
-    {file: '',                   tag: '[推荐]',   desc: 'sing-box · Shadowrocket · Hiddify (Type: Subscribe)', prefer: true},
+    {file: '',                   tag: '[推荐]',   desc: 'Shadowrocket 节点订阅 · sing-box · Hiddify', prefer: true},
     {file: '/clash.yaml',        tag: '[Clash 系]', desc: 'Stash · Clash for iOS · AI/流媒体/CN 分流'},
     {file: '/merlin.yaml',       tag: '[路由器]', desc: 'AsusWRT-Merlin · 透明代理分流'},
-    {file: '/shadowrocket.conf', tag: '[备用]',   desc: 'Shadowrocket .conf · 内置分流规则'},
+    {file: '/shadowrocket.txt',  tag: '[SR 节点]', desc: 'Shadowrocket Add Subscribe 节点订阅'},
+    {file: '/shadowrocket.conf', tag: '[SR 配置]', desc: '配置页导入 · 内置分流规则'},
     {file: '/sub.txt',           tag: '[别名]',   desc: 'URI 列表 · .txt 扩展名'},
   ];
   list.innerHTML = devices.map(dev => {
@@ -4297,14 +4299,16 @@ async function showDeviceSubs(name) {
     ? 'vless (legacy share)'
     : `vless :${dev.vless_port} · hy2 :${dev.hy2_port}`;
 
-  // v0.1.x serves the URI list at the base path and four extension-suffixed
-  // alternates (sub.txt / clash.yaml / merlin.yaml / shadowrocket.conf).
+  // v0.1.x serves the URI list at the base path and extension-suffixed
+  // alternates (sub.txt / shadowrocket.txt / clash.yaml / merlin.yaml /
+  // shadowrocket.conf).
   // Built on-the-fly by the subscription router, no extra files on disk.
   const urls = [
-    { file: '',                   label: 'sing-box / Shadowrocket (推荐)', hint: '📱 iOS · Type: Subscribe · 通用 URI 列表',  prefer: true },
+    { file: '',                   label: 'Shadowrocket / sing-box 节点订阅 (推荐)', hint: '📱 Add Subscribe · 通用 URI 列表',  prefer: true },
     { file: '/clash.yaml',        label: 'Stash / Clash for iOS',          hint: '📱 内置 AI/流媒体/CN 分流规则',              prefer: false },
     { file: '/merlin.yaml',       label: 'Merlin Clash 路由器',             hint: '🌐 内置 tun + 分流规则',                    prefer: false },
-    { file: '/shadowrocket.conf', label: 'Shadowrocket .conf (备用)',      hint: '⚠️ 内置分流, Reality 解析依赖客户端版本',   prefer: false },
+    { file: '/shadowrocket.txt',  label: 'Shadowrocket 节点订阅',           hint: '📱 填到 Add Subscribe / 节点订阅',         prefer: false },
+    { file: '/shadowrocket.conf', label: 'Shadowrocket 规则配置文件',        hint: '⚠️ 在「配置」导入, 不要填到节点订阅',     prefer: false },
     { file: '/sub.txt',           label: 'URI 列表 (.txt 别名)',           hint: '👀 与默认链接同内容, 部分客户端按扩展名识别',   prefer: false },
   ];
 
@@ -4445,7 +4449,8 @@ async function copyAllSubUrls(baseUrl) {
     `default (sing-box / Shadowrocket): ${baseUrl}`,
     `clash.yaml:        ${baseUrl}/clash.yaml`,
     `merlin.yaml:       ${baseUrl}/merlin.yaml`,
-    `shadowrocket.conf: ${baseUrl}/shadowrocket.conf`,
+    `shadowrocket nodes: ${baseUrl}/shadowrocket.txt`,
+    `shadowrocket rules: ${baseUrl}/shadowrocket.conf`,
     `sub.txt:           ${baseUrl}/sub.txt`,
   ];
   const ok = await _writeClipboard(lines.join('\n'));

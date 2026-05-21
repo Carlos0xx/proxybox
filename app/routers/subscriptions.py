@@ -9,15 +9,17 @@ Format selection:
   /api/sub/{sub_token}                  — URI list (default, sing-box family)
   /api/sub/{sub_token}/sub.txt          — same URI list, .txt alias for clients
                                            that look at extension
+  /api/sub/{sub_token}/shadowrocket.txt — explicit Shadowrocket node
+                                           subscription alias (URI list)
   /api/sub/{sub_token}/clash.yaml       — Mihomo / Clash for iOS / Stash YAML
   /api/sub/{sub_token}/merlin.yaml      — Clash YAML with tun: enable: true
                                            (AsusWRT-Merlin transparent proxy)
-  /api/sub/{sub_token}/shadowrocket.conf — Surge-format .conf
+  /api/sub/{sub_token}/shadowrocket.conf — Shadowrocket/Surge-style config
 
 For non-URI formats the device row is re-queried by sub_token and the file
 is built on the fly (no extra disk writes on device create / regen).
-The YAML/.conf formats include built-in split rules; the plain URI list formats
-only carry nodes because the URI subscription format has no routing-rule syntax.
+The YAML/.conf formats include built-in split rules. The URI list formats only
+carry nodes because the node-subscription format has no routing-rule syntax.
 """
 
 from __future__ import annotations
@@ -60,6 +62,12 @@ async def get_subscription(sub_token: SubTokenInPath) -> str:
 
 @router.get("/{sub_token}/sub.txt", response_class=PlainTextResponse)
 async def get_subscription_txt(sub_token: SubTokenInPath) -> str:
+    device = _device_by_sub_token(sub_token)
+    return subscriptions.generate_subscription_text(device, singbox.read_config())
+
+
+@router.get("/{sub_token}/shadowrocket.txt", response_class=PlainTextResponse)
+async def get_shadowrocket_txt(sub_token: SubTokenInPath) -> str:
     device = _device_by_sub_token(sub_token)
     return subscriptions.generate_subscription_text(device, singbox.read_config())
 

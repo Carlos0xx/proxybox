@@ -80,3 +80,11 @@ def test_services_view_renders_project_port_cards() -> None:
     assert "监听中" in STATIC_HTML
     assert "未监听" in STATIC_HTML
     assert "项目端口" in STATIC_HTML
+
+
+def test_shadowrocket_node_subscription_is_not_conf_profile() -> None:
+    assert "/shadowrocket.txt" in STATIC_HTML
+    assert "Shadowrocket Add Subscribe 节点订阅" in STATIC_HTML
+    assert "不要填到节点订阅" in STATIC_HTML
+    assert "shadowrocket nodes:" in STATIC_HTML
+    assert "shadowrocket rules:" in STATIC_HTML

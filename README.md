@@ -25,7 +25,7 @@
 | :--- | :--- |
 | 🔐 &nbsp; **Per-device inbounds** | Each device gets its own UUID + TCP/UDP port pair. Revoke one without rotating everyone else. |
 | 🌐 &nbsp; **VLESS Reality + Hysteria2** | TCP path hidden behind a real domain's TLS fingerprint; UDP path takes over when TCP is throttled. |
-| 📲 &nbsp; **5 subscription formats** | URI list · `clash.yaml` · `merlin.yaml` · `shadowrocket.conf` · `sub.txt` — generated server-side per device. |
+| 📲 &nbsp; **Subscription formats** | URI list · `clash.yaml` · `merlin.yaml` · `shadowrocket.txt` · `shadowrocket.conf` · `sub.txt` — generated server-side per device. |
 | 📊 &nbsp; **Real traffic accounting** | Worker polls sing-box's Clash API every 10 s. SQLite buckets bytes per device × hour and tags hosts (Video / Social / AI / CDN / …). |
 | 🔑 &nbsp; **Username + password login** | Form at `/login/{12-char-suffix}`; bare `/login` 404s. Rotate password + login path from the panel — no SSH. |
 | 🔒 &nbsp; **HTTPS options** | Docker path expects an external reverse proxy / tunnel; native mode can still provision Caddy + Let's Encrypt from the panel. |

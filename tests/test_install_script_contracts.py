@@ -57,6 +57,13 @@ def test_installer_bootstraps_first_device_with_login_session() -> None:
     assert "local-user|@local-user|auto-user" in INSTALL_SH
 
 
+def test_installer_distinguishes_shadowrocket_nodes_from_config() -> None:
+    assert "/shadowrocket.txt" in INSTALL_SH
+    assert "/shadowrocket.conf" in INSTALL_SH
+    assert "Shadowrocket Add Subscribe 节点订阅" in INSTALL_SH
+    assert "非节点订阅" in INSTALL_SH
+
+
 def test_installer_auto_escalates_when_passwordless_sudo_is_available() -> None:
     assert 'if [ "$(id -u)" != "0" ]; then' in INSTALL_SH
     assert "sudo -n true" in INSTALL_SH
