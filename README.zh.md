@@ -45,7 +45,7 @@ mkdir -p ~/.claude/skills/proxybox-deploy
 cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 ```
 
-然后在对话里:*"帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519"*。代理走最小 VPS 检查 → `git clone` / 更新 → 完整 pre-flight → `install.sh` → 验证服务 → 把登录地址 + 凭据发给你。
+然后在对话里:*"帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519"*。代理走临时 SSH `known_hosts` → 最小 VPS 检查 → `git clone` / 更新 → 带 Python 3.11 安装的完整 pre-flight → `install.sh` → 验证服务 → 把登录地址 + 凭据发给你。
 
 Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](./deploy/claude-skill/SKILL.md) 喂给它 —— 指令是通用的,不绑 Claude Code。
 

@@ -28,13 +28,14 @@ Claude will:
 | # | Step |
 | --- | --- |
 | 1 | Ask for SSH user / auth method if missing from the prompt. |
-| 2 | Run a minimal inline VPS check before the repo exists. |
-| 3 | Install bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
-| 4 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or update an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
-| 5 | Run `deploy/check-prereqs.sh` over SSH — abort if it fails. |
-| 6 | Run `bash deploy/install.sh --lang en` (or `--lang zh` if you asked in Chinese). |
-| 7 | Verify the four core services are `active`. |
-| 8 | Relay the login URL, username, password, and 5 subscription URLs back to you. |
+| 2 | Use a temporary session-local `known_hosts` file and print the VPS fingerprint instead of editing your normal SSH trust store. |
+| 3 | Run a minimal inline VPS check before the repo exists. |
+| 4 | Install bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
+| 5 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or update an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
+| 6 | Run `deploy/check-prereqs.sh --install` over SSH, including Python 3.11 provisioning — abort if it fails. |
+| 7 | Run `bash deploy/install.sh --lang en` (or `--lang zh` if you asked in Chinese). |
+| 8 | Verify the four core services are `active`. |
+| 9 | Relay the login URL, username, password, and 5 subscription URLs back to you. |
 
 ---
 

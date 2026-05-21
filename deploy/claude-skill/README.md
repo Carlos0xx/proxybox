@@ -26,14 +26,15 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | # | Step |
 | --- | --- |
 | 1 | Asks for SSH user / auth method if missing from the prompt. |
-| 2 | Runs a minimal inline VPS check before the repo exists. |
-| 3 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
-| 4 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or updates an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
-| 5 | Runs `deploy/check-prereqs.sh` over SSH — aborts on a blocking failure. |
-| 6 | Runs `bash deploy/install.sh --lang <auto-detected>`. |
-| 7 | Verifies `sing-box`, `proxybox-admin`, `proxybox-traffic-worker`, and `fail2ban` are `active`. |
-| 8 | Relays the **login URL + full password + 5 subscription URLs** back to the user. |
-| 9 | *(optional)* Writes `/etc/proxybox/bot.env` + enables `proxybox-bot` if Telegram details were supplied. |
+| 2 | Creates a temporary session-local `known_hosts` file, records the VPS fingerprint, and leaves the user's normal SSH trust store untouched. |
+| 3 | Runs a minimal inline VPS check before the repo exists. |
+| 4 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
+| 5 | `git clone https://github.com/carlos0xx/proxybox /opt/proxybox`, or updates an existing checkout from `origin/main` with `git pull --ff-only origin main`. |
+| 6 | Runs `deploy/check-prereqs.sh --install` over SSH, including Python 3.11 provisioning — aborts on a blocking failure. |
+| 7 | Runs `bash deploy/install.sh --lang <auto-detected>`. |
+| 8 | Verifies `sing-box`, `proxybox-admin`, `proxybox-traffic-worker`, and `fail2ban` are `active`. |
+| 9 | Relays the **login URL + full password + 5 subscription URLs** back to the user. |
+| 10 | *(optional)* Writes `/etc/proxybox/bot.env` + enables `proxybox-bot` if Telegram details were supplied. |
 
 ---
 

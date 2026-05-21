@@ -83,6 +83,7 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_APT="[9/9] apt 可装的运行依赖"
     M_APT_OK="%s 已装"
     M_APT_MISSING="%s 缺失"
+    M_APT_INSTALL_FAIL="apt 依赖安装失败"
     M_SB_HEADER="[额外] sing-box 二进制"
     M_SB_PRESENT="sing-box 已装: %s"
     M_SB_MISSING="sing-box 不存在 (install.sh 会从 GitHub 拉最新)"
@@ -135,6 +136,7 @@ else
     M_APT="[9/9] apt-installable runtime tools"
     M_APT_OK="%s installed"
     M_APT_MISSING="%s missing"
+    M_APT_INSTALL_FAIL="apt dependency install failed"
     M_SB_HEADER="[bonus] sing-box binary"
     M_SB_PRESENT="sing-box already installed: %s"
     M_SB_MISSING="sing-box not present (install.sh will download latest from GitHub)"
@@ -161,6 +163,26 @@ yellow() { printf "\033[33m%s\033[0m" "$*"; }
 pass()  { printf "  $(green ✓) "; printf -- "$@"; printf "\n"; }
 fail()  { printf "  $(red ✗) ";   printf -- "$@"; printf "\n"; FAIL=$((FAIL+1)); }
 warn()  { printf "  $(yellow ⚠) ";printf -- "$@"; printf "\n"; WARN=$((WARN+1)); }
+
+python311_candidate_available() {
+    apt-cache policy python3.11 2>/dev/null \
+        | awk 'BEGIN { ok = 1 } /Candidate:/ { ok = ($2 == "(none)") ? 1 : 0 } END { exit ok }'
+}
+
+ensure_python311_repo() {
+    if python311_candidate_available; then
+        return 0
+    fi
+
+    . /etc/os-release
+    if [ "${ID:-}" = "ubuntu" ]; then
+        apt-get -y install software-properties-common ca-certificates gnupg >/dev/null
+        add-apt-repository -y ppa:deadsnakes/ppa >/dev/null
+        apt-get -y update >/dev/null
+    fi
+
+    python311_candidate_available
+}
 
 echo "$M_HEADER"
 echo ""
@@ -281,7 +303,7 @@ echo "  $M_PORTS_NOTE"
 # ─── 9. apt deps ─────────────────────────────────────────────
 echo ""
 echo "$M_APT"
-DEPS="python3 python3-venv python3-systemd curl sqlite3 openssl fail2ban"
+DEPS="python3.11 python3.11-venv curl sqlite3 openssl fail2ban"
 for pkg in $DEPS; do
     if dpkg -s "$pkg" >/dev/null 2>&1; then
         pass "$M_APT_OK" "$pkg"
@@ -321,8 +343,17 @@ if [ -n "$NEEDED_APT" ]; then
         echo "  $M_INSTALL_DOING"
         echo "    ↳$NEEDED_APT"
         apt-get -y update >/dev/null 2>&1
+        if echo "$NEEDED_APT" | grep -q 'python3\.11'; then
+            if ! ensure_python311_repo; then
+                printf "  $(red "$M_APT_INSTALL_FAIL")\n"
+                exit 1
+            fi
+        fi
         # shellcheck disable=SC2086
-        apt-get -y install $NEEDED_APT 2>&1 | tail -3
+        if ! apt-get -y install $NEEDED_APT 2>&1 | tail -3; then
+            printf "  $(red "$M_APT_INSTALL_FAIL")\n"
+            exit 1
+        fi
         printf "  $(green "$M_INSTALL_DONE")\n"
     else
         echo "  $M_INSTALL_HINT"

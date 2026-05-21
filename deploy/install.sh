@@ -48,6 +48,8 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_INSTALLER_SRC="    源码:   %s"
     M_INSTALLER_CFG="    配置:   %s"
     M_APT_INSTALLING="==> 安装系统包..."
+    M_PY311_INSTALLING="==> 安装并验证 Python 3.11..."
+    M_PY311_FAIL="错误: 未能安装可用的 Python 3.11"
     M_SINGBOX_DOWNLOAD="==> 下载 sing-box..."
     M_SINGBOX_VERSION="    sing-box: %s"
     M_GEN_KEYPAIR="==> 生成 Reality 密钥 + Hy2 证书 + 随机 SNI..."
@@ -95,6 +97,8 @@ else
     M_INSTALLER_SRC="    source:     %s"
     M_INSTALLER_CFG="    config:     %s"
     M_APT_INSTALLING="==> installing system packages..."
+    M_PY311_INSTALLING="==> installing and verifying Python 3.11..."
+    M_PY311_FAIL="ERROR: could not install a working Python 3.11"
     M_SINGBOX_DOWNLOAD="==> installing sing-box..."
     M_SINGBOX_VERSION="    sing-box: %s"
     M_GEN_KEYPAIR="==> generating Reality keypair + Hy2 cert + random SNI..."
@@ -162,6 +166,7 @@ HR="━━━━━━━━━━━━━━━━━━━━━━━━━�
 : "${LOG_DIR:=/var/log/proxybox}"
 : "${SUB_DIR:=/var/www/proxybox-sub}"
 : "${SINGBOX_DIR:=/etc/sing-box}"
+: "${PYTHON_BIN:=python3.11}"
 
 # ─── privilege: install needs root; auto-escalate when safe ────────
 if [ "$(id -u)" != "0" ]; then
@@ -190,7 +195,7 @@ fi
 
 # ─── pre-flight: defer to check-prereqs.sh ─────────────────────────
 if [ "${PROXYBOX_SKIP_PREREQ:-0}" != "1" ]; then
-    if ! bash "$PROXYBOX_DIR/deploy/check-prereqs.sh" --lang "$LANG_CHOICE"; then
+    if ! bash "$PROXYBOX_DIR/deploy/check-prereqs.sh" --install --lang "$LANG_CHOICE"; then
         echo ""
         printf "$M_PREFLIGHT_FAIL\n" >&2
         printf "$M_PREFLIGHT_HINT\n" "$PROXYBOX_DIR/deploy/check-prereqs.sh" "$LANG_CHOICE" >&2
@@ -203,11 +208,37 @@ echo "$M_INSTALLER"
 printf "$M_INSTALLER_SRC\n" "$PROXYBOX_DIR"
 printf "$M_INSTALLER_CFG\n" "$CONFIG_DIR"
 
+ensure_python311_repo() {
+    if apt-cache policy python3.11 2>/dev/null | awk 'BEGIN { ok = 1 } /Candidate:/ { ok = ($2 == "(none)") ? 1 : 0 } END { exit ok }'; then
+        return 0
+    fi
+
+    . /etc/os-release
+    if [ "${ID:-}" = "ubuntu" ]; then
+        apt-get -y install software-properties-common ca-certificates gnupg >/dev/null
+        add-apt-repository -y ppa:deadsnakes/ppa >/dev/null
+        apt-get -y update >/dev/null
+    fi
+
+    apt-cache policy python3.11 2>/dev/null | awk 'BEGIN { ok = 1 } /Candidate:/ { ok = ($2 == "(none)") ? 1 : 0 } END { exit ok }'
+}
+
+ensure_python311() {
+    echo "$M_PY311_INSTALLING"
+    apt-get -y update >/dev/null
+    ensure_python311_repo || { echo "$M_PY311_FAIL" >&2; exit 1; }
+    apt-get -y install python3.11 python3.11-venv >/dev/null
+    if ! "$PYTHON_BIN" -c 'import sys, venv; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)' >/dev/null 2>&1; then
+        echo "$M_PY311_FAIL" >&2
+        exit 1
+    fi
+}
+
 # ─── 1. system packages ────────────────────────────────────────────
 echo "$M_APT_INSTALLING"
+ensure_python311
 apt-get -y update >/dev/null
 apt-get -y install \
-    python3 python3-venv python3-pip python3-systemd \
     curl sqlite3 openssl fail2ban \
     >/dev/null
 
@@ -322,9 +353,12 @@ fi
 
 # ─── 6. Python venv + deps ─────────────────────────────────────────
 cd "$PROXYBOX_DIR"
+if [ -x .venv/bin/python ] && ! .venv/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)' >/dev/null 2>&1; then
+    rm -rf .venv
+fi
 if [ ! -d .venv ]; then
     echo "$M_VENV_CREATE"
-    python3 -m venv .venv
+    "$PYTHON_BIN" -m venv .venv
 fi
 echo "$M_INSTALL_DEPS"
 .venv/bin/pip install --quiet --upgrade pip
@@ -393,12 +427,19 @@ YAML
 fi
 
 # ─── 8. fail2ban [manual] jail ─────────────────────────────────────
-if ! grep -q '^\[manual\]' /etc/fail2ban/jail.local 2>/dev/null; then
-    touch /etc/fail2ban/jail.local
-    [ -s /etc/fail2ban/jail.local ] && printf '\n' >> /etc/fail2ban/jail.local
-    cat >> /etc/fail2ban/jail.local <<'JAIL'
-# ProxyBox manual ban jail — explicit ban via /action/block.
-# backend=systemd avoids /var/log/auth.log dependency (Debian 13 = journald-only).
+mkdir -p /etc/fail2ban/jail.d
+install -m 644 /dev/stdin /etc/fail2ban/jail.d/proxybox.local <<'JAIL'
+# ProxyBox managed fail2ban config.
+# systemd backend avoids /var/log/auth.log dependency on minimal images.
+[DEFAULT]
+backend = systemd
+
+# Some distro packages enable sshd by default with file-log backends. Force
+# systemd so fail2ban does not fail on images without /var/log/auth.log.
+[sshd]
+backend = systemd
+
+# Explicit manual ban jail used by ProxyBox /action/block.
 [manual]
 enabled  = true
 backend  = systemd
@@ -408,7 +449,6 @@ bantime  = -1
 findtime = 60
 maxretry = 99999
 JAIL
-fi
 
 # ─── 9. ProxyBox admin systemd unit ────────────────────────────────
 if [ ! -f /etc/systemd/system/proxybox-admin.service ]; then

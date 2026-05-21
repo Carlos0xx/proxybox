@@ -16,14 +16,21 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   device during `install.sh` because the installer authenticates through
   `/login/{login_path}` first.
 - **Existing fail2ban config is preserved.** The installer appends the
-  ProxyBox `[manual]` jail only when missing instead of overwriting
-  `/etc/fail2ban/jail.local`.
+  ProxyBox `[manual]` jail via `/etc/fail2ban/jail.d/proxybox.local` instead
+  of overwriting `/etc/fail2ban/jail.local`, and forces systemd backends so
+  minimal Ubuntu/Debian images without `/var/log/auth.log` do not fail.
 - **Deploy skill now updates stale VPS checkouts from `origin/main`.** The
   agent path performs a minimal host check, installs bootstrap tools, clones or
   fast-forwards `/opt/proxybox`, then runs the full repo pre-flight.
-- **Ubuntu 22.04 installs no longer fail the package metadata gate.** The
-  package now declares Python `>=3.10`, matching the oldest supported VPS OS
-  in the install docs.
+- **Deploy skill avoids local SSH known-host churn.** It now uses a temporary
+  session-local `known_hosts` file and reports the VPS fingerprint instead of
+  deleting or rewriting the user's normal SSH trust store.
+- **Ubuntu 22.04 installs now provision Python 3.11.** Pre-flight `--install`
+  and `install.sh` install `python3.11` + `python3.11-venv` before creating the
+  app venv, preserving the project's Python `>=3.11` runtime contract.
+- **Service restart icons stay button-sized.** The service page restart SVG now
+  has explicit dimensions and a local CSS guard so it cannot expand to the
+  browser's default SVG size.
 
 ### Security — Codex audit follow-up #6
 

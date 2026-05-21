@@ -23,3 +23,10 @@ def test_admin_token_rotation_dialog_uses_returned_contract() -> None:
     assert "window.location.href = newAdminUrl" in STATIC_HTML
     assert "3 秒后自动重启" not in STATIC_HTML
     assert "不带 token" not in STATIC_HTML
+
+
+def test_service_restart_icon_has_explicit_size_guard() -> None:
+    assert "svc-restart-icon" in STATIC_HTML
+    assert 'width="12" height="12"' in STATIC_HTML
+    assert ".btn-svc-restart .svc-restart-icon" in STATIC_HTML
+    assert "max-width: 12px" in STATIC_HTML

@@ -43,7 +43,7 @@ Invoked automatically before any destructive step. Nine categories — exits non
 | 6 | **Network** | DNS resolves `github.com`; outbound HTTPS reaches `api.github.com`. |
 | 7 | **systemd** | PID 1 is `systemd`. |
 | 8 | **Ports** | `8080/tcp`, `11000/tcp`, `21000/udp` not already bound. |
-| 9 | **apt deps** | `python3-venv`, `python3-systemd`, `curl`, `sqlite3`, `openssl`, `fail2ban` present (`--install` auto-installs missing). |
+| 9 | **apt deps** | `python3.11`, `python3.11-venv`, `curl`, `sqlite3`, `openssl`, `fail2ban` present (`--install` auto-installs missing; Ubuntu images without `python3.11` get the deadsnakes PPA first). |
 
 Run standalone:
 
@@ -58,14 +58,14 @@ sudo bash deploy/check-prereqs.sh --install  # also apt-install missing apt deps
 
 | Step | Outcome |
 | --- | --- |
-| 1 | **System packages** via apt: `python3-venv`, `python3-systemd`, `curl`, `sqlite3`, `openssl`, `fail2ban`. |
+| 1 | **System packages** via apt: `python3.11`, `python3.11-venv`, `curl`, `sqlite3`, `openssl`, `fail2ban`. |
 | 2 | **Directories**: `/etc/proxybox`, `/var/lib/proxybox`, `/var/log/proxybox`, `/var/www/proxybox-sub`, `/etc/sing-box`. |
 | 3 | **sing-box binary** — latest GitHub release for the host's arch (amd64 / arm64). |
 | 4 | **sing-box systemd unit** — `/etc/systemd/system/sing-box.service`. |
 | 5 | **Reality keypair** (X25519), **Hy2 self-signed cert**, random **SNI** picked per install, `experimental.clash_api` enabled. |
-| 6 | **Python venv** at `/opt/proxybox/.venv` + `pip install -e .`. |
+| 6 | **Python 3.11 venv** at `/opt/proxybox/.venv` + `pip install -e .`; an existing non-3.11 venv is recreated. |
 | 7 | **`/etc/proxybox/config.yaml`** — random `admin.token` (24 bytes), random `admin.login_path` (12 alnum), `features.url_token_bypass: false`, and `server.public_host` auto-detected via `ifconfig.me` / `ipify.org`. Mode 0600, root-owned. **The password lives separately** at `/etc/proxybox/admin.password` (mode 0400, root-owned) so a casual `cat config.yaml` cannot leak it. |
-| 8 | **fail2ban `[manual]` jail** with `backend=systemd` (Debian 13 has no `/var/log/auth.log`); appended only if missing, preserving any existing `jail.local` content. |
+| 8 | **fail2ban `[manual]` jail** in `/etc/fail2ban/jail.d/proxybox.local` with `backend=systemd`, plus an `sshd` backend override so minimal images without `/var/log/auth.log` do not fail. |
 | 9 | **Four systemd units** — `proxybox-admin`, `proxybox-traffic-worker`, `proxybox-bot` (disabled by default). |
 | 10 | `systemctl enable --now` for core services. |
 | 11 | **Auto-creates the first device** (`phone-1` by default; override with `PROXYBOX_FIRST_DEVICE`) by logging in with the generated username/password and using that session cookie. |

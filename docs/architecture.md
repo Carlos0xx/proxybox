@@ -72,7 +72,7 @@ For end-user workflows, see [`guide.md`](./guide.md). For per-endpoint reference
 | **proxybox-traffic-worker** | [`app/workers/traffic.py`](../app/workers/traffic.py) | `proxybox-traffic-worker.service` | Polls sing-box Clash API every 10s; writes byte deltas to `traffic_log`, host suffixes to `host_log`. |
 | **caddy** *(opt-in)* | upstream binary | `caddy.service` | HTTPS reverse-proxy in front of `:8080`. Provisioned via the panel's HTTPS page. |
 | **proxybox-bot** *(opt-in)* | [`bot/__main__.py`](../bot/__main__.py) | `proxybox-bot.service` | Telegram long-poll — `/status`, `/devices`, `/traffic`, `/pause`, `/resume`, `/bans`. |
-| **fail2ban** | apt package | `fail2ban.service` | Manual IP-jail backend (custom `[manual]` jail, `backend=systemd`). |
+| **fail2ban** | apt package | `fail2ban.service` | Manual IP-jail backend (`/etc/fail2ban/jail.d/proxybox.local`, `backend=systemd`). |
 
 The first three are always running. The last three are opt-in and start disabled.
 

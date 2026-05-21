@@ -58,7 +58,7 @@ Then ask in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-The agent walks minimal VPS check → `git clone` / update → full pre-flight → `install.sh` → verification → relays the credentials back. For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) directly.
+The agent walks temporary SSH `known_hosts` → minimal VPS check → `git clone` / update → full pre-flight with Python 3.11 provisioning → `install.sh` → verification → relays the credentials back. For Codex or other agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) directly.
 
 #### Path B — `install.sh`
 
@@ -207,7 +207,7 @@ cp -r deploy/claude-skill/* ~/.claude/skills/proxybox-deploy/
 
 > 帮我在 1.2.3.4 这台 VPS 上部署 proxybox,SSH key 是 ~/.ssh/id_ed25519
 
-代理走最小 VPS 检查 → `git clone` / 更新 → 完整 pre-flight → `install.sh` → 验证服务 → 把凭据发给你。Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) 喂给它即可。
+代理走临时 SSH `known_hosts` → 最小 VPS 检查 → `git clone` / 更新 → 带 Python 3.11 安装的完整 pre-flight → `install.sh` → 验证服务 → 把凭据发给你。Codex 或其他代理:直接把 [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) 喂给它即可。
 
 #### 方式 B — `install.sh`
 

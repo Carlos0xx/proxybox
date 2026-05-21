@@ -33,7 +33,7 @@ Then in any session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-The agent runs a minimal VPS check, clones or updates the repo on the VPS, runs `deploy/check-prereqs.sh`, executes `install.sh`, verifies the four core services, and relays the **login URL, username, password, and 5 subscription URLs** back to you.
+The agent uses a temporary SSH `known_hosts`, runs a minimal VPS check, clones or updates the repo on the VPS, runs `deploy/check-prereqs.sh --install` to provision Python 3.11 and runtime deps, executes `install.sh`, verifies the four core services, and relays the **login URL, username, password, and 5 subscription URLs** back to you.
 
 For **Codex** or other coding agents, point them at [`deploy/claude-skill/SKILL.md`](../deploy/claude-skill/SKILL.md) — the instructions are framework-agnostic.
 
@@ -53,8 +53,8 @@ bash deploy/install.sh --lang en        # --lang zh for Chinese output
 
 The installer is idempotent — safe to re-run mid-way. It performs:
 
-1. **Pre-flight validation** via `deploy/check-prereqs.sh` (9 categories: OS, arch, privilege, RAM, disk, network, systemd, ports, apt deps).
-2. **apt install** of runtime dependencies (`python3-venv`, `curl`, `sqlite3`, `openssl`, `fail2ban`).
+1. **Pre-flight validation** via `deploy/check-prereqs.sh --install` (9 categories: OS, arch, privilege, RAM, disk, network, systemd, ports, apt deps) and Python 3.11 provisioning.
+2. **apt install** of runtime dependencies (`python3.11`, `python3.11-venv`, `curl`, `sqlite3`, `openssl`, `fail2ban`).
 3. **sing-box** — pulls the latest stable binary from GitHub releases (auto-detects amd64 / arm64).
 4. **Crypto generation** — Reality keypair, Hy2 self-signed cert, random SNI picked per install.
 5. **Config writes** — `/etc/sing-box/config.json` and `/etc/proxybox/config.yaml` (mode 0600, root-owned).

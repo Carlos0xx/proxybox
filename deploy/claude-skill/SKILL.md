@@ -31,6 +31,22 @@ the path).
 
 ## Execution
 
+### SSH session setup
+
+Before the first SSH call, isolate host-key handling for this deployment
+session. VPS rebuilds and recycled IPs often conflict with the operator's
+normal `~/.ssh/known_hosts`; do not edit or delete that file. Use a temporary
+known-hosts file, record the new fingerprint in the final handoff, and use the
+`SSH` array for every SSH command below.
+
+```bash
+: "${SSH_PORT:=22}"
+PROXYBOX_KNOWN_HOSTS="$(mktemp "${TMPDIR:-/tmp}/proxybox-known-hosts.XXXXXX")"
+ssh-keyscan -p "$SSH_PORT" -H "$HOST" > "$PROXYBOX_KNOWN_HOSTS"
+ssh-keygen -lf "$PROXYBOX_KNOWN_HOSTS"
+SSH=(ssh -p "$SSH_PORT" -o UserKnownHostsFile="$PROXYBOX_KNOWN_HOSTS" -o StrictHostKeyChecking=accept-new)
+```
+
 ### Step 1 — Minimal host pre-flight
 
 For the **first** SSH after the user gave us VPS credentials, do a minimal
@@ -39,7 +55,7 @@ in-line check first. The repo may not exist yet, so do not try to run
 updated the source.
 
 ```bash
-ssh -o BatchMode=yes "$USER@$HOST" bash -s <<'EOF'
+"${SSH[@]}" "$USER@$HOST" bash -s <<'EOF'
 echo "[arch]" $(uname -m)
 echo "[os]";   grep PRETTY_NAME /etc/os-release
 echo "[disk]"; df -h / | tail -1
@@ -64,7 +80,7 @@ checkouts must be updated from `origin/main` explicitly so a stale
 `/opt/proxybox` cannot keep serving an old installer.
 
 ```bash
-ssh "$USER@$HOST" '
+"${SSH[@]}" "$USER@$HOST" '
   set -e
   SUDO=""
   if [ "$(id -u)" != "0" ]; then SUDO="sudo"; fi
@@ -100,12 +116,12 @@ code:
 
 ```bash
 LANG_FLAG=zh  # use en if the user is not writing in Chinese
-ssh "$USER@$HOST" "
+"${SSH[@]}" "$USER@$HOST" "
   cd /opt/proxybox
   if [ \"\$(id -u)\" = \"0\" ]; then
-    bash deploy/check-prereqs.sh --lang $LANG_FLAG
+    bash deploy/check-prereqs.sh --install --lang $LANG_FLAG
   else
-    sudo bash deploy/check-prereqs.sh --lang $LANG_FLAG
+    sudo bash deploy/check-prereqs.sh --install --lang $LANG_FLAG
   fi
 "
 ```
@@ -117,7 +133,7 @@ don't try to "fix" their environment unless they explicitly ask.
 
 ```bash
 LANG_FLAG=zh  # use en if the user is not writing in Chinese
-ssh "$USER@$HOST" "
+"${SSH[@]}" "$USER@$HOST" "
   cd /opt/proxybox
   if [ \"\$(id -u)\" = \"0\" ]; then
     bash deploy/install.sh --lang $LANG_FLAG
@@ -144,7 +160,7 @@ admin URL is okay to quote in this context.
 ### Step 5 — Verify
 
 ```bash
-ssh "$USER@$HOST" '
+"${SSH[@]}" "$USER@$HOST" '
   for svc in sing-box proxybox-admin proxybox-traffic-worker fail2ban; do
     state=$(systemctl is-active "$svc" 2>/dev/null)
     printf "%-30s %s\n" "$svc" "$state"
@@ -186,7 +202,7 @@ If the user needs the credentials re-printed later (e.g. they lost the
 chat backscroll), this fetches them from the live config and password file:
 
 ```bash
-ssh "$USER@$HOST" '
+"${SSH[@]}" "$USER@$HOST" '
   /opt/proxybox/.venv/bin/python -c "
 from pathlib import Path
 import yaml
@@ -209,7 +225,7 @@ print(f\"password:  {Path(\\\"/etc/proxybox/admin.password\\\").read_text().stri
 Only do this if the user explicitly provided bot credentials.
 
 ```bash
-ssh "$USER@$HOST" "
+"${SSH[@]}" "$USER@$HOST" "
 cat > /etc/proxybox/bot.env <<ENV
 BOT_TOKEN=$BOT_TOKEN
 TG_ALLOWED_USERS=$ALLOWED_USERS
@@ -231,10 +247,11 @@ to the user with a one-line cover sentence — something like:
 
 > "装好了。下面四块全部直接能用：登录凭据（账号 + 密码 + 加随机后缀的
 > 登录地址,粘进浏览器就行）、5 个订阅 URL（任挑一个粘进客户端就翻墙）、
-> 服务状态、可选功能。"
+> 服务状态、可选功能。本次 SSH 主机指纹也在下面。"
 
-Then paste install.sh's output (or summarize it) — do not re-format,
-do not hide the password / login URL.
+Then paste install.sh's output (or summarize it), plus the `ssh-keygen -lf`
+fingerprint captured in the SSH setup step — do not re-format, do not hide
+the password / login URL.
 
 Concretely, the user can:
 
@@ -321,6 +338,9 @@ phones and laptops — Clash YAML is mainly for routers and Stash power-users.
   still masks credentials to first 8 chars.
 - **Never** SSH with `-o StrictHostKeyChecking=no` without the user's
   explicit consent — it disables host-key warnings and would mask MITM
+- **Never** delete or rewrite the user's normal `~/.ssh/known_hosts` to
+  work around a rebuilt VPS. Use the session-local `PROXYBOX_KNOWN_HOSTS`
+  file from the SSH setup step and report the fingerprint instead.
 - **Never** run `install.sh` on a host that already runs unrelated services
   on port 8080, 11000-11050, or 21000-21050 — check `ss -tlnp` first
 - **Never** commit the generated `config.yaml`, `bot.env`, or `session-secret`
