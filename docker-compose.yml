@@ -16,8 +16,9 @@
 #   PROXYBOX_FRESH=1 docker compose up -d
 #
 # This stack uses a Docker bridge network and published ports only. It does
-# not install Python, systemd units, fail2ban, Caddy, or SSH trust files on the
-# host.
+# does not install host Python, fail2ban, Caddy, or SSH trust files. The
+# installer adds one narrow host systemd timer for this install only, so Docker
+# and this Compose project come back after daemon or VPS restarts.
 
 services:
   bootstrap:

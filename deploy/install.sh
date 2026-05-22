@@ -46,7 +46,7 @@ dispatch_install_mode() {
     echo "ProxyBox 安装方式选择"
     echo
     echo "  1) Docker 安装（推荐）"
-    echo "     容器隔离，自动避开已占用端口，不写宿主机 systemd/fail2ban/Caddy。"
+    echo "     容器隔离，自动避开已占用端口；只写本次安装专属 Docker guard，不写宿主机业务服务。"
     echo "     如果这台 VPS 已经跑了其他服务、网站、面板或生产系统，强烈推荐选这个。"
     echo
     echo "  2) 宿主机安装（高级）"

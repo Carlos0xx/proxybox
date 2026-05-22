@@ -296,6 +296,56 @@ print_selected_ports() {
     info "selected ports: admin=${admin_port:-8080}/tcp, vless=${vless_template:-11000}+${vless_start:-11001}-${vless_end:-11050}/tcp, hy2=${hy2_template:-21000}+${hy2_start:-21001}-${hy2_end:-21050}/udp"
 }
 
+install_docker_guard() {
+    if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+        info "systemd not detected; Docker guard timer skipped"
+        return
+    fi
+
+    local project_name service_name timer_name service_path timer_path
+    project_name="$(env_value COMPOSE_PROJECT_NAME)"
+    validate_project_name "$project_name"
+    service_name="proxybox-docker-guard-${project_name}.service"
+    timer_name="proxybox-docker-guard-${project_name}.timer"
+    service_path="/etc/systemd/system/$service_name"
+    timer_path="/etc/systemd/system/$timer_name"
+
+    info "installing host Docker guard for this ProxyBox project"
+    "${SUDO[@]}" install -m 644 /dev/stdin "$service_path" <<UNIT
+[Unit]
+Description=ProxyBox Docker guard (${project_name})
+Documentation=https://github.com/carlos0xx/proxybox
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=$ROOT_DIR
+ExecStart=$ROOT_DIR/deploy/docker-guard.sh
+TimeoutStartSec=180
+UNIT
+
+    "${SUDO[@]}" install -m 644 /dev/stdin "$timer_path" <<UNIT
+[Unit]
+Description=Run ProxyBox Docker guard (${project_name})
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=60s
+AccuracySec=15s
+Persistent=true
+Unit=$service_name
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+    "${SUDO[@]}" systemctl daemon-reload
+    "${SUDO[@]}" systemctl enable --now "$timer_name" >/dev/null
+    "${SUDO[@]}" systemctl start "$service_name" >/dev/null 2>&1 || true
+    info "Docker guard enabled: $timer_name"
+}
+
 bootstrap_first_device() {
     local exec_env=()
     if [ "${PROXYBOX_FIRST_DEVICE+x}" = x ]; then
@@ -418,6 +468,7 @@ main() {
     info "starting isolated Docker stack"
     "${COMPOSE[@]}" up -d --build
     bootstrap_first_device
+    install_docker_guard
     print_handoff
     echo "Ports were written to:"
     echo "  ${ENV_FILE}"

@@ -56,7 +56,7 @@ cd "$INSTALL_DIR"
 bash deploy/install.sh
 ```
 
-The installer shows a Chinese mode picker and requires an explicit `1` or `2` choice. Pick Docker to check Docker/Compose and `ss`/`iproute2`, install missing runtime packages, start Docker, scan host ports, print/write a fresh isolated Compose project to `.env`, and start a bridge-network stack. If the VPS already runs websites, panels, or production services, choose Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
+The installer shows a Chinese mode picker and requires an explicit `1` or `2` choice. Pick Docker to check Docker/Compose and `ss`/`iproute2`, install missing runtime packages, start Docker, scan host ports, print/write a fresh isolated Compose project to `.env`, start a bridge-network stack, and install a narrow Docker guard for this project only. If the VPS already runs websites, panels, or production services, choose Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
 
 > **Installation red line:** never delete, modify, overwrite, or reuse files/services on the user's VPS outside this install. Even if `/opt/proxybox` or another same-name directory already exists, leave it untouched and clone into a new `proxybox-<timestamp>-<suffix>` directory.
 
@@ -207,7 +207,7 @@ cd "$INSTALL_DIR"
 bash deploy/install.sh
 ```
 
-安装器会用中文提示选择 Docker 或宿主机,并强制输入 `1` 或 `2`。推荐选 Docker:容器隔离、自动避开已占用端口、不写宿主机 systemd/fail2ban/Caddy。如果 VPS 已经跑了其他服务、网站、面板或生产系统,强烈推荐 Docker。宿主机安装会直接安装 Python、sing-box、systemd unit、fail2ban,仅建议用于干净、专用、不跑其他生产服务的 VPS。
+安装器会用中文提示选择 Docker 或宿主机,并强制输入 `1` 或 `2`。推荐选 Docker:容器隔离、自动避开已占用端口,并安装只属于本项目的 Docker guard。如果 VPS 已经跑了其他服务、网站、面板或生产系统,强烈推荐 Docker。宿主机安装会直接安装 Python、sing-box、systemd unit、fail2ban,仅建议用于干净、专用、不跑其他生产服务的 VPS。
 
 > **安装红线:** 不要删除、修改、覆盖或复用用户 VPS 上本次安装以外的任何文件和服务。即便宿主机已经存在 `/opt/proxybox` 或同名目录,也必须保留不动,改用新的 `proxybox-<时间戳>-<后缀>` 目录。
 

@@ -46,7 +46,7 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | HTTPS options | v1.0 | Tells Docker users to put Admin UI behind a host reverse proxy, gateway, or Cloudflare Tunnel. |
 | Account self-service | v0.1.11 | Mentions the rotation options in the *Security* page. |
 | Per-line copy buttons | v0.1.12 | Confirms the SPA's copy buttons work over HTTP. |
-| Explicit install-mode choice | v1.0 | Requires Docker/native selection before remote install; Docker uses bridge networking, auto-selected ports, and no host systemd/fail2ban writes. |
+| Explicit install-mode choice | v1.0 | Requires Docker/native selection before remote install; Docker uses bridge networking, auto-selected ports, and an install-scoped Docker guard. |
 
 ---
 

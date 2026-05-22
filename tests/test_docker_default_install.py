@@ -14,6 +14,7 @@ from app.services import caddy, fail2ban, singbox, system_stats, watchdog
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = (ROOT / "docker-compose.yml").read_text()
 DOCKER_INSTALL = (ROOT / "deploy" / "docker-install.sh").read_text()
+DOCKER_GUARD = (ROOT / "deploy" / "docker-guard.sh").read_text()
 README_ZH = (ROOT / "README.zh.md").read_text()
 DOCKER_DOC = (ROOT / "docs" / "deploy" / "docker.md").read_text()
 STATIC_HTML = (ROOT / "static" / "index.html").read_text()
@@ -66,6 +67,29 @@ def test_docker_install_provisions_runtime_and_scans_ports() -> None:
     assert "docker compose down" not in DOCKER_INSTALL
     assert "docker volume rm" not in DOCKER_INSTALL
     assert "rm -rf" not in DOCKER_INSTALL
+
+
+def test_docker_install_adds_project_scoped_host_guard() -> None:
+    assert "install_docker_guard" in DOCKER_INSTALL
+    assert "proxybox-docker-guard-${project_name}.service" in DOCKER_INSTALL
+    assert "proxybox-docker-guard-${project_name}.timer" in DOCKER_INSTALL
+    assert "After=network-online.target docker.service" in DOCKER_INSTALL
+    assert "OnBootSec=45s" in DOCKER_INSTALL
+    assert "OnUnitActiveSec=60s" in DOCKER_INSTALL
+    assert 'systemctl enable --now "$timer_name"' in DOCKER_INSTALL
+    assert "Docker guard enabled:" in DOCKER_INSTALL
+
+
+def test_docker_guard_only_starts_this_compose_project() -> None:
+    assert 'ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"' in DOCKER_GUARD
+    assert 'ENV_FILE="$ROOT_DIR/.env"' in DOCKER_GUARD
+    assert 'COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"' in DOCKER_GUARD
+    assert "systemctl start docker" in DOCKER_GUARD
+    assert '--env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d' in DOCKER_GUARD
+    assert "docker compose down" not in DOCKER_GUARD
+    assert "docker volume rm" not in DOCKER_GUARD
+    assert "rm -rf" not in DOCKER_GUARD
+    assert "--remove-orphans" not in DOCKER_GUARD
 
 
 def test_install_red_line_is_documented_for_docker_path() -> None:

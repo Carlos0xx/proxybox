@@ -1,6 +1,6 @@
 # Docker 默认安装
 
-> 推荐路径。Docker stack 使用 bridge 网络隔离,自动挑选空闲宿主端口,不写宿主机 Python、systemd、fail2ban、Caddy 或 SSH known_hosts。
+> 推荐路径。Docker stack 使用 bridge 网络隔离,自动挑选空闲宿主端口,不写宿主机 Python、fail2ban、Caddy 或 SSH known_hosts。安装器只额外写一个本次安装专属的 systemd Docker guard,用于 Docker daemon 或 VPS 重启后的自动恢复。
 
 > [!IMPORTANT]
 > 安装红线: 不要删除、修改、覆盖或复用用户 VPS 上本次安装以外的任何文件和服务。即便宿主机已经存在 `/opt/proxybox` 或同名目录,也必须保留不动,改用新的 `proxybox-<时间戳>-<后缀>` 目录克隆和安装;安装器和部署代理只能碰本次安装新建的资源。
@@ -25,6 +25,7 @@ bash deploy/docker-install.sh
 | 写 `.env` | 把新的 Compose project name、专属镜像 tag、选中的端口和 public host 写进项目目录 `.env`。 |
 | 启动 stack | `docker compose up -d --build`,使用 bridge network + 显式 published ports。 |
 | 首台设备 | 如果设备列表为空,自动创建 5 个小写字母的随机设备名。`PROXYBOX_FIRST_DEVICE=` 可跳过。 |
+| Docker guard | 写入 `proxybox-docker-guard-<project>.timer`,每分钟只在本安装目录执行 `docker compose up -d`,并在 Docker daemon 停止时启动 `docker.service`。 |
 
 每次运行安装器默认都会新建一套 Compose project 和 Docker volumes。它不会 `down`、删除或改写旧 ProxyBox project；旧项目如果还在运行,只会被端口扫描识别为“端口已占用”,新项目会自动选择其他端口。
 

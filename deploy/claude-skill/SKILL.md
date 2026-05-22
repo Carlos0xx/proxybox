@@ -27,7 +27,7 @@ Ask the user for, in order:
 4. **Install mode** — ask explicitly unless the user already stated one of the
    two modes in this conversation:
    - Docker install (recommended): isolated containers, auto-selected ports,
-     no host Python/systemd/fail2ban/Caddy writes.
+     and one install-scoped Docker guard; no host Python/fail2ban/Caddy writes.
    - Native host install (advanced): writes Python, sing-box, systemd units,
      and fail2ban directly to the VPS; only for a clean dedicated VPS.
 5. **Optional bot config**: Telegram bot token + allowed user ID(s) if the
