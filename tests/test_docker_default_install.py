@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = (ROOT / "docker-compose.yml").read_text()
 DOCKER_INSTALL = (ROOT / "deploy" / "docker-install.sh").read_text()
 DOCKER_GUARD = (ROOT / "deploy" / "docker-guard.sh").read_text()
+DOCKER_HTTPS_APPLY = (ROOT / "deploy" / "docker-https-apply.sh").read_text()
 README_ZH = (ROOT / "README.zh.md").read_text()
 DOCKER_DOC = (ROOT / "docs" / "deploy" / "docker.md").read_text()
 STATIC_HTML = (ROOT / "static" / "index.html").read_text()
@@ -38,8 +39,12 @@ def test_compose_uses_bridge_network_and_env_published_ports() -> None:
     guard_status_env = "/".join(
         ["PROXYBOX_DOCKER_GUARD_STATUS=", "var", "lib", "proxybox-host-guard", "status"]
     )
+    guard_dir_env = "/".join(["PROXYBOX_DOCKER_GUARD_DIR=", "var", "lib", "proxybox-host-guard"])
     assert guard_status_env in COMPOSE
-    assert "./.proxybox-guard:/var/lib/proxybox-host-guard:ro" in COMPOSE
+    assert guard_dir_env in COMPOSE
+    assert "PROXYBOX_ADMIN_PORT=${PROXYBOX_ADMIN_PORT:-8080}" in COMPOSE
+    assert "./.proxybox-guard:/var/lib/proxybox-host-guard" in COMPOSE
+    assert "./.proxybox-guard:/var/lib/proxybox-host-guard:ro" not in COMPOSE
     assert "/etc/proxybox/bot.env" not in COMPOSE
 
 
@@ -88,6 +93,17 @@ def test_docker_install_adds_project_scoped_host_guard() -> None:
     assert "Docker guard enabled:" in DOCKER_INSTALL
 
 
+def test_docker_install_adds_project_scoped_https_helper() -> None:
+    assert "install_docker_https_helper" in DOCKER_INSTALL
+    assert "proxybox-docker-https-${project_name}.service" in DOCKER_INSTALL
+    assert "proxybox-docker-https-${project_name}.path" in DOCKER_INSTALL
+    assert 'chmod +x "$ROOT_DIR/deploy/docker-https-apply.sh"' in DOCKER_INSTALL
+    assert "PathChanged=$HOST_GUARD_DIR/https-request" in DOCKER_INSTALL
+    assert "PathModified=$HOST_GUARD_DIR/https-request" in DOCKER_INSTALL
+    assert 'systemctl enable --now "$path_name"' in DOCKER_INSTALL
+    assert "Docker HTTPS helper enabled:" in DOCKER_INSTALL
+
+
 def test_docker_guard_only_starts_this_compose_project() -> None:
     assert 'ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"' in DOCKER_GUARD
     assert 'ENV_FILE="$ROOT_DIR/.env"' in DOCKER_GUARD
@@ -101,6 +117,22 @@ def test_docker_guard_only_starts_this_compose_project() -> None:
     assert "docker volume rm" not in DOCKER_GUARD
     assert "rm -rf" not in DOCKER_GUARD
     assert "--remove-orphans" not in DOCKER_GUARD
+
+
+def test_docker_https_helper_is_request_scoped_and_refuses_user_caddyfile() -> None:
+    assert 'REQUEST_FILE="$GUARD_DIR/https-request"' in DOCKER_HTTPS_APPLY
+    assert 'RESPONSE_FILE="$GUARD_DIR/https-response"' in DOCKER_HTTPS_APPLY
+    assert "getent ahostsv4" in DOCKER_HTTPS_APPLY
+    assert "https://ifconfig.me" in DOCKER_HTTPS_APPLY
+    assert "reverse_proxy 127.0.0.1:$admin_port" in DOCKER_HTTPS_APPLY
+    assert "header_up X-Forwarded-Proto https" in DOCKER_HTTPS_APPLY
+    assert "header_up X-Forwarded-Host {http.request.host}" in DOCKER_HTTPS_APPLY
+    assert "caddy validate --config /etc/caddy/Caddyfile" in DOCKER_HTTPS_APPLY
+    assert "caddyfile_conflict" in DOCKER_HTTPS_APPLY
+    assert "refusing to overwrite user Caddy config" in DOCKER_HTTPS_APPLY
+    assert "docker compose down" not in DOCKER_HTTPS_APPLY
+    assert "docker volume rm" not in DOCKER_HTTPS_APPLY
+    assert "rm -rf" not in DOCKER_HTTPS_APPLY
 
 
 def test_install_red_line_is_documented_for_docker_path() -> None:
@@ -433,20 +465,91 @@ def test_docker_logs_read_shared_log_file(monkeypatch, tmp_path: Path) -> None:
     assert asyncio.run(system.logs("sing-box", n=2)) == "two\nthree\n"
 
 
-def test_https_caddy_is_explicitly_disabled_in_docker(monkeypatch) -> None:
+def test_https_caddy_uses_docker_host_helper(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("PROXYBOX_RUNTIME", "docker")
+    monkeypatch.setenv("PROXYBOX_DOCKER_GUARD_DIR", str(tmp_path))
+    monkeypatch.setenv("PROXYBOX_ADMIN_PORT", "18080")
+    patched: list[str] = []
+    settings = SimpleNamespace(
+        admin=SimpleNamespace(login_path="abc123", port=18080),
+        server=SimpleNamespace(public_host="203.0.113.10"),
+    )
     monkeypatch.setattr(
         caddy,
         "get_settings",
-        lambda: SimpleNamespace(server=SimpleNamespace(public_host="203.0.113.10")),
+        lambda: settings,
     )
+    monkeypatch.setattr(caddy, "_patch_config", lambda domain: patched.append(domain))
+
+    def fake_sleep(_seconds: float) -> None:
+        request = caddy._parse_kv_file(tmp_path / "https-request")
+        (tmp_path / "https-response").write_text(
+            "\n".join(
+                [
+                    f"request_id={request['request_id']}",
+                    "state=success",
+                    "code=ok",
+                    "message=HTTPS enabled",
+                    "public_ip=203.0.113.10",
+                    "caddy=installed",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(caddy.time, "sleep", fake_sleep)
 
     status = caddy.status()
     assert status.docker_runtime is True
     assert status.caddy_installed is False
-    assert "容器内安装 Caddy" in status.notes[0]
+    assert "宿主机 helper" in status.notes[0]
+
+    result = caddy.run("proxybox.example.com")
+    request = caddy._parse_kv_file(tmp_path / "https-request")
+
+    assert request["domain"] == "proxybox.example.com"
+    assert request["admin_port"] == "18080"
+    assert patched == ["proxybox.example.com"]
+    assert result["public_ip"] == "203.0.113.10"
+    assert result["caddy"] == "installed"
+    assert result["login_url"] == "https://proxybox.example.com/login/abc123"
+    assert "docker_unsupported" not in STATIC_HTML
+    assert "docker_helper_unavailable" in STATIC_HTML
+    assert "docker_helper_timeout" in STATIC_HTML
+    assert "docker_helper_failed" in STATIC_HTML
+
+
+def test_https_caddy_surfaces_docker_helper_failure(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("PROXYBOX_RUNTIME", "docker")
+    monkeypatch.setenv("PROXYBOX_DOCKER_GUARD_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        caddy,
+        "get_settings",
+        lambda: SimpleNamespace(
+            admin=SimpleNamespace(login_path="", port=8080),
+            server=SimpleNamespace(public_host="203.0.113.10"),
+        ),
+    )
+
+    def fake_sleep(_seconds: float) -> None:
+        request = caddy._parse_kv_file(tmp_path / "https-request")
+        (tmp_path / "https-response").write_text(
+            "\n".join(
+                [
+                    f"request_id={request['request_id']}",
+                    "state=failed",
+                    "code=dns_mismatch",
+                    "message=proxybox.example.com -> 198.51.100.9 but VPS public IP = 203.0.113.10",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(caddy.time, "sleep", fake_sleep)
 
     with pytest.raises(caddy.HTTPSEnableError) as exc:
         caddy.run("proxybox.example.com")
-    assert exc.value.code == "docker_unsupported"
-    assert "docker_unsupported" in STATIC_HTML
+    assert exc.value.code == "dns_mismatch"
+    assert "198.51.100.9" in exc.value.detail

@@ -153,6 +153,9 @@ def test_deploy_skill_clones_new_directory_without_reusing_checkout() -> None:
     assert "existing Docker volumes" in DEPLOY_SKILL
     assert "bash deploy/install.sh --docker" in DEPLOY_SKILL
     assert "installs Docker / Compose" in DEPLOY_SKILL
+    assert "proxybox-docker-https-<project>.path" in DEPLOY_SKILL
+    assert ".proxybox-guard/https-request" in DEPLOY_SKILL
+    assert "non-ProxyBox-managed" in DEPLOY_SKILL
     assert "deploy/check-prereqs.sh --install --lang $LANG_FLAG" not in DEPLOY_SKILL
     assert "deploy/install.sh --fresh --lang $LANG_FLAG" not in DEPLOY_SKILL
     assert "install dir already exists; refusing to touch it" in DEPLOY_SKILL

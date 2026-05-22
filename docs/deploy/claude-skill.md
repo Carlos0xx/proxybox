@@ -33,7 +33,7 @@ Claude will:
 | 4 | Run a minimal inline VPS check before the repo exists. |
 | 5 | Install bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
 | 6 | Clone `https://github.com/carlos0xx/proxybox` into a new `/opt/proxybox-<timestamp>-<suffix>` directory and refuse to touch existing directories. |
-| 7 | Run `bash deploy/install.sh --docker` or `bash deploy/install.sh --native --fresh`; Docker mode checks/installs Docker + Compose, starts Docker, and scans free host ports. |
+| 7 | Run `bash deploy/install.sh --docker` or `bash deploy/install.sh --native --fresh`; Docker mode checks/installs Docker + Compose, starts Docker, scans free host ports, and installs project-scoped Docker guard + HTTPS helper systemd units. |
 | 8 | Verify the core services are healthy. |
 | 9 | Relay the login URL, username, password, and first device status back to you. |
 
@@ -44,7 +44,7 @@ Claude will:
 The bundled `SKILL.md` carries instructions for:
 
 - **v0.1.6+** login model — username + password form at `/login/{login_path}`, *not* URL-token-only auth.
-- **HTTPS options** — Docker users should put Admin UI behind a host reverse proxy, gateway, or Cloudflare Tunnel.
+- **HTTPS options** — Docker users can enable HTTPS from the panel; a project-scoped host systemd helper validates DNS and configures Caddy without installing Caddy inside the container.
 - **v0.1.11+** account self-service — how to mention rotation options in the handoff.
 - **v0.1.12** copy-button fix — the SPA now has per-line copy buttons on the subscription page.
 - **Explicit install-mode choice** — Docker remains recommended; native is advanced and host-level.

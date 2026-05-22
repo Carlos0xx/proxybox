@@ -27,7 +27,9 @@ Ask the user for, in order:
 4. **Install mode** — ask explicitly unless the user already stated one of the
    two modes in this conversation:
    - Docker install (recommended): isolated containers, auto-selected ports,
-     and one install-scoped Docker guard; no host Python/fail2ban/Caddy writes.
+     one install-scoped Docker guard, and one install-scoped HTTPS helper.
+     It does not write host Python/fail2ban. Host Caddy is touched only if
+     the user later clicks the panel's HTTPS enable button.
    - Native host install (advanced): writes Python, sing-box, systemd units,
      and fail2ban directly to the VPS; only for a clean dedicated VPS.
 5. **Optional bot config**: Telegram bot token + allowed user ID(s) if the
@@ -190,8 +192,11 @@ EOF
 missing, starts the Docker service, scans host ports, and writes `.env`.
 Each installer run creates a new Compose project name and new Docker volumes.
 It must not stop, delete, or rewrite any older ProxyBox project or unrelated
-host service. `deploy/install.sh --native --fresh` is the advanced host-level
-path and must only be run after the user explicitly chose native mode.
+host service. It also installs two project-scoped systemd helpers:
+`proxybox-docker-guard-<project>` for Docker self-recovery and
+`proxybox-docker-https-<project>.path` for optional panel-driven HTTPS.
+`deploy/install.sh --native --fresh` is the advanced host-level path and must
+only be run after the user explicitly chose native mode.
 
 ### Step 5 — Verify
 
@@ -201,6 +206,11 @@ path and must only be run after the user explicitly chose native mode.
     docker compose ps
     docker compose logs --tail=80 bootstrap
     docker compose logs --tail=80 sing-box proxybox-admin proxybox-traffic-worker
+    project="$(awk -F= '$1 == "COMPOSE_PROJECT_NAME" { print $2 }' .env | tail -n 1)"
+    systemctl is-enabled "proxybox-docker-guard-${project}.timer" || true
+    systemctl is-active "proxybox-docker-guard-${project}.timer" || true
+    systemctl is-enabled "proxybox-docker-https-${project}.path" || true
+    systemctl is-active "proxybox-docker-https-${project}.path" || true
   else
     systemctl is-active sing-box proxybox-admin proxybox-traffic-worker
     journalctl -u sing-box -u proxybox-admin -u proxybox-traffic-worker -n 80 --no-pager
@@ -313,9 +323,13 @@ shell user, sanitized to the device-name format.
 Mention any of these only when the user asks — don't dump them all at
 handoff. v0.1.6+ exposes a lot in the panel:
 
-- **HTTPS:** Docker installs should use a host reverse proxy, gateway, or
-  Cloudflare Tunnel. The in-panel Caddy provisioner is only for the advanced
-  native `install.sh` path.
+- **HTTPS:** Docker installs can use the panel's HTTPS page. The container
+  writes `.proxybox-guard/https-request`; the install-scoped host systemd
+  `.path` helper validates DNS, installs/configures Caddy on the host, writes
+  `.proxybox-guard/https-response`, then the container updates
+  `server.public_host` and passkey origin fields. The helper refuses to
+  overwrite a non-ProxyBox-managed `/etc/caddy/Caddyfile`; in that case report
+  the conflict instead of editing host Caddy by hand.
 - **Change username / password (v0.1.11):** `安全` page → `🔐 登录设置`
   card. Password change requires the current password (session-hijack
   defense).

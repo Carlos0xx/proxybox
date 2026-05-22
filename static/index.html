@@ -2187,7 +2187,7 @@ a:hover { color: var(--accent-hover); }
             <div style="flex:1;">
               <div style="font-weight:var(--weight-semibold); color:var(--text-1);">在这里输入域名 + 点启用</div>
               <div style="color:var(--text-3); font-size:var(--text-xs); margin-top:4px;">
-                后台会自动验证 DNS → 装 Caddy → 申 Let's Encrypt 证书 → 配反代 → 重启服务,全程 30 秒内
+                后台会自动验证 DNS → 装 Caddy → 申 Let's Encrypt 证书 → 配反代 → 重启服务,Docker 模式最多等待 180 秒
               </div>
 
               <div style="display:flex; gap:var(--space-3); margin-top:var(--space-3); flex-wrap:wrap;">
@@ -3765,9 +3765,9 @@ async function loadHttpsView() {
     const sub = $('https-status-sub');
     const enableBtn = $('https-enable-btn');
     if (s.docker_runtime) {
-      badge.innerHTML = '<span class="badge badge-warn"><span class="dot dot-warn"></span> Docker 模式</span>';
-      sub.innerHTML = 'Docker 默认安装不在容器内安装 Caddy。请在宿主机反向代理、网关或 Cloudflare Tunnel 配置 HTTPS';
-      if (enableBtn) enableBtn.disabled = true;
+      badge.innerHTML = '<span class="badge badge-warn"><span class="dot dot-warn"></span> Docker 模式 · 宿主 helper</span>';
+      sub.innerHTML = 'Docker 模式不会在容器内安装 Caddy；点击启用后会调用本次安装创建的宿主机 helper 配置 HTTPS';
+      if (enableBtn) enableBtn.disabled = false;
     } else if (s.using_https) {
       badge.innerHTML = '<span class="badge badge-accent" style="font-size:var(--text-sm);"><span class="dot dot-ok dot-pulse"></span> ✓ 已启用</span>';
       sub.innerHTML = `当前后台运行在 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;color:var(--accent);">https://${escapeHtml(s.configured_domain)}/</code>,证书由 Let's Encrypt 自动维护`;
@@ -3776,7 +3776,7 @@ async function loadHttpsView() {
       sub.innerHTML = `已为 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;">${escapeHtml(s.configured_domain)}</code> 配置过,但 Caddy 没在运行。SSH 进 VPS 跑 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;">systemctl start caddy</code> 或重新启用`;
     } else {
       badge.innerHTML = '<span class="badge"><span class="dot dot-bad"></span> 未启用 · HTTP only</span>';
-      sub.innerHTML = '当前后台是明文 HTTP。生产环境强烈建议启用 HTTPS — 跟着下面 4 步走,30 秒搞定';
+      sub.innerHTML = '当前后台是明文 HTTP。生产环境强烈建议启用 HTTPS — 跟着下面 4 步走即可';
       if (enableBtn) enableBtn.disabled = false;
     }
   } catch (e) {
@@ -3798,8 +3798,8 @@ async function _httpsEnableSubmit() {
     title: `启用 HTTPS 到 ${domain}?`,
     body: `会做这几件事:<br><br>
       · 验证 <code>${escapeHtml(domain)}</code> 解析到本机<br>
-      · apt 安装 Caddy (Cloudsmith 官方源)<br>
-      · 写 /etc/caddy/Caddyfile (反代 8080)<br>
+      · apt 安装 Caddy (Cloudsmith 官方源；Docker 模式由宿主机 helper 执行)<br>
+      · 写 /etc/caddy/Caddyfile (反代当前后台端口)<br>
       · 改 /etc/proxybox/config.yaml: public_host + passkey 字段<br>
       · 重启 Caddy → Let's Encrypt 自动签发证书<br><br>
       <span style="color:var(--warn);">⚠️ 域名必须先指向本机 IP,不然 DNS 这步会卡住</span>`,
@@ -3811,7 +3811,7 @@ async function _httpsEnableSubmit() {
   btn.disabled = true;
   btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg> 处理中…';
   log.style.display = 'block';
-  log.innerHTML = '> 正在执行,请等待最多 30 秒…\n> (DNS 校验 → apt install caddy → 写配置 → 申请证书 → 重载)';
+  log.innerHTML = '> 正在执行,请等待最多 180 秒…\n> (DNS 校验 → apt install caddy → 写配置 → 申请证书 → 重载)';
 
   try {
     const r = await apiJSON('/api/https/enable', { domain });
@@ -3843,7 +3843,10 @@ async function _httpsEnableSubmit() {
           'invalid_domain': '域名格式不对 (例: proxybox.example.com,需要至少一个点)',
           'dns_no_answer': '域名解析不到 IP (DNS 还没生效,等 1-10 分钟重试)',
           'dns_mismatch': '域名解析到的 IP 不是本机 (检查 DNS A 记录)',
-          'docker_unsupported': 'Docker 模式不支持内置 Caddy,请用宿主机反向代理或 Cloudflare Tunnel',
+          'docker_helper_unavailable': 'Docker HTTPS helper 不可用,请重新运行安装脚本或检查 systemd helper',
+          'docker_helper_timeout': 'Docker HTTPS helper 超时,请检查宿主机 systemd 和 Caddy 日志',
+          'docker_helper_failed': 'Docker HTTPS helper 执行失败',
+          'caddyfile_conflict': '宿主机已有非 ProxyBox 管理的 Caddyfile,为避免覆盖用户配置已停止',
           'cmd_failed': 'apt / systemctl / curl 命令失败',
         };
         msg = codeMap[code] || code || msg;

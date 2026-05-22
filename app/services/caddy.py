@@ -17,6 +17,11 @@ The flow, in order:
      up the new public_host immediately (avoids needing a self-restart)
   8. systemctl reload-or-restart caddy
 
+Docker mode never installs Caddy inside the container. Instead the admin
+container writes a request file into the install-scoped host guard directory;
+a host systemd .path helper applies Caddy on the host and writes a response
+file back for this process to consume.
+
 We intentionally do NOT restart proxybox-admin — restarting our own process
 mid-request would kill the response we're trying to return. The cache reset
 at step 7 covers the only case where it would matter.
@@ -30,9 +35,11 @@ from __future__ import annotations
 import contextlib
 import os
 import re
+import secrets
 import shutil
 import socket
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -91,7 +98,7 @@ def status() -> HTTPSStatus:
             configured_domain=None,
             public_host=public_host,
             using_https=False,
-            notes=["Docker 模式不在容器内安装 Caddy; 请在宿主机或网关配置反向代理"],
+            notes=["Docker 模式通过本次安装的宿主机 helper 启用 HTTPS; 容器内不安装 Caddy"],
             docker_runtime=True,
         )
     caddy_bin = shutil.which("caddy") is not None
@@ -277,6 +284,90 @@ def _patch_config(domain: str) -> None:
     reset_settings_cache()
 
 
+def _parse_kv_file(path: Path) -> dict[str, str]:
+    data: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        data[key.strip()] = value.strip()
+    return data
+
+
+def _write_kv_atomic(path: Path, data: dict[str, str]) -> None:
+    tmp = path.with_name(path.name + f".{secrets.token_hex(4)}.tmp")
+    body = "".join(f"{key}={value}\n" for key, value in data.items())
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(body)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            tmp.unlink()
+        raise
+
+
+def _run_docker_host_https(domain: str) -> dict[str, str]:
+    guard_dir_raw = os.environ.get("PROXYBOX_DOCKER_GUARD_DIR")
+    if not guard_dir_raw:
+        raise HTTPSEnableError(
+            "docker_helper_unavailable",
+            "PROXYBOX_DOCKER_GUARD_DIR is not configured; reinstall or upgrade the Docker helper",
+        )
+    guard_dir = Path(guard_dir_raw)
+    request_path = guard_dir / "https-request"
+    response_path = guard_dir / "https-response"
+    try:
+        guard_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    except OSError as e:
+        raise HTTPSEnableError("docker_helper_unavailable", str(e)) from e
+    if not os.access(guard_dir, os.W_OK):
+        raise HTTPSEnableError(
+            "docker_helper_unavailable", f"{guard_dir} is not writable from the container"
+        )
+
+    request_id = secrets.token_urlsafe(18)
+    with contextlib.suppress(FileNotFoundError):
+        response_path.unlink()
+    admin_port = os.environ.get("PROXYBOX_ADMIN_PORT") or str(get_settings().admin.port or 8080)
+    try:
+        _write_kv_atomic(
+            request_path,
+            {
+                "request_id": request_id,
+                "domain": domain,
+                "admin_port": admin_port,
+                "created_at": str(int(time.time())),
+            },
+        )
+    except OSError as e:
+        raise HTTPSEnableError("docker_helper_unavailable", str(e)) from e
+
+    deadline = time.monotonic() + 180
+    while time.monotonic() < deadline:
+        if response_path.exists():
+            try:
+                response = _parse_kv_file(response_path)
+            except OSError:
+                response = {}
+            if response.get("request_id") == request_id:
+                state = response.get("state", "")
+                if state == "success":
+                    return {
+                        "public_ip": response.get("public_ip") or "unknown",
+                        "caddy": response.get("caddy") or "unknown",
+                    }
+                code = response.get("code") or "docker_helper_failed"
+                detail = response.get("message") or code
+                raise HTTPSEnableError(code, detail)
+        time.sleep(1)
+    raise HTTPSEnableError(
+        "docker_helper_timeout",
+        "host HTTPS helper did not write https-response within 180 seconds",
+    )
+
+
 def _reload_caddy() -> None:
     _run(["systemctl", "enable", "--now", "caddy"])
     rc = subprocess.run(
@@ -294,10 +385,19 @@ def run(domain: str) -> dict[str, str]:
     """Full enablement. Raises HTTPSEnableError on failure with a short
     ``code`` the SPA can branch on. Returns the new state on success."""
     if runtime_is_docker():
-        raise HTTPSEnableError(
-            "docker_unsupported",
-            "Docker 默认安装不在容器内安装 Caddy; 请在宿主机、网关或 Cloudflare Tunnel 配置 HTTPS",
+        _validate_domain(domain)
+        result = _run_docker_host_https(domain)
+        _patch_config(domain)
+        login_path = get_settings().admin.login_path or ""
+        login_url = (
+            f"https://{domain}/login/{login_path}" if login_path else f"https://{domain}/login"
         )
+        return {
+            "domain": domain,
+            "public_ip": result["public_ip"],
+            "caddy": result["caddy"],
+            "login_url": login_url,
+        }
     _validate_domain(domain)
 
     vps_ip = _public_ip()

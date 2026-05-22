@@ -299,6 +299,7 @@ print_selected_ports() {
 
 prepare_guard_status_dir() {
     mkdir -p "$HOST_GUARD_DIR"
+    chmod 700 "$HOST_GUARD_DIR"
     {
         printf 'state=activating\n'
         printf 'last_run=%s\n' "$(date +%s)"
@@ -354,6 +355,57 @@ UNIT
     "${SUDO[@]}" systemctl enable --now "$timer_name" >/dev/null
     "${SUDO[@]}" systemctl start "$service_name" >/dev/null 2>&1 || true
     info "Docker guard enabled: $timer_name"
+}
+
+install_docker_https_helper() {
+    if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+        info "systemd not detected; Docker HTTPS helper skipped"
+        return
+    fi
+
+    local project_name service_name path_name service_path path_path
+    project_name="$(env_value COMPOSE_PROJECT_NAME)"
+    validate_project_name "$project_name"
+    service_name="proxybox-docker-https-${project_name}.service"
+    path_name="proxybox-docker-https-${project_name}.path"
+    service_path="/etc/systemd/system/$service_name"
+    path_path="/etc/systemd/system/$path_name"
+
+    info "installing host HTTPS helper for this ProxyBox project"
+    chmod +x "$ROOT_DIR/deploy/docker-https-apply.sh"
+    mkdir -p "$HOST_GUARD_DIR"
+    chmod 700 "$HOST_GUARD_DIR"
+
+    "${SUDO[@]}" install -m 644 /dev/stdin "$service_path" <<UNIT
+[Unit]
+Description=ProxyBox Docker HTTPS helper (${project_name})
+Documentation=https://github.com/carlos0xx/proxybox
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$ROOT_DIR
+ExecStart=$ROOT_DIR/deploy/docker-https-apply.sh
+TimeoutStartSec=180
+UNIT
+
+    "${SUDO[@]}" install -m 644 /dev/stdin "$path_path" <<UNIT
+[Unit]
+Description=Watch ProxyBox Docker HTTPS requests (${project_name})
+
+[Path]
+PathChanged=$HOST_GUARD_DIR/https-request
+PathModified=$HOST_GUARD_DIR/https-request
+Unit=$service_name
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+    "${SUDO[@]}" systemctl daemon-reload
+    "${SUDO[@]}" systemctl enable --now "$path_name" >/dev/null
+    info "Docker HTTPS helper enabled: $path_name"
 }
 
 bootstrap_first_device() {
@@ -480,6 +532,7 @@ main() {
     "${COMPOSE[@]}" up -d --build
     bootstrap_first_device
     install_docker_guard
+    install_docker_https_helper
     print_handoff
     echo "Ports were written to:"
     echo "  ${ENV_FILE}"

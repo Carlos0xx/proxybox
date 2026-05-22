@@ -29,7 +29,7 @@ cd "$INSTALL_DIR"
 bash deploy/install.sh
 ```
 
-`deploy/install.sh` shows a Chinese mode picker and requires an explicit `1` or `2` choice. Pick Docker to check Docker/Compose and `ss`/`iproute2`, install missing runtime packages, start Docker, scan host ports, write `.env`, start an isolated bridge-network stack, and install a narrow Docker guard for this project only. Use Docker if the VPS already runs websites, panels, or production services. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
+`deploy/install.sh` shows a Chinese mode picker and requires an explicit `1` or `2` choice. Pick Docker to check Docker/Compose and `ss`/`iproute2`, install missing runtime packages, start Docker, scan host ports, write `.env`, start an isolated bridge-network stack, and install narrow Docker guard + HTTPS helper units for this project only. Use Docker if the VPS already runs websites, panels, or production services. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
 
 > [!IMPORTANT]
 > Installation red line: never delete, modify, overwrite, or reuse files/services on the user's VPS outside this install. Even if `/opt/proxybox` or another same-name directory already exists, leave it untouched, clone into a new `proxybox-<timestamp>-<suffix>` directory, and only touch resources created for this run.

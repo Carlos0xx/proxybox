@@ -122,7 +122,7 @@ Paste the matching URL into your client's "Add subscription" dialog. Then verify
 
 ### 5 · Day-to-day operations
 
-Mostly from the panel. Docker installs should handle HTTPS with an external reverse proxy or tunnel.
+Mostly from the panel. Docker installs can enable HTTPS from the panel through the install-scoped host helper.
 
 | Task | Where | Notes |
 | --- | --- | --- |
@@ -131,7 +131,7 @@ Mostly from the panel. Docker installs should handle HTTPS with an external reve
 | **Pause a device** | Devices → ⏸ Pause | Indefinite or until a timestamp. Inbound removed; traffic history preserved. |
 | **Change password / username** | Security → Login → Edit | Requires the current password (defends against session-hijack re-auth). |
 | **Rotate login-path suffix** | Security → Login → 🎲 Rotate | Old `/login/{old}` 404s immediately. Existing sessions stay valid. |
-| **Enable HTTPS** | External proxy / native HTTPS page | Docker: use host reverse proxy, gateway, or Cloudflare Tunnel. Native: HTTPS page provisions Caddy. |
+| **Enable HTTPS** | HTTPS page | Docker: host helper validates DNS and configures host Caddy. Native: provisions Caddy directly. |
 | **Watch live traffic** | Overview | Real-time bps + connection count from sing-box's Clash API. |
 | **Per-device drilldown** | History | KPIs · daily chart · 24h heatmap · per-app category · per-host table. |
 | **Ban / unban an IP** | Security → Bans | Wraps fail2ban. |
@@ -270,7 +270,7 @@ http://<你的-VPS>:<admin-port>/login/<12 位随机串>
 
 ### 5 · 日常操作
 
-大多数操作都在后台做。Docker 安装的 HTTPS 建议用外部反代或 Tunnel。
+大多数操作都在后台做。Docker 安装可以在后台通过本次安装专属的宿主机 helper 启用 HTTPS。
 
 | 任务 | 在哪 | 说明 |
 | --- | --- | --- |
@@ -279,7 +279,7 @@ http://<你的-VPS>:<admin-port>/login/<12 位随机串>
 | **暂停设备** | 设备管理 → ⏸ 暂停 | 选无限期或定时间。inbound 移除,历史流量保留。 |
 | **改密码 / 用户名** | 安全 → 登录设置 → 修改 | 改密码需先输当前密码 (防 session 被劫后立刻被改密)。 |
 | **轮换登录路径后缀** | 安全 → 登录设置 → 🎲 轮换 | 老的 `/login/{老后缀}` 立刻 404。已登录 session 不受影响。 |
-| **开 HTTPS** | 外部反代 / 裸机 HTTPS 页 | Docker:用宿主反代、网关或 Cloudflare Tunnel。裸机:HTTPS 页配置 Caddy。 |
+| **开 HTTPS** | HTTPS · 域名页 | Docker:宿主机 helper 验证 DNS 并配置宿主 Caddy。裸机:直接配置 Caddy。 |
 | **看实时流量** | 总览 | 实时 bps + 连接数,从 sing-box Clash API 取。 |
 | **单设备下钻** | 设备历史 | KPI · 每日柱状 · 24h 热力图 · 按 App 分类 · 按域名细表。 |
 | **封禁 / 解封 IP** | 安全 → 封禁 | 包装 fail2ban。 |

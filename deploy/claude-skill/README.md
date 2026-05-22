@@ -43,10 +43,10 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | Feature | Since | Skill behaviour |
 | --- | --- | --- |
 | Username + password login form | v0.1.6 | Surfaces `admin.username` (config.yaml) + the password file inside the Docker volume (`/etc/proxybox/admin.password`) + `admin.login_path` (config.yaml) in the handoff. |
-| HTTPS options | v1.0 | Tells Docker users to put Admin UI behind a host reverse proxy, gateway, or Cloudflare Tunnel. |
+| HTTPS options | v1.0 | Docker users can enable HTTPS from the panel through the install-scoped host systemd helper, which configures host Caddy without installing Caddy inside the container. |
 | Account self-service | v0.1.11 | Mentions the rotation options in the *Security* page. |
 | Per-line copy buttons | v0.1.12 | Confirms the SPA's copy buttons work over HTTP. |
-| Explicit install-mode choice | v1.0 | Requires Docker/native selection before remote install; Docker uses bridge networking, auto-selected ports, and an install-scoped Docker guard. |
+| Explicit install-mode choice | v1.0 | Requires Docker/native selection before remote install; Docker uses bridge networking, auto-selected ports, an install-scoped Docker guard, and an install-scoped HTTPS helper. |
 
 ---
 
