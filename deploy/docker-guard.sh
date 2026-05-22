@@ -10,14 +10,27 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
+GUARD_DIR="$ROOT_DIR/.proxybox-guard"
+STATUS_FILE="$GUARD_DIR/status"
 
 log() {
     echo "[proxybox-docker-guard] $*"
 }
 
 die() {
+    write_status failed "$*"
     echo "[proxybox-docker-guard] ERROR: $*" >&2
     exit 1
+}
+
+write_status() {
+    local state="$1" message="${2:-}"
+    mkdir -p "$GUARD_DIR"
+    {
+        printf 'state=%s\n' "$state"
+        printf 'last_run=%s\n' "$(date +%s)"
+        printf 'message=%s\n' "$message"
+    } > "$STATUS_FILE"
 }
 
 start_docker_if_needed() {
@@ -57,11 +70,13 @@ main() {
     [ -f "$ENV_FILE" ] || die "missing env file: $ENV_FILE"
     [ -f "$COMPOSE_FILE" ] || die "missing compose file: $COMPOSE_FILE"
 
+    write_status checking "checking docker daemon and compose stack"
     start_docker_if_needed
 
     read -r -a compose <<<"$(compose_cmd)"
     log "ensuring ProxyBox stack is up in $ROOT_DIR"
     "${compose[@]}" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
+    write_status active "compose stack ensured"
 }
 
 main "$@"

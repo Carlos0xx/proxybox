@@ -243,6 +243,7 @@ services:
     - proxybox-admin
     - proxybox-traffic-worker
     - proxybox-watchdog
+    - proxybox-docker-guard
 ports:
   vless_range: [{vless_range[0]}, {vless_range[1]}]
   hy2_range: [{hy2_range[0]}, {hy2_range[1]}]

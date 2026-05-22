@@ -106,6 +106,8 @@ def _docker_service_state(unit: str) -> str:
         return _heartbeat_state("PROXYBOX_TRAFFIC_HEARTBEAT")
     if unit == "proxybox-watchdog":
         return _heartbeat_state("PROXYBOX_WATCHDOG_HEARTBEAT")
+    if unit == "proxybox-docker-guard":
+        return _docker_guard_state()
     if unit == "sing-box":
         return _clash_api_state()
     return "unknown"
@@ -253,6 +255,26 @@ def _heartbeat_state(env_name: str) -> str:
     except OSError:
         return "activating"
     return "active" if age <= 45 else "failed"
+
+
+def _docker_guard_state() -> str:
+    raw_path = os.environ.get("PROXYBOX_DOCKER_GUARD_STATUS")
+    if not raw_path:
+        return "unknown"
+    path = Path(raw_path)
+    try:
+        age = time.time() - path.stat().st_mtime
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return "activating"
+    if age > 180:
+        return "failed"
+    for line in text.splitlines():
+        key, _, value = line.partition("=")
+        if key == "state":
+            state = value.strip()
+            return state if state in {"active", "failed", "activating", "checking"} else "unknown"
+    return "active"
 
 
 def _clash_api_state() -> str:

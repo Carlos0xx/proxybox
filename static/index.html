@@ -439,17 +439,112 @@ a:hover { color: var(--accent-hover); }
 .btn-sm { height: var(--h-sm); padding: 0 var(--space-3); font-size: var(--text-xs); }
 .btn-sm svg { width: 12px; height: 12px; }
 .btn-lg { height: var(--h-lg); padding: 0 var(--space-5); font-size: var(--text-md); }
+.services-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: var(--space-5);
+  row-gap: var(--space-3);
+  align-items: start;
+  position: relative;
+}
+.services-layout::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border-subtle);
+  transform: translateX(-0.5px);
+  pointer-events: none;
+}
+.services-panel {
+  min-width: 0;
+}
+.services-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  margin-bottom: var(--space-2);
+}
+.services-panel-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-1);
+}
+.services-panel-sub {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-4);
+  font-weight: var(--weight-normal);
+}
+.services-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-auto-rows: 120px;
+  gap: var(--space-2);
+}
 .svc-card {
-  min-height: 182px;
-  padding: var(--space-6);
+  height: 120px;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
 }
 .svc-card-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--space-2);
+  gap: var(--space-3);
+  margin-bottom: 0;
+}
+.svc-main {
+  min-width: 0;
+  overflow: hidden;
+}
+.svc-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.svc-desc {
+  font-size: var(--text-2xs);
+  color: var(--text-4);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.svc-key {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-5);
+  margin-top: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.port-pill {
+  margin-top: auto;
+  width: 100%;
+  justify-content: center;
+  height: 28px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+@media (max-width: 720px) {
+  .services-layout {
+    grid-template-columns: 1fr;
+  }
+  .services-layout::before {
+    display: none;
+  }
 }
 .btn-svc-restart {
   display: flex !important;
@@ -458,7 +553,7 @@ a:hover { color: var(--accent-hover); }
   justify-content: center !important;
   width: 100%;
   min-width: 0;
-  height: 36px;
+  height: 28px;
   margin-top: auto;
   gap: var(--space-2);
   overflow: hidden;
@@ -466,7 +561,7 @@ a:hover { color: var(--accent-hover); }
   border-color: var(--border-default);
   border-radius: var(--radius-md);
   color: #ea580c;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   line-height: 1;
   white-space: nowrap !important;
@@ -2240,8 +2335,23 @@ a:hover { color: var(--accent-hover); }
          VIEW: 服务
          ═══════════════════════════════════════════════════════════ -->
     <section class="view" id="view-services">
-      <div id="services-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-3);">
-        <div class="empty-state"><span class="empty-icon">⚙️</span><div class="empty-desc">加载中…</div></div>
+      <div class="services-layout" id="services-layout">
+        <div class="services-panel">
+          <div class="services-panel-head">
+            <div class="services-panel-title">服务<span class="services-panel-sub" id="services-count">加载中</span></div>
+          </div>
+          <div class="services-list" id="services-list">
+            <div class="empty-state"><span class="empty-icon">⚙️</span><div class="empty-desc">加载中…</div></div>
+          </div>
+        </div>
+        <div class="services-panel">
+          <div class="services-panel-head">
+            <div class="services-panel-title">端口<span class="services-panel-sub" id="ports-count">加载中</span></div>
+          </div>
+          <div class="services-list" id="ports-list">
+            <div class="empty-state"><span class="empty-icon">◌</span><div class="empty-desc">加载中…</div></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -2971,7 +3081,7 @@ async function loadCurrentView() {
       case 'subscribers': await loadDevices(); break;
       case 'endpoints':   await loadSubs(); break;
       case 'security':    await loadBans(); break;
-      case 'services':    await Promise.all([loadStatus(), renderServices()]); break;
+      case 'services':    await loadStatus(); renderServices(); break;
       case 'https':       await loadHttpsView(); break;
       case 'devices':     await loadDevicesMgmt(); break;
       case 'passkeys':    await loadPasskeys(); break;
@@ -3681,6 +3791,7 @@ function renderServices() {
     'proxybox-admin':           { label: 'Admin',          desc: 'Web 后台 (本进程)',    restart: false }, // restarting self = bad UX
     'proxybox-traffic-worker':  { label: 'Traffic Worker', desc: '流量采集 (Clash API)',  restart: true  },
     'proxybox-watchdog':        { label: '看门狗',          desc: '服务与端口自恢复',       restart: false },
+    'proxybox-docker-guard':    { label: 'Docker Guard',   desc: '宿主机 Docker 自恢复',  restart: false },
     'fail2ban':                 { label: 'fail2ban',       desc: '入侵检测 / IP 封禁',    restart: false },
     'caddy':                    { label: 'caddy',          desc: 'HTTPS 反向代理 (可选)', restart: true  },
     'proxybox-bot':             { label: 'TG bot',         desc: 'Telegram 管理 bot (可选)', restart: true },
@@ -3696,10 +3807,10 @@ function renderServices() {
     const ok = st === 'active';
     return `<div class="card card-static svc-card">
       <div class="svc-card-head">
-        <div>
-          <div style="font-size: var(--text-base); font-weight: var(--weight-semibold);">${escapeHtml(s.label)}</div>
-          <div style="font-size: var(--text-xs); color: var(--text-4); margin-top: 2px;">${escapeHtml(s.desc)}</div>
-          <div style="font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-5); margin-top: 4px;">${escapeHtml(s.name)}</div>
+        <div class="svc-main">
+          <div class="svc-name">${escapeHtml(s.label)}</div>
+          <div class="svc-desc">${escapeHtml(s.desc)}</div>
+          <div class="svc-key">${escapeHtml(s.name)}</div>
         </div>
         <span class="badge ${ok ? 'badge-accent' : 'badge-danger'}">
           <span class="dot ${ok ? 'dot-ok dot-pulse' : 'dot-bad'}"></span>
@@ -3717,22 +3828,25 @@ function renderServices() {
     const host = p.host ? ` · ${p.host}` : '';
     return `<div class="card card-static svc-card port-card">
       <div class="svc-card-head">
-        <div>
-          <div style="font-size: var(--text-base); font-weight: var(--weight-semibold);">${escapeHtml(p.label || '端口')}</div>
-          <div style="font-size: var(--text-xs); color: var(--text-4); margin-top: 2px;">${escapeHtml(p.desc || '项目端口')}</div>
-          <div style="font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-5); margin-top: 4px;">${escapeHtml(p.owner || 'proxybox')}${escapeHtml(host)}</div>
+        <div class="svc-main">
+          <div class="svc-name">${escapeHtml(p.label || '端口')}</div>
+          <div class="svc-desc">${escapeHtml(p.desc || '项目端口')}</div>
+          <div class="svc-key">${escapeHtml(p.owner || 'proxybox')}${escapeHtml(host)}</div>
         </div>
         <span class="badge ${ok ? 'badge-accent' : 'badge-danger'}">
           <span class="dot ${ok ? 'dot-ok dot-pulse' : 'dot-bad'}"></span>
           ${escapeHtml(stateText)}
         </span>
       </div>
-      <div class="badge" style="margin-top:auto; width:100%; justify-content:center; height:36px; font-family:var(--font-mono); font-size:var(--text-sm);">
+      <div class="badge port-pill">
         ${escapeHtml(proto)} :${escapeHtml(p.port)}
       </div>
     </div>`;
   });
-  $('services-grid').innerHTML = [...serviceCards, ...portCards].join('');
+  $('services-count').textContent = `${services.length} 项`;
+  $('ports-count').textContent = `${portCards.length} 项`;
+  $('services-list').innerHTML = serviceCards.join('') || '<div class="empty-state"><span class="empty-icon">⚙️</span><div class="empty-desc">暂无服务状态</div></div>';
+  $('ports-list').innerHTML = portCards.join('') || '<div class="empty-state"><span class="empty-icon">◌</span><div class="empty-desc">暂无端口状态</div></div>';
 }
 
 async function restartSvc(svc) {
@@ -3882,6 +3996,7 @@ const LOG_LABELS = {
   'proxybox-admin':          'admin',
   'proxybox-traffic-worker': 'traffic',
   'proxybox-watchdog':       'watchdog',
+  'proxybox-docker-guard':   'docker guard',
   'fail2ban':                'fail2ban',
   'caddy':                   'caddy',
   'proxybox-bot':            'TG bot',

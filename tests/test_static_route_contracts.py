@@ -56,7 +56,7 @@ def test_service_restart_button_uses_css_pseudo_icon() -> None:
     assert 'content: ""' in STATIC_HTML
     assert 'background-image: url("data:image/svg+xml' in STATIC_HTML
     assert "stroke='%23ea580c'" in STATIC_HTML
-    assert "min-height: 182px" in STATIC_HTML
+    assert "height: 120px" in STATIC_HTML
     assert "background-size: 14px 14px" in STATIC_HTML
     assert "width: 14px" in STATIC_HTML
     assert "height: 36px" in STATIC_HTML
@@ -76,6 +76,16 @@ def test_service_status_dots_do_not_clobber_restart_buttons() -> None:
 
 def test_services_view_renders_project_port_cards() -> None:
     assert "lastStatus?.ports" in STATIC_HTML
+    assert 'id="services-list"' in STATIC_HTML
+    assert 'id="ports-list"' in STATIC_HTML
+    assert ".services-layout" in STATIC_HTML
+    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in STATIC_HTML
+    assert ".services-layout::before" in STATIC_HTML
+    assert "grid-auto-rows: 120px" in STATIC_HTML
+    assert "grid-template-columns: 1fr" in STATIC_HTML
+    assert "Docker Guard" in STATIC_HTML
+    assert "proxybox-docker-guard" in STATIC_HTML
+    assert "case 'services':    await loadStatus(); renderServices(); break;" in STATIC_HTML
     assert "port-card" in STATIC_HTML
     assert "监听中" in STATIC_HTML
     assert "未监听" in STATIC_HTML

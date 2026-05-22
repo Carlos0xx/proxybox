@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
+HOST_GUARD_DIR="$ROOT_DIR/.proxybox-guard"
 SUDO=()
 DOCKER=(docker)
 DOCKER_NEEDS_SUDO=0
@@ -296,6 +297,15 @@ print_selected_ports() {
     info "selected ports: admin=${admin_port:-8080}/tcp, vless=${vless_template:-11000}+${vless_start:-11001}-${vless_end:-11050}/tcp, hy2=${hy2_template:-21000}+${hy2_start:-21001}-${hy2_end:-21050}/udp"
 }
 
+prepare_guard_status_dir() {
+    mkdir -p "$HOST_GUARD_DIR"
+    {
+        printf 'state=activating\n'
+        printf 'last_run=%s\n' "$(date +%s)"
+        printf 'message=waiting for docker guard timer\n'
+    } > "$HOST_GUARD_DIR/status"
+}
+
 install_docker_guard() {
     if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
         info "systemd not detected; Docker guard timer skipped"
@@ -466,6 +476,7 @@ main() {
     fi
 
     info "starting isolated Docker stack"
+    prepare_guard_status_dir
     "${COMPOSE[@]}" up -d --build
     bootstrap_first_device
     install_docker_guard

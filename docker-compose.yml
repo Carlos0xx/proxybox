@@ -85,6 +85,7 @@ services:
       - PROXYBOX_SINGBOX_RELOAD_FILE=/etc/sing-box/reload.flag
       - PROXYBOX_TRAFFIC_HEARTBEAT=/var/lib/proxybox/traffic-worker.heartbeat
       - PROXYBOX_WATCHDOG_HEARTBEAT=/var/lib/proxybox/watchdog.heartbeat
+      - PROXYBOX_DOCKER_GUARD_STATUS=/var/lib/proxybox-host-guard/status
       - PROXYBOX_WORKER_RESTART_FILE=/var/lib/proxybox/traffic-worker.restart
       - PROXYBOX_DOCKER_LOG_DIR=/var/lib/proxybox/logs
     volumes:
@@ -92,6 +93,7 @@ services:
       - proxybox-data:/var/lib/proxybox
       - proxybox-sub:/var/www/proxybox-sub
       - singbox-config:/etc/sing-box
+      - ./.proxybox-guard:/var/lib/proxybox-host-guard:ro
     ports:
       - "${PROXYBOX_ADMIN_BIND:-0.0.0.0}:${PROXYBOX_ADMIN_PORT:-8080}:8080/tcp"
     networks:

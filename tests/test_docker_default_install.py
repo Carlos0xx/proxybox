@@ -35,6 +35,11 @@ def test_compose_uses_bridge_network_and_env_published_ports() -> None:
     assert "PROXYBOX_DOCKER_LOG_DIR" in COMPOSE
     assert "/var/lib/proxybox/logs" in COMPOSE
     assert "PROXYBOX_WATCHDOG_HEARTBEAT=/var/lib/proxybox/watchdog.heartbeat" in COMPOSE
+    guard_status_env = "/".join(
+        ["PROXYBOX_DOCKER_GUARD_STATUS=", "var", "lib", "proxybox-host-guard", "status"]
+    )
+    assert guard_status_env in COMPOSE
+    assert "./.proxybox-guard:/var/lib/proxybox-host-guard:ro" in COMPOSE
     assert "/etc/proxybox/bot.env" not in COMPOSE
 
 
@@ -73,6 +78,9 @@ def test_docker_install_adds_project_scoped_host_guard() -> None:
     assert "install_docker_guard" in DOCKER_INSTALL
     assert "proxybox-docker-guard-${project_name}.service" in DOCKER_INSTALL
     assert "proxybox-docker-guard-${project_name}.timer" in DOCKER_INSTALL
+    assert "prepare_guard_status_dir" in DOCKER_INSTALL
+    assert 'HOST_GUARD_DIR="$ROOT_DIR/.proxybox-guard"' in DOCKER_INSTALL
+    assert "waiting for docker guard timer" in DOCKER_INSTALL
     assert "After=network-online.target docker.service" in DOCKER_INSTALL
     assert "OnBootSec=45s" in DOCKER_INSTALL
     assert "OnUnitActiveSec=60s" in DOCKER_INSTALL
@@ -85,6 +93,9 @@ def test_docker_guard_only_starts_this_compose_project() -> None:
     assert 'ENV_FILE="$ROOT_DIR/.env"' in DOCKER_GUARD
     assert 'COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"' in DOCKER_GUARD
     assert "systemctl start docker" in DOCKER_GUARD
+    assert 'STATUS_FILE="$GUARD_DIR/status"' in DOCKER_GUARD
+    assert "write_status checking" in DOCKER_GUARD
+    assert "write_status active" in DOCKER_GUARD
     assert '--env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d' in DOCKER_GUARD
     assert "docker compose down" not in DOCKER_GUARD
     assert "docker volume rm" not in DOCKER_GUARD
@@ -138,6 +149,7 @@ def test_bootstrap_uses_docker_env_ports(monkeypatch, tmp_path: Path) -> None:
     assert proxybox_cfg["ports"]["hy2_range"] == [22101, 22150]
     assert proxybox_cfg["clash"]["api_url"] == "http://sing-box:19090"
     assert "proxybox-watchdog" in proxybox_cfg["services"]["monitored"]
+    assert "proxybox-docker-guard" in proxybox_cfg["services"]["monitored"]
 
 
 def test_singbox_reload_uses_docker_flag_before_systemctl(monkeypatch, tmp_path: Path) -> None:
@@ -255,15 +267,33 @@ def test_watchdog_restarts_native_monitored_owner(monkeypatch) -> None:
 def test_docker_status_uses_internal_runtime_probes(monkeypatch, tmp_path: Path) -> None:
     heartbeat = tmp_path / "traffic-worker.heartbeat"
     watchdog_heartbeat = tmp_path / "watchdog.heartbeat"
+    docker_guard_status = tmp_path / "docker-guard.status"
     heartbeat.write_text("ok")
     watchdog_heartbeat.write_text("ok")
+    docker_guard_status.write_text("state=active\nlast_run=1\nmessage=ok\n")
     monkeypatch.setenv("PROXYBOX_RUNTIME", "docker")
     monkeypatch.setenv("PROXYBOX_TRAFFIC_HEARTBEAT", str(heartbeat))
     monkeypatch.setenv("PROXYBOX_WATCHDOG_HEARTBEAT", str(watchdog_heartbeat))
+    monkeypatch.setenv("PROXYBOX_DOCKER_GUARD_STATUS", str(docker_guard_status))
 
     assert system_stats.systemctl_is_active("proxybox-admin") == "active"
     assert system_stats.systemctl_is_active("proxybox-traffic-worker") == "active"
     assert system_stats.systemctl_is_active("proxybox-watchdog") == "active"
+    assert system_stats.systemctl_is_active("proxybox-docker-guard") == "active"
+
+
+def test_docker_guard_status_fails_when_stale(monkeypatch, tmp_path: Path) -> None:
+    docker_guard_status = tmp_path / "docker-guard.status"
+    docker_guard_status.write_text("state=active\nlast_run=1\nmessage=ok\n")
+    monkeypatch.setenv("PROXYBOX_RUNTIME", "docker")
+    monkeypatch.setenv("PROXYBOX_DOCKER_GUARD_STATUS", str(docker_guard_status))
+    monkeypatch.setattr(
+        system_stats.time,
+        "time",
+        lambda: docker_guard_status.stat().st_mtime + 181,
+    )
+
+    assert system_stats.systemctl_is_active("proxybox-docker-guard") == "failed"
 
 
 def test_project_port_statuses_include_native_service_ports(monkeypatch, tmp_path: Path) -> None:

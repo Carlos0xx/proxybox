@@ -69,6 +69,10 @@ PROXYBOX_FRESH=0
 | `proxybox-traffic-worker` | 轮询 Clash API 记账。 | 不发布端口。 |
 | `proxybox-bot` | 可选 Telegram bot。 | 只读项目目录 `bot.env`,不读宿主 `/etc/proxybox/bot.env`。 |
 
+服务页会显示容器内 `看门狗` 和宿主机 `Docker Guard` 两项。`看门狗`
+负责容器内服务/端口自恢复；`Docker Guard` 是宿主机 timer 的状态回传,
+通过本安装目录 `.proxybox-guard/status` 只读挂载进 admin 容器。
+
 Docker 模式下,后台不会调用宿主 `systemctl` 来控制服务:
 
 | 操作 | Docker 行为 |
