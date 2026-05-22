@@ -1,0 +1,86 @@
+# ProxyBox configuration
+#
+# Copy this to /etc/proxybox/config.yaml (or set PROXYBOX_CONFIG env var to a
+# custom path) and edit before first run. install.sh handles this on deploy.
+#
+# Secrets (admin token, bot token, ...) should be read from env vars via the
+# ${ENV_VAR} placeholder syntax — keep them out of this file in production.
+
+admin:
+  # Token in URL path: /admin/{token}/api/...
+  # In production, set ADMIN_TOKEN env var; for dev you may hardcode a value.
+  token: "${ADMIN_TOKEN}"
+  # Browser login username (default "admin"). The PASSWORD does NOT live in
+  # this file — it goes in /etc/proxybox/admin.password (mode 0400, root-
+  # owned). Keeps cat config.yaml screenshot-safe / backup-safe. See
+  # paths.admin_password_file below to override the location.
+  username: "admin"
+  # /login/{login_path} is the actual form URL; /login itself returns 404
+  # so common-path brute-force scans never see a form. install.sh / Docker
+  # bootstrap generate a 12-char random value automatically.
+  login_path: ""
+  host: "0.0.0.0"
+  port: 8080
+
+server:
+  # Public host (IP or domain) clients use to reach this VPS.
+  # Embedded into subscription URIs so phones can connect.
+  # install.sh auto-detects via ifconfig.me; manual edit also fine.
+  public_host: ""
+
+paths:
+  traffic_db: /var/lib/proxybox/traffic.db
+  static_dir: /opt/proxybox/static
+  sub_dir: /var/www/proxybox-sub
+  singbox_config: /etc/sing-box/config.json
+  session_secret: /etc/proxybox/session-secret
+  admin_password_file: /etc/proxybox/admin.password
+
+services:
+  # systemd unit names probed by GET /api/status.
+  # Comment out units you don't run; add custom ones as needed.
+  monitored:
+    - sing-box
+    - caddy
+    - proxybox-admin
+    - proxybox-traffic-worker
+    - fail2ban
+
+ports:
+  # Per-device port allocation ranges (inclusive). install.sh / your firewall
+  # layer should open these. Each new device claims one vless port + one hy2
+  # port from these ranges.
+  vless_range: [11001, 11050]
+  hy2_range:   [21001, 21050]
+
+clash:
+  # sing-box must have experimental.clash_api.external_controller set for
+  # the traffic worker to fetch /connections. The api_url here must match.
+  api_url: "http://127.0.0.1:9090"
+  api_secret: ""
+
+worker:
+  # Traffic worker poll interval (seconds) and retention (days).
+  # Lower poll = more accurate but more DB writes. 10s is a sane default.
+  poll_interval: 10
+  retention_days: 7
+
+passkey:
+  # WebAuthn relying-party identity. Required when features.passkey = true.
+  # rp_id    must match the public-facing host (no scheme, no port).
+  # origin   is the full https:// URL the SPA is served from.
+  # Browsers require HTTPS — set up Caddy + Let's Encrypt first.
+  rp_id: ""
+  rp_name: "ProxyBox"
+  origin: ""
+
+features:
+  # WebAuthn passkey auth as an alternative to URL-path token. When true,
+  # a valid session cookie (issued post-login) is accepted in place of the
+  # token in /admin/{token}/.../ URLs. Requires HTTPS in production.
+  passkey: false
+
+  # Telegram bot module (proxybox-bot.service). Set bot token via TG_BOT_TOKEN
+  # env var when enabled. When true, token-only admin API access is accepted
+  # only from loopback so the bot can call http://127.0.0.1:8080.
+  bot: false

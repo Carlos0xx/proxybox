@@ -1,0 +1,66 @@
+# ─── Local agent / session state (Claude Code, IDE) ────────
+.claude/
+
+# ─── Secrets / config ───────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+secrets/
+config.yaml
+!config.example.yaml
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ─── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Node (前端构建产物 / 包管理) ──────────────────────────
+node_modules/
+.next/
+dist/
+build/
+
+# ─── OS / IDE ───────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ─── 测试 / 本地 dev VM ────────────────────────────────────
+.multipass/
+.vagrant/
+*.iso
+
+# ─── 个人 PII 黑名单 (绝不能进仓库) ─────────────────────────
+.proxybox-pii-blocklist.txt
+pii-blocklist.txt
+
+# ─── 内部决策 / onboarding 文档 (含开发者私有上下文, 不公开) ─
+# 公开仓库应该用 CONTRIBUTING.md (脱敏版本) 代替
+CONSTRAINTS.md
+SESSION_HANDOFF.md
+NOTES.md
+TODO.md
+dashboard.html
+
+# ─── Backups / 临时文件 ─────────────────────────────────────
+*.bak
+*.bak.*
+*.orig
+*.tmp
+*~

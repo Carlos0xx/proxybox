@@ -1,0 +1,49 @@
+version: 2
+
+# Dependabot keeps our pinned dependencies current without us having to
+# manually look up new SHAs. Three ecosystems track:
+#
+#   1. github-actions  — workflow files in .github/workflows. Because every
+#      action is pinned to a commit SHA (per supply-chain hygiene), Dependabot
+#      opens PRs that bump the SHA AND update the trailing `# vX.Y.Z` comment.
+#
+#   2. pip             — runtime + dev Python deps in pyproject.toml.
+#
+#   3. docker          — base image in Dockerfile (`FROM ...`).
+#
+# All three open PRs against `main`; the test/lint/build workflows gate
+# the merge.
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "ci"
+    commit-message:
+      prefix: "ci(deps)"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "python"
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "deps"
+      - "docker"
+    commit-message:
+      prefix: "build(deps)"
