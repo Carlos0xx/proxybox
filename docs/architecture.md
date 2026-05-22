@@ -184,7 +184,7 @@ CREATE TABLE passkey_credential (      -- opt-in
 
 | Path | Notes |
 | --- | --- |
-| `GET /login/{login_path}` | Login form. `?lang=en` / `?lang=zh` to switch language. |
+| `GET /login/{login_path}` | Login form. The admin SPA is Chinese-only. |
 | `POST /login/{login_path}` | Submit username + password — sets the session cookie. |
 | `POST /logout` | Clears the cookie. |
 | `GET /admin/{token}/` | SPA shell. Requires cookie. |
@@ -194,14 +194,14 @@ CREATE TABLE passkey_credential (      -- opt-in
 
 | Group | Examples |
 | --- | --- |
-| **Status** | `GET /admin/{token}/api/status` · `GET /api/connections` (Clash API proxy) |
-| **Devices** | `GET /api/devices/list` · `POST /api/devices/new` · `POST /api/devices/{name}/pause` · `POST /api/devices/{name}/resume` · `POST /api/devices/{name}/delete` |
-| **Subscription** | `GET /api/devices/{name}/sub` · `POST /api/devices/{name}/sub/regen` |
-| **History** | `GET /api/history/devices?days=N` · `GET /api/history/{device}/hourly` · `GET /api/history/{device}/apps` · `GET /api/history/{device}/hosts` |
-| **HTTPS** | `GET /api/https/status` · `POST /api/https/enable` · `POST /api/https/disable` |
-| **Account** | `GET /api/admin/account` · `POST /api/admin/account` (change username/password) · `POST /api/admin/login-path` (rotate suffix) |
-| **Logs** | `GET /api/logs/{svc}` — allowlist: `sing-box`, `proxybox-admin`, `proxybox-traffic-worker`, `proxybox-bot`, `caddy`, `fail2ban` |
-| **Bans** | `GET /api/bans` · `POST /api/bans` · `POST /api/bans/{id}/release` |
+| **Status** | `GET /admin/{token}/api/status` · `GET /admin/{token}/api/connections` |
+| **Devices** | `GET /admin/{token}/api/devices/list` · `POST /admin/{token}/api/devices/new` · `POST /admin/{token}/api/devices/{name}/pause` · `POST /admin/{token}/api/devices/{name}/resume` · `POST /admin/{token}/api/devices/{name}/delete` |
+| **Subscription** | `GET /admin/{token}/api/devices/{name}/sub` · `POST /admin/{token}/api/devices/{name}/sub/regen` |
+| **History** | `GET /admin/{token}/api/history/devices?days=N` · `GET /admin/{token}/api/history/{device}/hourly` · `GET /admin/{token}/api/history/{device}/apps` · `GET /admin/{token}/api/history/{device}/hosts` |
+| **HTTPS** | `GET /admin/{token}/api/https/status` · `POST /admin/{token}/api/https/enable` |
+| **Account** | `GET /admin/{token}/api/admin/account` · `POST /admin/{token}/api/admin/account` (change username/password) · `POST /admin/{token}/api/admin/login-path` (rotate suffix) |
+| **Logs** | `GET /admin/{token}/api/logs/{svc}` — allowlist follows `services.monitored`. |
+| **Bans** | `GET /admin/{token}/api/bans` · `POST /admin/{token}/api/bans` · `POST /admin/{token}/api/bans/{id}/release` |
 | **Rotate** | `POST /admin/{token}/action/rotate` (Reality keypair) |
 
 > Full per-endpoint reference: [`api/endpoints.md`](./api/endpoints.md).
@@ -220,9 +220,9 @@ CREATE TABLE passkey_credential (      -- opt-in
 | **Admin auth** | Cookie + URL-path token *both* required; bypass mode opt-in | A stolen cookie can't be replayed against an instance on a different host. |
 | **Reality cover-domain** | Random pick from a small pool of well-known TLS-fronted sites per install | No shared fingerprint across deployments. |
 | **Host categorisation** | Suffix → app_group lookup (~120 entries, no DNS calls) | Privacy: no per-request DNS lookup; performance: O(1) per host. |
-| **HTTPS provisioning** | Caddy + Let's Encrypt, triggered from the SPA | One click instead of an SSH session for a non-technical user. |
-| **`install.sh` fresh/reuse modes** | `--fresh` clears ProxyBox-managed state; default reuse keeps devices and history | Template installs avoid old traces, while upgrades stay non-destructive. |
-| **i18n** | Phrase → phrase dict + MutationObserver | No source-code annotation of every Chinese string; topbar toggle reloads via cookie + `localStorage`. |
+| **HTTPS provisioning** | Caddy + Let's Encrypt, triggered from the SPA | Docker uses an install-scoped host helper; native provisions directly and refuses to overwrite user Caddy configs. |
+| **`install.sh` fresh/reuse/purge modes** | `--fresh` refuses old native state; default reuse keeps current-install state; destructive cleanup requires `--purge-existing-proxybox` confirmation | New installs stay non-destructive by default. |
+| **i18n** | Chinese-only production SPA, English docs in repo | Avoids the previous language-toggle runtime complexity. |
 
 ---
 

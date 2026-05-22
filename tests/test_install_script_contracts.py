@@ -105,11 +105,14 @@ def test_installer_uses_managed_fail2ban_jail_dropin() -> None:
 def test_installer_has_explicit_fresh_mode_without_touching_ssh_trust() -> None:
     assert "--fresh" in INSTALL_SH
     assert "PROXYBOX_FRESH" in INSTALL_SH
-    assert 'rm -rf "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR" "$SUB_DIR"' in INSTALL_SH
+    assert "--purge-existing-proxybox" in INSTALL_SH
+    assert "PROXYBOX_CONFIRM_PURGE" in INSTALL_SH
+    assert "DELETE PROXYBOX" in INSTALL_SH
+    assert "M_EXISTING_REFUSE" in INSTALL_SH
     assert (
-        'rm -f "$SINGBOX_DIR/config.json" "$SINGBOX_DIR/key.pem" "$SINGBOX_DIR/cert.pem"'
-        in INSTALL_SH
+        "Fresh mode: --fresh or PROXYBOX_FRESH=1 generates a new native install only" in INSTALL_SH
     )
+    assert "Destructive cleanup requires --purge-existing-proxybox plus confirmation" in INSTALL_SH
     assert "/etc/systemd/system/proxybox-admin.service" in INSTALL_SH
     assert "/etc/systemd/system/proxybox-traffic-worker.service" in INSTALL_SH
     assert "/etc/fail2ban/jail.d/proxybox-manual.conf" in INSTALL_SH

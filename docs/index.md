@@ -31,7 +31,7 @@ features:
 
   - icon: 🔒
     title: HTTPS options
-    details: Docker installs stay isolated and expect an external reverse proxy or tunnel. Native installs can still enable Caddy + Let's Encrypt from the panel.
+    details: Docker installs can enable host Caddy + Let's Encrypt from the panel through an install-scoped helper. Native installs provision Caddy directly and refuse to overwrite user Caddy configs.
 
   - icon: 📲
     title: Subscription formats
@@ -43,7 +43,7 @@ features:
 
   - icon: 🤖
     title: Telegram bot (optional)
-    details: /status · /devices · /traffic · /pause · /resume · /bans from your phone. Opt-in, runs as its own systemd service.
+    details: /status · /devices · /traffic · /pause · /resume · /bans from your phone. Opt-in; native uses systemd, Docker uses a sidecar profile.
 
   - icon: 🚀
     title: Multiple deploy paths

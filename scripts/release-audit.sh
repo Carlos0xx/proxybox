@@ -13,6 +13,7 @@
 #   5. commit-message body grep against blocklist
 #   6. version sanity        (pyproject.toml, app/main.py)
 #   7. CHANGELOG entry for the candidate tag
+#   8. shellcheck for deployment scripts (when shellcheck is installed)
 
 set -uo pipefail
 
@@ -28,7 +29,7 @@ fail() { red "  ✗ $*"; FINDINGS=$((FINDINGS+1)); }
 pass() { green "  ✓ $*"; }
 
 # ───────────────── 1. clean tree ─────────────────
-echo "[1/7] clean working tree"
+echo "[1/8] clean working tree"
 if [ -n "$(git status --porcelain)" ]; then
     fail "uncommitted changes present; commit or stash before release"
     git status --short | sed 's/^/      /'
@@ -38,7 +39,7 @@ fi
 
 # ───────────────── 2. pii-check on all tracked files ─────────────────
 echo ""
-echo "[2/7] pii-check.sh --all (tracked files vs blocklist)"
+echo "[2/8] pii-check.sh --all (tracked files vs blocklist)"
 if ./scripts/pii-check.sh --all 2>&1 | tail -3; then
     pass "no PII hits across tracked files"
 else
@@ -47,7 +48,7 @@ fi
 
 # ───────────────── 3. gitleaks (full history) ─────────────────
 echo ""
-echo "[3/7] gitleaks detect (full git history)"
+echo "[3/8] gitleaks detect (full git history)"
 if command -v gitleaks >/dev/null 2>&1; then
     if gitleaks detect --no-banner --redact 2>&1 | tail -10; then
         pass "gitleaks clean"
@@ -60,7 +61,7 @@ fi
 
 # ───────────────── 4. git author / committer scan ─────────────────
 echo ""
-echo "[4/7] git authors + committers vs PII blocklist"
+echo "[4/8] git authors + committers vs PII blocklist"
 BLOCKLIST="${PROXYBOX_PII_BLOCKLIST:-$HOME/.proxybox-pii-blocklist.txt}"
 if [ ! -f "$BLOCKLIST" ]; then
     fail "blocklist not found at $BLOCKLIST"
@@ -96,7 +97,7 @@ fi
 # role intact while reflecting that git messages are a different surface
 # than files-on-disk.
 echo ""
-echo "[5/7] commit message bodies vs PII blocklist"
+echo "[5/8] commit message bodies vs PII blocklist"
 HISTORY_IGNORE="$(dirname "$0")/release-audit-history-ignore"
 if [ -f "$BLOCKLIST" ]; then
     MSGS=$(git log --all --format='%B')
@@ -125,7 +126,7 @@ fi
 # pyproject is set, AND that app/main.py uses VERSION (sourced via
 # _pkg_version) for the FastAPI app version field.
 echo ""
-echo "[6/7] version sanity (pyproject.toml = canonical)"
+echo "[6/8] version sanity (pyproject.toml = canonical)"
 PYP_VER=$(grep -oE '^version = "[^"]+"' pyproject.toml | cut -d'"' -f2)
 echo "      pyproject.toml: $PYP_VER"
 if grep -qE 'version=VERSION' app/main.py && grep -qE '_pkg_version\("proxybox"\)' app/main.py; then
@@ -151,13 +152,26 @@ fi
 
 # ───────────────── 7. CHANGELOG ─────────────────
 echo ""
-echo "[7/7] CHANGELOG.md entry"
+echo "[7/8] CHANGELOG.md entry"
 if [ ! -f CHANGELOG.md ]; then
     fail "CHANGELOG.md not found"
 elif [ -n "$CANDIDATE_TAG" ] && ! grep -qF "$CANDIDATE_TAG" CHANGELOG.md; then
     fail "CHANGELOG.md has no entry for $CANDIDATE_TAG"
 else
     pass "CHANGELOG.md present (manual review still recommended)"
+fi
+
+# ───────────────── 8. shell scripts ─────────────────
+echo ""
+echo "[8/8] shellcheck deploy/scripts"
+if command -v shellcheck >/dev/null 2>&1; then
+    if find deploy scripts -name '*.sh' -print0 | xargs -0 shellcheck -S warning; then
+        pass "shellcheck clean for deploy/scripts"
+    else
+        fail "shellcheck reported deployment script issues"
+    fi
+else
+    warn "  ! shellcheck not installed; CI lint workflow still enforces it"
 fi
 
 echo ""

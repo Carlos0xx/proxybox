@@ -11,8 +11,8 @@
 #   1  one or more blocking failures
 #   2  bad invocation
 #
-# This script is invoked by install.sh before any destructive operation, and
-# by the Claude Code deploy skill after the repo has been cloned/updated.
+# This script is invoked by install.sh before host-level provisioning, and
+# by the deploy skill after the repo has been cloned into a new directory.
 # Designed to give the operator a complete go/no-go view in <5 seconds.
 
 set -uo pipefail
@@ -69,8 +69,8 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_NET="[6/9] 出站网络"
     M_NET_GH_OK="github.com 可达 (sing-box 二进制下载会成功)"
     M_NET_GH_FAIL="github.com 不可达 — 无法下载 sing-box"
-    M_NET_IP_OK="ifconfig.me 可达 (公网 IP 自动检测会工作)"
-    M_NET_IP_WARN="ifconfig.me 不可达 — install.sh 会留空 server.public_host"
+    M_NET_IP_OK="IPv4 公网 IP 服务可达 (公网 IP 自动检测会工作)"
+    M_NET_IP_WARN="IPv4 公网 IP 服务不可达 — install.sh 会留空 server.public_host"
     M_NET_CURL_WARN="curl 未安装 — 下方 apt 步骤会装上"
     M_SYSD="[7/9] 服务管理器"
     M_SYSD_OK="systemd 存在 (systemctl 找到)"
@@ -122,8 +122,8 @@ else
     M_NET="[6/9] Outbound network"
     M_NET_GH_OK="github.com reachable (sing-box binary download will work)"
     M_NET_GH_FAIL="github.com unreachable — cannot download sing-box"
-    M_NET_IP_OK="ifconfig.me reachable (public IP auto-detection will work)"
-    M_NET_IP_WARN="ifconfig.me unreachable — install.sh will leave server.public_host blank"
+    M_NET_IP_OK="IPv4 public-IP service reachable (public IP auto-detection will work)"
+    M_NET_IP_WARN="IPv4 public-IP service unreachable — install.sh will leave server.public_host blank"
     M_NET_CURL_WARN="curl not installed — will install in apt step below"
     M_SYSD="[7/9] Service manager"
     M_SYSD_OK="systemd present (systemctl found)"
@@ -256,7 +256,8 @@ if command -v curl >/dev/null 2>&1; then
     else
         fail "$M_NET_GH_FAIL"
     fi
-    if curl -fsSL --max-time 5 -o /dev/null https://ifconfig.me; then
+    if curl -4 -fsSL --max-time 5 -o /dev/null https://api4.ipify.org \
+        || curl -4 -fsSL --max-time 5 -o /dev/null https://ipv4.icanhazip.com; then
         pass "$M_NET_IP_OK"
     else
         warn "$M_NET_IP_WARN"

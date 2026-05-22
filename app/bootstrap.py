@@ -101,7 +101,7 @@ def _hy2_self_signed_cert(out_dir: Path, cn: str) -> None:
 
 
 def _detect_public_host() -> str:
-    for url in ("https://ifconfig.me", "https://api.ipify.org"):
+    for url in ("https://api4.ipify.org", "https://ipv4.icanhazip.com"):
         try:
             with urllib.request.urlopen(url, timeout=5) as r:
                 return r.read().decode().strip()

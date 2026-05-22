@@ -24,7 +24,7 @@ Cookie-issuing endpoints — not under `/admin/{token}/`.
 
 | Method · Path | Notes |
 | --- | --- |
-| `GET /login/{login_path}` | Login form HTML. `?lang=en` / `?lang=zh` to switch language. The bare `/login` returns **404** when `admin.login_path` is set. |
+| `GET /login/{login_path}` | Chinese login form HTML. The bare `/login` returns **404** when `admin.login_path` is set. |
 | `POST /login/{login_path}` | Form-urlencoded `username` + `password`. Sets `session` cookie (30 days) and redirects to `/admin/{token}/`. |
 | `POST /logout` · `GET /logout` | Clears the cookie. |
 
@@ -79,11 +79,11 @@ Base: `/admin/{token}/api/https`.
 
 | Method · Path | Notes |
 | --- | --- |
-| `GET /status` | Returns `{enabled, domain, caddy_active, public_host}`. |
-| `POST /enable` | Body: `{domain}`. Validates DNS, apt-installs Caddy, writes Caddyfile, rewrites `server.public_host` + `passkey.rp_id` + `passkey.origin` in `config.yaml`, reloads. |
+| `GET /status` | Returns `{caddy_installed, caddy_active, configured_domain, public_host, using_https, notes, docker_runtime}`. In Docker mode, Caddy state is the last known host-helper result because Caddy runs on the host. |
+| `POST /enable` | Body: `{domain}`. Validates DNS, apt-installs Caddy, best-effort opens `80/tcp` and `443/tcp` in ufw/firewalld, writes a ProxyBox-managed Caddyfile without overwriting user configs, rewrites `server.public_host` + `passkey.rp_id` + `passkey.origin` in `config.yaml`, reloads. Docker mode delegates the host work to the install-scoped helper. |
 
 > [!NOTE]
-> `POST /enable` returns a structured error code on failure: `dns_mismatch`, `caddy_install_failed`, `cert_issue_failed`, `port_in_use`. The SPA surfaces these as localised messages.
+> `POST /enable` returns a structured error code on failure: `invalid_domain`, `dns_no_answer`, `dns_mismatch`, `caddyfile_conflict`, `cmd_failed`, `docker_helper_unavailable`, `docker_helper_timeout`, `docker_helper_failed`. The SPA surfaces these as Chinese messages.
 
 ---
 

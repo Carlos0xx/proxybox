@@ -1,6 +1,6 @@
 # Subscription URLs
 
-> The public path each client device hits to fetch its proxy config. Five formats; the `sub_token` itself is the secret.
+> The public path each client device hits to fetch its proxy config. One default URI list plus three YAML variants; the `sub_token` itself is the secret.
 
 For the admin-only endpoints that create devices and rotate tokens, see [`endpoints.md · Devices`](./endpoints.md#devices).
 
@@ -16,7 +16,7 @@ http://<server.public_host>:8080/api/sub/<sub_token>
 
 …or `https://<domain>/api/sub/<sub_token>` once Caddy is provisioned.
 
-Five suffixes are accepted — pick the one that matches the client:
+These suffixes are accepted — pick the one that matches the client:
 
 | Suffix | MIME | Best for |
 | --- | --- | --- |
@@ -36,10 +36,10 @@ Five suffixes are accepted — pick the one that matches the client:
 
 ```text
 vless://{uuid}@{host}:{vless_port}?security=reality&sni={sni}&fp=chrome&pbk={pubkey}&sid={short_id}&type=tcp&flow=xtls-rprx-vision#ProxyBox-{name}-vless
-hysteria2://{password}@{host}:{hy2_port}?sni={sni}&obfs=salamander&obfs-password={obfs_pw}&insecure=1#ProxyBox-{name}-hy2
+hysteria2://{password}@{host}:{hy2_port}?sni={sni}&insecure=1#ProxyBox-{name}-hy2
 ```
 
-The Clash, Merlin, and Shadowrocket variants encode the same two endpoints in each client's native syntax — with a `select` group so the user can toggle between VLESS (TCP) and Hy2 (UDP) from inside the client.
+The Clash, Merlin, and Shadowrocket variants encode the same two endpoints in each client's native syntax. Hy2 YAML variants include explicit `auth`, `password`, `alpn: [h3]`, and `skip-cert-verify: true` for Stash/Shadowrocket compatibility.
 
 ---
 
@@ -48,7 +48,7 @@ The Clash, Merlin, and Shadowrocket variants encode the same two endpoints in ea
 | Client | Path to import |
 | --- | --- |
 | sing-box (iOS / Android / macOS / Windows) | `+ → Subscribe` → paste default URL |
-| Shadowrocket (iOS) | `+ → Type: Subscribe` → paste default URL |
+| Shadowrocket (iOS) | Add subscription → paste `.../shadowrocket.yaml` |
 | Hiddify Next | `+ → Add profile from URL` → paste default URL |
 | NekoBox (Android) | `+ → Subscription` → paste default URL |
 | v2rayN (Windows) | `Subscriptions → Add` → paste default URL |
@@ -56,7 +56,7 @@ The Clash, Merlin, and Shadowrocket variants encode the same two endpoints in ea
 | AsusWRT-Merlin (Clash) | Subscription URL → paste `.../merlin.yaml` |
 
 > [!IMPORTANT]
-> Shadowrocket *prefers* the "Subscribe" flow over raw `vless://` paste (confirmed in our testing). If a single URI paste shows the server but won't connect, switch to subscription mode.
+> Shadowrocket should use `shadowrocket.yaml` when you want nodes + split rules. The default URI list remains for clients that only understand raw node subscriptions.
 
 ---
 

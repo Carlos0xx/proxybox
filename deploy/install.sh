@@ -6,12 +6,13 @@
 #   git clone https://github.com/carlos0xx/proxybox "$INSTALL_DIR"
 #   cd "$INSTALL_DIR" && bash deploy/install.sh                      # choose install mode
 #   cd "$INSTALL_DIR" && bash deploy/install.sh --docker             # Docker install
-#   cd "$INSTALL_DIR" && bash deploy/install.sh --native --fresh     # native install
-#   cd "$INSTALL_DIR" && bash deploy/install.sh --fresh --lang zh    # native back-compat
+#   cd "$INSTALL_DIR" && bash deploy/install.sh --native --fresh     # native install; refuses old state
 #
 # Idempotent: re-running it on an existing install does nothing destructive,
 # only fills in missing pieces. Safe to run repeatedly.
-# Fresh mode: --fresh or PROXYBOX_FRESH=1 removes ProxyBox-managed state first.
+# Fresh mode: --fresh or PROXYBOX_FRESH=1 generates a new native install only
+# when no previous native state is present. It does not delete old state.
+# Destructive cleanup requires --purge-existing-proxybox plus confirmation.
 # Installation red line: never delete or modify user files/services outside
 # this ProxyBox install. On non-dedicated VPS hosts, use Docker install.
 
@@ -46,7 +47,7 @@ dispatch_install_mode() {
     echo "ProxyBox 安装方式选择"
     echo
     echo "  1) Docker 安装（推荐）"
-    echo "     容器隔离，自动避开已占用端口；只写本次安装专属 Docker guard，不写宿主机业务服务。"
+    echo "     容器隔离，自动避开已占用端口；只写本次安装专属 Docker guard 和 HTTPS helper。"
     echo "     如果这台 VPS 已经跑了其他服务、网站、面板或生产系统，强烈推荐选这个。"
     echo
     echo "  2) 宿主机安装（高级）"
@@ -94,12 +95,14 @@ dispatch_install_mode "$@"
 # ─── argv: --lang en|zh + pass-through to check-prereqs.sh ────────
 LANG_CHOICE="${PROXYBOX_LANG:-auto}"
 FRESH_MODE="${PROXYBOX_FRESH:-0}"
+PURGE_MODE="${PROXYBOX_PURGE_EXISTING_PROXYBOX:-0}"
 while [ $# -gt 0 ]; do
     case "$1" in
         --lang)        LANG_CHOICE="${2:-auto}"; shift 2 ;;
         --lang=*)      LANG_CHOICE="${1#*=}"; shift ;;
         --fresh)       FRESH_MODE=1; shift ;;
         --reuse|--no-fresh) FRESH_MODE=0; shift ;;
+        --purge-existing-proxybox) PURGE_MODE=1; shift ;;
         -h|--help)     sed -n '2,13p' "$0"; exit 0 ;;
         *)             echo "unknown arg: $1" >&2; exit 2 ;;
     esac
@@ -120,6 +123,10 @@ case "$FRESH_MODE" in
     1|true|TRUE|yes|YES|on|ON) FRESH_MODE=1 ;;
     *)                         FRESH_MODE=0 ;;
 esac
+case "$PURGE_MODE" in
+    1|true|TRUE|yes|YES|on|ON) PURGE_MODE=1 ;;
+    *)                         PURGE_MODE=0 ;;
+esac
 
 # ─── i18n strings ────────────────────────────────────────────────
 if [ "$LANG_CHOICE" = "zh" ]; then
@@ -133,10 +140,14 @@ if [ "$LANG_CHOICE" = "zh" ]; then
     M_INSTALLER_SRC="    源码:   %s"
     M_INSTALLER_CFG="    配置:   %s"
     M_INSTALLER_MODE="    模式:   %s"
-    M_MODE_FRESH="fresh (清理旧 ProxyBox 状态)"
+    M_MODE_FRESH="fresh (发现旧 native 状态会拒绝, 不自动删除)"
     M_MODE_REUSE="reuse (保留已有状态)"
-    M_FRESH_CLEAN="==> fresh 模式: 清理旧 ProxyBox 配置、数据、订阅、unit 和 HTTPS 配置..."
-    M_FRESH_DONE="    fresh 清理完成, 将重新生成全新身份"
+    M_MODE_PURGE="purge (显式删除旧 ProxyBox native 状态)"
+    M_PURGE_CLEAN="==> 危险清理: 删除旧 ProxyBox 配置、数据、订阅、unit 和 HTTPS 配置..."
+    M_PURGE_DONE="    清理完成, 将重新生成全新身份"
+    M_EXISTING_REFUSE="错误: 检测到已有 ProxyBox/sing-box native 状态, 为保护用户数据已拒绝继续。请改用 Docker 新目录安装, 或在确认要删除旧 ProxyBox 状态后显式运行 --purge-existing-proxybox。"
+    M_PURGE_CONFIRM="这会删除旧 ProxyBox native 状态。请输入 DELETE PROXYBOX 确认: "
+    M_PURGE_NEED_CONFIRM="错误: 非交互环境执行 --purge-existing-proxybox 时, 必须设置 PROXYBOX_CONFIRM_PURGE='DELETE PROXYBOX'"
     M_APT_INSTALLING="==> 安装系统包..."
     M_PY311_INSTALLING="==> 安装并验证 Python 3.11..."
     M_PY311_FAIL="错误: 未能安装可用的 Python 3.11"
@@ -186,10 +197,14 @@ else
     M_INSTALLER_SRC="    source:     %s"
     M_INSTALLER_CFG="    config:     %s"
     M_INSTALLER_MODE="    mode:       %s"
-    M_MODE_FRESH="fresh (wipe old ProxyBox state)"
+    M_MODE_FRESH="fresh (refuse existing native state; no auto-delete)"
     M_MODE_REUSE="reuse (keep existing state)"
-    M_FRESH_CLEAN="==> fresh mode: clearing old ProxyBox config, data, subscriptions, units, and HTTPS config..."
-    M_FRESH_DONE="    fresh cleanup complete; generating a new identity"
+    M_MODE_PURGE="purge (explicitly remove old ProxyBox native state)"
+    M_PURGE_CLEAN="==> dangerous purge: removing old ProxyBox config, data, subscriptions, units, and HTTPS config..."
+    M_PURGE_DONE="    purge complete; generating a new identity"
+    M_EXISTING_REFUSE="ERROR: existing ProxyBox/sing-box native state detected; refusing to continue to protect user data. Use Docker in a new directory, or explicitly run --purge-existing-proxybox only after you decide to delete the old ProxyBox state."
+    M_PURGE_CONFIRM="This deletes old ProxyBox native state. Type DELETE PROXYBOX to confirm: "
+    M_PURGE_NEED_CONFIRM="ERROR: non-interactive --purge-existing-proxybox requires PROXYBOX_CONFIRM_PURGE='DELETE PROXYBOX'"
     M_APT_INSTALLING="==> installing system packages..."
     M_PY311_INSTALLING="==> installing and verifying Python 3.11..."
     M_PY311_FAIL="ERROR: could not install a working Python 3.11"
@@ -277,6 +292,8 @@ if [ "$(id -u)" != "0" ]; then
         )
         [ "${PROXYBOX_INSTALL_MODE+x}" = x ] && sudo_env+=(PROXYBOX_INSTALL_MODE="$PROXYBOX_INSTALL_MODE")
         [ "${PROXYBOX_FRESH+x}" = x ] && sudo_env+=(PROXYBOX_FRESH="$PROXYBOX_FRESH")
+        [ "${PROXYBOX_PURGE_EXISTING_PROXYBOX+x}" = x ] && sudo_env+=(PROXYBOX_PURGE_EXISTING_PROXYBOX="$PROXYBOX_PURGE_EXISTING_PROXYBOX")
+        [ "${PROXYBOX_CONFIRM_PURGE+x}" = x ] && sudo_env+=(PROXYBOX_CONFIRM_PURGE="$PROXYBOX_CONFIRM_PURGE")
         [ "${PROXYBOX_FIRST_DEVICE+x}" = x ] && sudo_env+=(PROXYBOX_FIRST_DEVICE="$PROXYBOX_FIRST_DEVICE")
         [ "${PROXYBOX_LOCAL_USERNAME+x}" = x ] && sudo_env+=(PROXYBOX_LOCAL_USERNAME="$PROXYBOX_LOCAL_USERNAME")
         exec sudo env "${sudo_env[@]}" bash "$0" "${ORIG_ARGS[@]}"
@@ -314,8 +331,73 @@ cleanup_legacy_fail2ban_jail_local() {
     fi
 }
 
-fresh_cleanup() {
-    echo "$M_FRESH_CLEAN"
+path_has_entries() {
+    [ -d "$1" ] || return 1
+    find "$1" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .
+}
+
+native_state_exists() {
+    for path in \
+        "$CONFIG_DIR/config.yaml" \
+        "$CONFIG_DIR/admin.password" \
+        "$DATA_DIR/traffic.db" \
+        "$SINGBOX_DIR/config.json" \
+        "$SINGBOX_DIR/key.pem" \
+        "$SINGBOX_DIR/cert.pem" \
+        /etc/systemd/system/proxybox-admin.service \
+        /etc/systemd/system/proxybox-watchdog.service \
+        /etc/systemd/system/proxybox-traffic-worker.service \
+        /etc/systemd/system/proxybox-bot.service \
+        /etc/systemd/system/sing-box.service \
+        /etc/fail2ban/jail.d/proxybox.local \
+        /etc/fail2ban/jail.d/proxybox-manual.conf; do
+        [ -e "$path" ] && return 0
+    done
+    if [ -f /etc/fail2ban/jail.local ] \
+        && grep -q '^# ProxyBox manual ban jail' /etc/fail2ban/jail.local 2>/dev/null; then
+        return 0
+    fi
+    if [ -f /etc/caddy/Caddyfile ] \
+        && grep -q '^# ProxyBox HTTPS' /etc/caddy/Caddyfile 2>/dev/null; then
+        return 0
+    fi
+    for dir in "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR" "$SUB_DIR"; do
+        path_has_entries "$dir" && return 0
+    done
+    return 1
+}
+
+native_state_belongs_to_current_install() {
+    if [ -f "$CONFIG_DIR/config.yaml" ] \
+        && grep -Fq "static_dir: $PROXYBOX_DIR/static" "$CONFIG_DIR/config.yaml"; then
+        return 0
+    fi
+    if [ -f /etc/systemd/system/proxybox-admin.service ] \
+        && grep -Fq "WorkingDirectory=$PROXYBOX_DIR" /etc/systemd/system/proxybox-admin.service; then
+        return 0
+    fi
+    return 1
+}
+
+confirm_purge_existing_proxybox() {
+    if [ "${PROXYBOX_CONFIRM_PURGE:-}" = "DELETE PROXYBOX" ]; then
+        return 0
+    fi
+    if [ -t 0 ] && [ -t 1 ]; then
+        local answer
+        printf "%s" "$M_PURGE_CONFIRM"
+        read -r answer
+        [ "$answer" = "DELETE PROXYBOX" ] && return 0
+    else
+        echo "$M_PURGE_NEED_CONFIRM" >&2
+        exit 3
+    fi
+    echo "$M_EXISTING_REFUSE" >&2
+    exit 3
+}
+
+purge_existing_proxybox() {
+    echo "$M_PURGE_CLEAN"
 
     if command -v systemctl >/dev/null 2>&1; then
         systemctl stop proxybox-watchdog proxybox-bot proxybox-traffic-worker proxybox-admin sing-box >/dev/null 2>&1 || true
@@ -341,11 +423,17 @@ fresh_cleanup() {
     rm -f /etc/fail2ban/jail.d/proxybox.local /etc/fail2ban/jail.d/proxybox-manual.conf
     cleanup_legacy_fail2ban_jail_local
 
-    echo "$M_FRESH_DONE"
+    echo "$M_PURGE_DONE"
 }
 
-if [ "$FRESH_MODE" = "1" ]; then
-    fresh_cleanup
+if native_state_exists; then
+    if [ "$PURGE_MODE" = "1" ]; then
+        confirm_purge_existing_proxybox
+        purge_existing_proxybox
+    elif [ "$FRESH_MODE" = "1" ] || ! native_state_belongs_to_current_install; then
+        echo "$M_EXISTING_REFUSE" >&2
+        exit 3
+    fi
 fi
 
 # ─── pre-flight: defer to check-prereqs.sh ─────────────────────────
@@ -362,7 +450,9 @@ echo ""
 echo "$M_INSTALLER"
 printf "$M_INSTALLER_SRC\n" "$PROXYBOX_DIR"
 printf "$M_INSTALLER_CFG\n" "$CONFIG_DIR"
-if [ "$FRESH_MODE" = "1" ]; then
+if [ "$PURGE_MODE" = "1" ]; then
+    printf "$M_INSTALLER_MODE\n" "$M_MODE_PURGE"
+elif [ "$FRESH_MODE" = "1" ]; then
     printf "$M_INSTALLER_MODE\n" "$M_MODE_FRESH"
 else
     printf "$M_INSTALLER_MODE\n" "$M_MODE_REUSE"
@@ -528,8 +618,8 @@ if [ ! -f "$CONFIG_DIR/config.yaml" ]; then
     # login_path = 12 alnum chars (~71 bits) — makes /login a 404 so bots
     # can't even find the form to attempt password brute-force.
     ADMIN_LOGIN_PATH=$(.venv/bin/python -c "import secrets, string; alpha = string.ascii_letters + string.digits; print(''.join(secrets.choice(alpha) for _ in range(12)))")
-    PUBLIC_HOST=$(curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
-                 || curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
+    PUBLIC_HOST=$(curl -4 -fsS --max-time 5 https://api4.ipify.org 2>/dev/null \
+                 || curl -4 -fsS --max-time 5 https://ipv4.icanhazip.com 2>/dev/null \
                  || echo "")
     # Password lives in /etc/proxybox/admin.password (mode 0400), NOT in
     # config.yaml. Keeps cat config.yaml screenshot-safe and backup-safe

@@ -5,6 +5,25 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Pre-release hardening
+
+- **Native installs no longer delete old state through `--fresh`.** `--fresh`
+  now refuses to continue when previous ProxyBox/sing-box native state exists;
+  destructive cleanup moved behind `--purge-existing-proxybox` plus an explicit
+  `DELETE PROXYBOX` confirmation.
+- **HTTPS enablement avoids user config overwrite and duplicate side effects.**
+  Native and Docker paths both refuse non-ProxyBox Caddyfiles, Docker helper
+  trusts the install `.env` port instead of container request data, and the SPA
+  no longer sends a second `POST /api/https/enable` when showing errors.
+- **Docker HTTPS/bot/docs contracts aligned.** Docker HTTPS status now reports
+  last successful host-helper enablement, helper does best-effort ufw/firewalld
+  80/443 opening, and the optional Docker bot uses the internal admin URL plus
+  an install-scoped secret.
+- **Documentation updated for the current Chinese-only UI and Docker-first
+  architecture.** README, deploy docs, API docs, and the deployment skill no
+  longer describe the removed language switcher or obsolete Docker HTTPS
+  limitations.
+
 ### Installation reliability — Codex install follow-up
 
 - **Fresh installs keep URL-token-only admin access disabled from first boot.**
@@ -19,9 +38,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ProxyBox `[manual]` jail via `/etc/fail2ban/jail.d/proxybox.local` instead
   of overwriting `/etc/fail2ban/jail.local`, and forces systemd backends so
   minimal Ubuntu/Debian images without `/var/log/auth.log` do not fail.
-- **Deploy skill now updates stale VPS checkouts from `origin/main`.** The
-  agent path performs a minimal host check, installs bootstrap tools, clones or
-  fast-forwards `/opt/proxybox`, then runs the full repo pre-flight.
+- **Deploy skill always clones into a new install directory.** The agent path
+  performs a minimal host check, installs bootstrap tools, and refuses to touch
+  existing checkout directories during a normal install.
 - **Deploy skill avoids SSH host-key residue.** It now uses a temporary
   session-local `known_hosts` file, deletes it on shell exit, and does not
   print or persist VPS host fingerprints.

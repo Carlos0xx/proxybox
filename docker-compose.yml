@@ -88,6 +88,7 @@ services:
       - PROXYBOX_DOCKER_GUARD_STATUS=/var/lib/proxybox-host-guard/status
       - PROXYBOX_DOCKER_GUARD_DIR=/var/lib/proxybox-host-guard
       - PROXYBOX_ADMIN_PORT=${PROXYBOX_ADMIN_PORT:-8080}
+      - PROXYBOX_BOT_INTERNAL_SECRET=${PROXYBOX_BOT_INTERNAL_SECRET:-}
       - PROXYBOX_WORKER_RESTART_FILE=/var/lib/proxybox/traffic-worker.restart
       - PROXYBOX_DOCKER_LOG_DIR=/var/lib/proxybox/logs
     volumes:
@@ -114,6 +115,8 @@ services:
     environment:
       - PROXYBOX_CONFIG=/etc/proxybox/config.yaml
       - PROXYBOX_RUNTIME=docker
+      - PROXYBOX_API_URL=http://proxybox-admin:8080
+      - PROXYBOX_BOT_INTERNAL_SECRET=${PROXYBOX_BOT_INTERNAL_SECRET:-}
       - PROXYBOX_TRAFFIC_HEARTBEAT=/var/lib/proxybox/traffic-worker.heartbeat
       - PROXYBOX_WORKER_RESTART_FILE=/var/lib/proxybox/traffic-worker.restart
       - PROXYBOX_DOCKER_LOG_DIR=/var/lib/proxybox/logs

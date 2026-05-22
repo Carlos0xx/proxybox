@@ -85,7 +85,7 @@ def _handle_update(cfg: BotConfig, api: ProxyBoxAPI, update: dict) -> None:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     cfg = load_config()
-    api = ProxyBoxAPI(cfg.api_url, cfg.admin_token)
+    api = ProxyBoxAPI(cfg.api_url, cfg.admin_token, internal_secret=cfg.internal_secret)
 
     me = _tg_call(cfg, "getMe", {}, timeout=10)
     if not me.get("ok"):

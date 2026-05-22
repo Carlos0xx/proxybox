@@ -7,11 +7,15 @@ Required env:
     BOT_TOKEN              Telegram bot token from @BotFather
     TG_ALLOWED_USERS       Comma-separated Telegram user IDs (whitelist)
     ADMIN_TOKEN            ProxyBox admin token (must match config.yaml admin.token)
-                            config.yaml also needs features.bot=true so token-only
-                            API access is accepted from 127.0.0.1 only.
+                            Native mode also needs features.bot=true so token-only
+                            API access is accepted from 127.0.0.1 only. Docker
+                            mode uses PROXYBOX_BOT_INTERNAL_SECRET instead.
 
 Optional env:
     PROXYBOX_API_URL       Default http://127.0.0.1:8080
+    PROXYBOX_BOT_INTERNAL_SECRET
+                           Docker sidecar auth secret. Automatically set by
+                           docker-compose for Docker installs.
     POLL_TIMEOUT           getUpdates long-poll timeout seconds, default 30
 """
 
@@ -27,6 +31,7 @@ class BotConfig:
     allowed_users: frozenset[int]
     admin_token: str
     api_url: str
+    internal_secret: str
     poll_timeout: int
 
 
@@ -52,5 +57,6 @@ def load_config() -> BotConfig:
         allowed_users=users,
         admin_token=admin_token,
         api_url=os.environ.get("PROXYBOX_API_URL", "http://127.0.0.1:8080").rstrip("/"),
+        internal_secret=os.environ.get("PROXYBOX_BOT_INTERNAL_SECRET", ""),
         poll_timeout=int(os.environ.get("POLL_TIMEOUT", "30")),
     )

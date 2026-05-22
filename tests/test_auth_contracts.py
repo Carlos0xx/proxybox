@@ -31,6 +31,19 @@ def _request(peer: str) -> Request:
     )
 
 
+def _request_with_headers(peer: str, headers: list[tuple[bytes, bytes]]) -> Request:
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/admin/test-token/api/status",
+        "scheme": "http",
+        "headers": headers,
+        "client": (peer, 12345),
+        "server": ("testserver", 80),
+    }
+    return Request(scope)
+
+
 def test_bot_token_only_auth_is_loopback_only(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = SimpleNamespace(
         admin=SimpleNamespace(token="test-token"),
@@ -42,6 +55,41 @@ def test_bot_token_only_auth_is_loopback_only(monkeypatch: pytest.MonkeyPatch) -
 
     with pytest.raises(HTTPException):
         asyncio.run(token_auth.admin_auth(_request("198.51.100.10"), "test-token"))
+
+
+def test_docker_bot_secret_allows_sidecar_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = SimpleNamespace(
+        admin=SimpleNamespace(token="test-token"),
+        features=SimpleNamespace(url_token_bypass=False, bot=False),
+    )
+    monkeypatch.setattr(token_auth, "get_settings", lambda: settings)
+    monkeypatch.setenv("PROXYBOX_RUNTIME", "docker")
+    monkeypatch.setenv("PROXYBOX_BOT_INTERNAL_SECRET", "secret-123")
+
+    req = _request_with_headers(
+        "172.18.0.5",
+        [(b"x-proxybox-bot-secret", b"secret-123")],
+    )
+    assert asyncio.run(token_auth.admin_auth(req, "test-token")) == "test-token"
+
+    with pytest.raises(HTTPException):
+        asyncio.run(token_auth.admin_auth(_request("172.18.0.5"), "test-token"))
+
+
+def test_bot_secret_is_docker_runtime_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = SimpleNamespace(
+        admin=SimpleNamespace(token="test-token"),
+        features=SimpleNamespace(url_token_bypass=False, bot=False),
+    )
+    monkeypatch.setattr(token_auth, "get_settings", lambda: settings)
+    monkeypatch.setenv("PROXYBOX_BOT_INTERNAL_SECRET", "secret-123")
+
+    req = _request_with_headers(
+        "172.18.0.5",
+        [(b"x-proxybox-bot-secret", b"secret-123")],
+    )
+    with pytest.raises(HTTPException):
+        asyncio.run(token_auth.admin_auth(req, "test-token"))
 
 
 def test_session_cookie_name_is_scoped_per_instance(monkeypatch: pytest.MonkeyPatch) -> None:

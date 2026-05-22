@@ -74,7 +74,7 @@ cd "$INSTALL_DIR"
 bash deploy/install.sh --native --fresh --lang en        # --lang zh for Chinese output
 ```
 
-Fresh mode clears old ProxyBox-managed state first. It performs:
+Native `--fresh` is a safety gate for new host-level installs: it proceeds only when no previous ProxyBox/sing-box native state is present. If old state exists, the installer refuses to continue rather than deleting it. The install performs:
 
 1. **Pre-flight validation** via `deploy/check-prereqs.sh --install` (9 categories: OS, arch, privilege, RAM, disk, network, systemd, ports, apt deps) and Python 3.11 provisioning.
 2. **apt install** of runtime dependencies (`python3.11`, `python3.11-venv`, `curl`, `sqlite3`, `openssl`, `fail2ban`).
@@ -125,7 +125,6 @@ Full reference: [`deploy/install-sh.md`](./deploy/install-sh.md).
 - **Day-to-day operations** — add devices, rotate URLs, pause a device, change credentials: [`guide.md`](./guide.md).
 - **Turn on HTTPS** — paste a domain into the panel's *HTTPS* page: [`deploy/install-sh.md`](./deploy/install-sh.md#https-with-caddy).
 - **Wire up Telegram** — control devices from your phone: [`deploy/install-sh.md`](./deploy/install-sh.md#telegram-bot).
-- **Switch UI language** — language toggle in the topbar.
 
 ---
 

@@ -13,13 +13,16 @@ Order of checks:
   2. ``url_token_bypass`` enabled AND URL token matches → accept.
      (Emergency / automation / SDK use case.)
   3. Optional Telegram bot mode AND loopback peer AND URL token matches → accept.
-     (Keeps bot automation local without making the public API token-only.)
-  4. Otherwise → 401 with header X-Login-URL: /login so the SPA can
+     (Native bot automation.)
+  4. Docker sidecar bot secret AND URL token matches → accept.
+     (Install-scoped service-to-service auth, not exposed to browsers.)
+  5. Otherwise → 401 with header X-Login-URL: /login so the SPA can
      redirect.
 """
 
 from __future__ import annotations
 
+import os
 import secrets
 from ipaddress import ip_address
 from typing import Annotated
@@ -39,6 +42,16 @@ def _request_from_loopback(request: Request) -> bool:
         return ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+def _bot_secret_matches(request: Request) -> bool:
+    if os.environ.get("PROXYBOX_RUNTIME") != "docker":
+        return False
+    expected = os.environ.get("PROXYBOX_BOT_INTERNAL_SECRET", "")
+    provided = request.headers.get("X-ProxyBox-Bot-Secret", "")
+    return bool(expected and provided) and secrets.compare_digest(
+        provided.encode(), expected.encode()
+    )
 
 
 async def admin_auth(request: Request, token: Annotated[str, Path()]) -> str:
@@ -63,6 +76,12 @@ async def admin_auth(request: Request, token: Annotated[str, Path()]) -> str:
         and _request_from_loopback(request)
         and _token_matches(token, expected)
     ):
+        return token
+
+    # Docker Telegram bot path. The bot is a separate container, so it is not
+    # loopback from the admin process. Limit this to an install-scoped secret
+    # generated into the Docker .env and passed only to proxybox-admin/bot.
+    if _bot_secret_matches(request) and _token_matches(token, expected):
         return token
 
     raise HTTPException(

@@ -221,9 +221,17 @@ detect_public_host() {
     if ! command -v curl >/dev/null 2>&1; then
         return 0
     fi
-    curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
-        || curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
+    curl -4 -fsS --max-time 5 https://api4.ipify.org 2>/dev/null \
+        || curl -4 -fsS --max-time 5 https://ipv4.icanhazip.com 2>/dev/null \
         || true
+}
+
+random_hex() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex 32
+    else
+        od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+    fi
 }
 
 new_project_name() {
@@ -247,6 +255,7 @@ write_env_file() {
     local vless_block hy2_block
     local vless_template vless_start vless_end
     local hy2_template hy2_start hy2_end
+    local bot_internal_secret
 
     project_name="${PROXYBOX_PROJECT_NAME:-$(new_project_name)}"
     validate_project_name "$project_name"
@@ -256,6 +265,7 @@ write_env_file() {
     read -r vless_template vless_start vless_end <<<"$vless_block"
     read -r hy2_template hy2_start hy2_end <<<"$hy2_block"
     public_host="$(detect_public_host)"
+    bot_internal_secret="$(random_hex)"
 
     umask 077
     cat > "$ENV_FILE" <<EOF
@@ -272,6 +282,7 @@ PROXYBOX_VLESS_END=${vless_end}
 PROXYBOX_HY2_TEMPLATE_PORT=${hy2_template}
 PROXYBOX_HY2_START=${hy2_start}
 PROXYBOX_HY2_END=${hy2_end}
+PROXYBOX_BOT_INTERNAL_SECRET=${bot_internal_secret}
 PROXYBOX_FRESH=0
 EOF
     info "created isolated Docker project: ${project_name}"

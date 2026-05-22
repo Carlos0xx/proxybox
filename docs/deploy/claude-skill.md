@@ -1,6 +1,6 @@
 # Claude Code skill
 
-> A bundled Claude Code skill that drives an explicitly selected install mode over SSH — minimal VPS check, clone into a new install directory, `deploy/install.sh --docker` or `deploy/install.sh --native --fresh`, verification, credential handoff.
+> A bundled Claude Code skill that drives an explicitly selected install mode over SSH — minimal VPS check, clone into a new install directory, `deploy/install.sh --docker` or `deploy/install.sh --native --fresh`, verification, credential handoff. Native `--fresh` refuses existing native state; it does not delete old data.
 
 For the high-level walkthrough, see [Getting started · Path 3](../getting-started.md#path-3--claude-code).
 
@@ -72,7 +72,7 @@ If you also pass Telegram bot details in the initial prompt:
 
 > deploy proxybox on 1.2.3.4 with TG bot token 123:ABC for user id 4567
 
-…the skill will additionally write `bot.env` inside the new install directory and run `docker compose --profile bot up -d proxybox-bot` at the end.
+…the skill will additionally write `bot.env` inside the new install directory and run `docker compose --profile bot up -d proxybox-bot` at the end. Docker compose supplies the internal admin URL and install-scoped bot secret from `.env`; the bot does not need an extra host port.
 
 ---
 

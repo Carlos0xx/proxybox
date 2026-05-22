@@ -24,8 +24,9 @@ changes.
 | Flag | Effect |
 | --- | --- |
 | `--native` | Use the host-level installer instead of the Docker/native chooser. |
-| `--fresh` / `PROXYBOX_FRESH=1` | Stop ProxyBox services, remove ProxyBox-managed config/data/subscriptions/systemd units/managed Caddyfile, then generate a new identity. |
+| `--fresh` / `PROXYBOX_FRESH=1` | New native install mode. Refuses to continue if previous ProxyBox/sing-box native state exists; does not delete old state. |
 | `--reuse` / `--no-fresh` | Keep existing ProxyBox state. This is the default for manual reruns and upgrades. |
+| `--purge-existing-proxybox` | Advanced destructive cleanup for old ProxyBox native state. Requires typing `DELETE PROXYBOX` interactively, or `PROXYBOX_CONFIRM_PURGE='DELETE PROXYBOX'` in non-interactive runs. |
 | `--lang en` / `--lang zh` | Force language. Default: auto-detect from `$LANG`. |
 | `-h` / `--help` | Print the header comment and exit. |
 | `PROXYBOX_FIRST_DEVICE=<name>` *(env)* | Override the auto-created first device (default: 5 random lowercase letters). Set it to an empty string to skip auto-creation. |
@@ -36,7 +37,7 @@ changes.
 
 ## Pre-flight (`deploy/check-prereqs.sh`)
 
-Invoked automatically before any destructive step. Nine categories — exits non-zero on the first blocking failure:
+Invoked automatically before host-level provisioning. Nine categories — exits non-zero on the first blocking failure:
 
 | # | Category | Checks |
 | --- | --- | --- |
@@ -69,7 +70,7 @@ sudo bash deploy/check-prereqs.sh --install  # also apt-install missing apt deps
 | 4 | **sing-box systemd unit** — `/etc/systemd/system/sing-box.service`. |
 | 5 | **Reality keypair** (X25519), **Hy2 self-signed cert**, random **SNI** picked per install, `experimental.clash_api` enabled. |
 | 6 | **Python 3.11 venv** at `<proxybox-install-dir>/.venv` + `pip install -e .`; an existing non-3.11 venv in that install dir is recreated. |
-| 7 | **`/etc/proxybox/config.yaml`** — random `admin.token` (24 bytes), random `admin.login_path` (12 alnum), `features.url_token_bypass: false`, and `server.public_host` auto-detected via `ifconfig.me` / `ipify.org`. Mode 0600, root-owned. **The password lives separately** at `/etc/proxybox/admin.password` (mode 0400, root-owned) so a casual `cat config.yaml` cannot leak it. |
+| 7 | **`/etc/proxybox/config.yaml`** — random `admin.token` (24 bytes), random `admin.login_path` (12 alnum), `features.url_token_bypass: false`, and `server.public_host` auto-detected via IPv4 public-IP services. Mode 0600, root-owned. **The password lives separately** at `/etc/proxybox/admin.password` (mode 0400, root-owned) so a casual `cat config.yaml` cannot leak it. |
 | 8 | **fail2ban `[manual]` jail** in `/etc/fail2ban/jail.d/proxybox.local` with `backend=systemd`, plus an `sshd` backend override so minimal images without `/var/log/auth.log` do not fail. |
 | 9 | **Systemd units** — `proxybox-admin`, `proxybox-traffic-worker`, `proxybox-watchdog`, `proxybox-bot` (bot disabled by default). |
 | 10 | `systemctl enable --now` for core services. |
@@ -81,17 +82,11 @@ sudo bash deploy/check-prereqs.sh --install  # also apt-install missing apt deps
 
 ---
 
-## Fresh vs Reuse
+## Fresh, Reuse, and Purge
 
-Use `--fresh` for first installs on templates, rebuilt VPSes, or any host that might contain previous ProxyBox state. It removes:
+Use `--fresh` for first native installs on clean VPSes. It is intentionally non-destructive: if it detects existing ProxyBox/sing-box native state, it stops and prints an error instead of deleting anything.
 
-- `/etc/proxybox`, `/var/lib/proxybox`, `/var/log/proxybox`, `/var/www/proxybox-sub`
-- ProxyBox's `sing-box` config/cert/key under `/etc/sing-box`
-- ProxyBox-managed systemd unit files
-- ProxyBox fail2ban drop-ins and the old marked `[manual]` block in `/etc/fail2ban/jail.local`
-- the managed ProxyBox Caddyfile if HTTPS was enabled from the panel
-
-Without `--fresh`, re-running on an installed system keeps state:
+Without `--fresh`, re-running on the same native install keeps state:
 
 - existing config files are kept verbatim
 - managed systemd units are rewritten to the current shipped version
@@ -99,6 +94,8 @@ Without `--fresh`, re-running on an installed system keeps state:
 - the bootstrap "create first device" step skips if any device row already exists
 
 Use reuse mode for upgrades or partial-failure recovery when you want to keep devices, traffic history, subscription URLs, and credentials.
+
+Only use `--purge-existing-proxybox` when you have decided to delete an old native ProxyBox install. It removes ProxyBox-managed config/data/subscription/log directories, ProxyBox systemd unit files, ProxyBox fail2ban drop-ins, ProxyBox's sing-box config/cert/key, and a ProxyBox-managed Caddyfile. It refuses non-interactive runs unless `PROXYBOX_CONFIRM_PURGE='DELETE PROXYBOX'` is set.
 
 ---
 
@@ -113,7 +110,7 @@ Two entry points; same flow underneath.
 3. Enter the domain that already points at the VPS.
 4. Click **Enable HTTPS**.
 
-Server-side: validates DNS → apt-installs Caddy from the Cloudsmith stable repo → requests a Let's Encrypt cert → writes a reverse-proxy `Caddyfile` → rewrites `server.public_host`, `passkey.rp_id`, `passkey.origin` in `config.yaml` → reloads. End-to-end ~30 s.
+Server-side: validates DNS → apt-installs Caddy from the Cloudsmith stable repo → best-effort opens `80/tcp` and `443/tcp` in ufw/firewalld if active → writes a ProxyBox-managed reverse-proxy `Caddyfile` only when it can do so without overwriting a user Caddy config → rewrites `server.public_host`, `passkey.rp_id`, `passkey.origin` in `config.yaml` → reloads. End-to-end ~30 s.
 
 ### From the CLI
 
@@ -150,6 +147,7 @@ TG_ALLOWED_USERS=<your-telegram-user-id>,<another>
 ADMIN_TOKEN=$(grep '^  token:' /etc/proxybox/config.yaml | cut -d'"' -f2)
 EOF
 chmod 600 /etc/proxybox/bot.env
+# Also set features.bot: true in /etc/proxybox/config.yaml for native loopback auth.
 systemctl enable --now proxybox-bot
 ```
 

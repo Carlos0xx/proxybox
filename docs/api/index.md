@@ -5,7 +5,7 @@
 | Page | Covers |
 | --- | --- |
 | [Endpoints](./endpoints.md) | Admin API — devices · traffic · history · HTTPS · account · logs · bans. Cookie + URL-path token gated. |
-| [Subscription URLs](./subscription.md) | Public `/api/sub/{sub_token}` — the URL each client device fetches. Five formats. |
+| [Subscription URLs](./subscription.md) | Public `/api/sub/{sub_token}` — default URI list plus `shadowrocket.yaml`, `clash.yaml`, and `merlin.yaml`. |
 
 ---
 

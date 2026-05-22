@@ -28,8 +28,8 @@
 | 📲 &nbsp; **Subscription formats** | Shadowrocket split config · `clash.yaml` · `merlin.yaml` · default URI list — generated server-side per device. |
 | 📊 &nbsp; **Real traffic accounting** | Worker polls sing-box's Clash API every 10 s. SQLite buckets bytes per device × hour and tags hosts (Video / Social / AI / CDN / …). |
 | 🔑 &nbsp; **Username + password login** | Form at `/login/{12-char-suffix}`; bare `/login` 404s. Rotate password + login path from the panel — no SSH. |
-| 🔒 &nbsp; **HTTPS options** | Docker path expects an external reverse proxy / tunnel; native mode can still provision Caddy + Let's Encrypt from the panel. |
-| 🐳 &nbsp; **Docker-first install** | Bridge-network stack, auto-selected free host ports, and one install-scoped Docker guard. |
+| 🔒 &nbsp; **HTTPS options** | Docker installs can enable host Caddy + Let's Encrypt from the panel through an install-scoped helper; native mode provisions Caddy directly. |
+| 🐳 &nbsp; **Docker-first install** | Bridge-network stack, auto-selected free host ports, install-scoped Docker guard, and HTTPS helper. |
 | 🤖 &nbsp; **Optional Telegram bot** | `/status` · `/devices` · `/traffic` · `/pause` · `/resume` · `/bans` from your phone. |
 
 ---
@@ -46,7 +46,7 @@ git clone https://github.com/carlos0xx/proxybox "$INSTALL_DIR"
 cd "$INSTALL_DIR" && bash deploy/install.sh
 ```
 
-Running `deploy/install.sh` without arguments shows a Chinese mode picker for **Docker install** or **native install** and requires an explicit `1` or `2` choice. Pick Docker for container isolation, automatic port selection, and an install-scoped Docker guard that recovers after daemon or VPS restarts without installing host Python/fail2ban/Caddy. If the VPS already runs websites, panels, or production services, use Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
+Running `deploy/install.sh` without arguments shows a Chinese mode picker for **Docker install** or **native install** and requires an explicit `1` or `2` choice. Pick Docker for container isolation, automatic port selection, an install-scoped Docker guard, and an HTTPS helper that only runs when you enable HTTPS from the panel. If the VPS already runs websites, panels, or production services, use Docker. Native install writes Python, sing-box, systemd units, and fail2ban directly to the host; only use it on a clean dedicated VPS.
 
 Direct mode selection:
 
@@ -85,7 +85,7 @@ git clone https://github.com/carlos0xx/proxybox "$INSTALL_DIR"
 cd "$INSTALL_DIR" && bash deploy/install.sh --native --fresh
 ```
 
-Fresh mode clears old ProxyBox-managed state first, then generates a Reality keypair, Hy2 cert, random 16-char admin password, and a random five-letter first device. Omit `--fresh` only when intentionally preserving an existing ProxyBox install.
+Native `--fresh` now means "new native install only": it generates a Reality keypair, Hy2 cert, random 16-char admin password, and a random five-letter first device only when no previous native ProxyBox/sing-box state is present. If old state exists, the installer refuses to continue rather than deleting it. Destructive cleanup is a separate advanced operation: `--purge-existing-proxybox` plus an explicit `DELETE PROXYBOX` confirmation.
 
 > [!IMPORTANT]
 > The installer prints login URL + password **once**. Copy them into a password manager before closing the terminal. Docker recovery: `cd <proxybox-install-dir> && docker compose exec proxybox-admin sh -c 'cat /etc/proxybox/admin.password; grep -E "username|login_path" /etc/proxybox/config.yaml'`.
@@ -101,7 +101,7 @@ Fresh mode clears old ProxyBox-managed state first, then generates a Reality key
 ├── static/     Web UI — Chinese single-file SPA served by the backend
 ├── deploy/     Provisioning + ops — installer, pre-flight, HTTPS, AI skill
 ├── docs/       User documentation — guide · architecture · API · deploy
-├── scripts/    Release gates — PII blocklist + 7-step audit
+├── scripts/    Release gates — PII blocklist + audit checks
 └── tests/      Regression coverage — config loader, subscriptions, traffic worker
 ```
 

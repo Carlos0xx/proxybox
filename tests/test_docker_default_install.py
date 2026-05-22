@@ -43,9 +43,11 @@ def test_compose_uses_bridge_network_and_env_published_ports() -> None:
     assert guard_status_env in COMPOSE
     assert guard_dir_env in COMPOSE
     assert "PROXYBOX_ADMIN_PORT=${PROXYBOX_ADMIN_PORT:-8080}" in COMPOSE
+    assert "PROXYBOX_BOT_INTERNAL_SECRET=${PROXYBOX_BOT_INTERNAL_SECRET:-}" in COMPOSE
     assert "./.proxybox-guard:/var/lib/proxybox-host-guard" in COMPOSE
     assert "./.proxybox-guard:/var/lib/proxybox-host-guard:ro" not in COMPOSE
     assert "/etc/proxybox/bot.env" not in COMPOSE
+    assert "PROXYBOX_API_URL=http://proxybox-admin:8080" in COMPOSE
 
 
 def test_docker_install_provisions_runtime_and_scans_ports() -> None:
@@ -70,6 +72,8 @@ def test_docker_install_provisions_runtime_and_scans_ports() -> None:
     assert "COMPOSE_PROJECT_NAME=" in DOCKER_INSTALL
     assert "PROXYBOX_IMAGE=proxybox:${project_name}" in DOCKER_INSTALL
     assert "PROXYBOX_SINGBOX_IMAGE=proxybox-sing-box:${project_name}" in DOCKER_INSTALL
+    assert "PROXYBOX_BOT_INTERNAL_SECRET=${bot_internal_secret}" in DOCKER_INSTALL
+    assert "random_hex" in DOCKER_INSTALL
     assert "PROXYBOX_UPGRADE" in DOCKER_INSTALL
     assert "PROXYBOX_REWRITE_ENV" not in DOCKER_INSTALL
     assert "network_mode" not in DOCKER_INSTALL
@@ -123,7 +127,10 @@ def test_docker_https_helper_is_request_scoped_and_refuses_user_caddyfile() -> N
     assert 'REQUEST_FILE="$GUARD_DIR/https-request"' in DOCKER_HTTPS_APPLY
     assert 'RESPONSE_FILE="$GUARD_DIR/https-response"' in DOCKER_HTTPS_APPLY
     assert "getent ahostsv4" in DOCKER_HTTPS_APPLY
-    assert "https://ifconfig.me" in DOCKER_HTTPS_APPLY
+    assert "https://api4.ipify.org" in DOCKER_HTTPS_APPLY
+    assert 'admin_port="$(env_value PROXYBOX_ADMIN_PORT)"' in DOCKER_HTTPS_APPLY
+    assert 'requested_admin_port="$(kv_get admin_port "$REQUEST_FILE")"' in DOCKER_HTTPS_APPLY
+    assert "open_firewall" in DOCKER_HTTPS_APPLY
     assert "reverse_proxy 127.0.0.1:$admin_port" in DOCKER_HTTPS_APPLY
     assert "header_up X-Forwarded-Proto https" in DOCKER_HTTPS_APPLY
     assert "header_up X-Forwarded-Host {http.request.host}" in DOCKER_HTTPS_APPLY
@@ -479,7 +486,12 @@ def test_https_caddy_uses_docker_host_helper(monkeypatch, tmp_path: Path) -> Non
         "get_settings",
         lambda: settings,
     )
-    monkeypatch.setattr(caddy, "_patch_config", lambda domain: patched.append(domain))
+
+    def fake_patch(domain: str) -> None:
+        patched.append(domain)
+        settings.server.public_host = domain
+
+    monkeypatch.setattr(caddy, "_patch_config", fake_patch)
 
     def fake_sleep(_seconds: float) -> None:
         request = caddy._parse_kv_file(tmp_path / "https-request")
@@ -509,11 +521,14 @@ def test_https_caddy_uses_docker_host_helper(monkeypatch, tmp_path: Path) -> Non
     request = caddy._parse_kv_file(tmp_path / "https-request")
 
     assert request["domain"] == "proxybox.example.com"
-    assert request["admin_port"] == "18080"
+    assert "admin_port" not in request
     assert patched == ["proxybox.example.com"]
     assert result["public_ip"] == "203.0.113.10"
     assert result["caddy"] == "installed"
     assert result["login_url"] == "https://proxybox.example.com/login/abc123"
+    status = caddy.status()
+    assert status.using_https is True
+    assert status.configured_domain == "proxybox.example.com"
     assert "docker_unsupported" not in STATIC_HTML
     assert "docker_helper_unavailable" in STATIC_HTML
     assert "docker_helper_timeout" in STATIC_HTML
@@ -553,3 +568,25 @@ def test_https_caddy_surfaces_docker_helper_failure(monkeypatch, tmp_path: Path)
         caddy.run("proxybox.example.com")
     assert exc.value.code == "dns_mismatch"
     assert "198.51.100.9" in exc.value.detail
+
+
+def test_native_https_refuses_user_caddyfile(monkeypatch, tmp_path: Path) -> None:
+    caddyfile = tmp_path / "Caddyfile"
+    caddyfile.write_text(
+        "example.org {\n    reverse_proxy 127.0.0.1:3000\n}\n",
+        encoding="utf-8",
+    )
+    real_path = Path
+
+    def fake_path(value: str) -> Path:
+        if value == "/etc/caddy/Caddyfile":
+            return caddyfile
+        return real_path(value)
+
+    monkeypatch.setattr(caddy, "Path", fake_path)
+    monkeypatch.setattr(caddy, "_run", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(caddy.HTTPSEnableError) as exc:
+        caddy._write_caddyfile("proxybox.example.com")
+    assert exc.value.code == "caddyfile_conflict"
+    assert "example.org" in caddyfile.read_text(encoding="utf-8")

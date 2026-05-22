@@ -16,9 +16,9 @@ jobs:
           python-version: "3.13"
       - run: pip install ruff
       - name: ruff check
-        run: ruff check app/ bot/
+        run: ruff check app/ bot/ tests/ scripts/
       - name: ruff format --check
-        run: ruff format --check app/ bot/
+        run: ruff format --check app/ bot/ tests/ scripts/
 
   shellcheck:
     runs-on: ubuntu-latest
@@ -26,4 +26,4 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
       - name: shellcheck install
         run: sudo apt-get -y install shellcheck
-      - run: shellcheck -S warning deploy/install.sh scripts/pii-check.sh
+      - run: find deploy scripts -name '*.sh' -print0 | xargs -0 shellcheck -S warning

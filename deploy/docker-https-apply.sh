@@ -70,8 +70,8 @@ validate_domain() {
 }
 
 public_ip() {
-    curl -fsS --max-time 8 https://ifconfig.me 2>/dev/null \
-        || curl -fsS --max-time 8 https://api.ipify.org 2>/dev/null \
+    curl -4 -fsS --max-time 8 https://api4.ipify.org 2>/dev/null \
+        || curl -4 -fsS --max-time 8 https://ipv4.icanhazip.com 2>/dev/null \
         || true
 }
 
@@ -134,6 +134,19 @@ EOF
     run_cmd caddy validate --config /etc/caddy/Caddyfile >/dev/null
 }
 
+open_firewall() {
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        ufw allow 80/tcp >/dev/null 2>&1 || true
+        ufw allow 443/tcp >/dev/null 2>&1 || true
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 \
+        && systemctl is-active firewalld >/dev/null 2>&1; then
+        firewall-cmd --add-service=http --permanent >/dev/null 2>&1 || true
+        firewall-cmd --add-service=https --permanent >/dev/null 2>&1 || true
+        firewall-cmd --reload >/dev/null 2>&1 || true
+    fi
+}
+
 reload_caddy() {
     run_cmd systemctl enable --now caddy >/dev/null
     if ! systemctl reload caddy >/dev/null 2>&1; then
@@ -153,14 +166,17 @@ main() {
     [ -r "$REQUEST_FILE" ] || fail docker_helper_failed "request file not readable"
 
     request_id="$(kv_get request_id "$REQUEST_FILE")"
-    local domain admin_port detected_ip resolved_ips caddy_result
+    local domain admin_port requested_admin_port detected_ip resolved_ips caddy_result
     domain="$(kv_get domain "$REQUEST_FILE")"
-    admin_port="$(kv_get admin_port "$REQUEST_FILE")"
+    requested_admin_port="$(kv_get admin_port "$REQUEST_FILE")"
     [ -n "$request_id" ] || request_id="unknown"
-    [ -n "$admin_port" ] || admin_port="$(env_value PROXYBOX_ADMIN_PORT)"
-    [ -n "$admin_port" ] || admin_port="8080"
+    admin_port="$(env_value PROXYBOX_ADMIN_PORT)"
+    [ -n "$admin_port" ] || fail docker_helper_failed "PROXYBOX_ADMIN_PORT is missing from .env"
 
     validate_domain "$domain"
+    if [ -n "$requested_admin_port" ] && [ "$requested_admin_port" != "$admin_port" ]; then
+        fail invalid_port "request admin_port does not match this install"
+    fi
     case "$admin_port" in
         ''|*[!0-9]*) fail invalid_port "$admin_port" ;;
     esac
@@ -178,6 +194,7 @@ main() {
     fi
 
     caddy_result="$(install_caddy)"
+    open_firewall
     write_caddyfile "$domain" "$admin_port"
     reload_caddy
     write_response success ok "HTTPS enabled" "$detected_ip" "$caddy_result"

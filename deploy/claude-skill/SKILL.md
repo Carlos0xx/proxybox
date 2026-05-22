@@ -154,7 +154,9 @@ Now that the fresh install directory exists, do only a lightweight host probe
 for Docker mode. Do not run the native `check-prereqs.sh` for Docker; missing
 Docker / Compose / daemon startup is handled by `deploy/install.sh --docker`
 in the next step. If native mode was selected, skip this lightweight probe and
-let `deploy/install.sh --native --fresh` run the full native pre-flight.
+let `deploy/install.sh --native --fresh` run the full native pre-flight. Native
+`--fresh` is non-destructive: if previous ProxyBox/sing-box native state is
+present, the installer refuses instead of deleting it.
 
 ```bash
 "${SSH[@]}" "$USER@$HOST" "cd '$REMOTE_INSTALL_DIR' && PROXYBOX_INSTALL_MODE='$PROXYBOX_INSTALL_MODE' bash -s" <<'EOF'
@@ -196,7 +198,10 @@ host service. It also installs two project-scoped systemd helpers:
 `proxybox-docker-guard-<project>` for Docker self-recovery and
 `proxybox-docker-https-<project>.path` for optional panel-driven HTTPS.
 `deploy/install.sh --native --fresh` is the advanced host-level path and must
-only be run after the user explicitly chose native mode.
+only be run after the user explicitly chose native mode. It must not be used
+as a cleanup mechanism; destructive native cleanup requires the separate
+`--purge-existing-proxybox` confirmation flow, which this skill should not run
+unless the user explicitly asks to delete the old ProxyBox native install.
 
 ### Step 5 — Verify
 
@@ -282,7 +287,9 @@ EOF
 
 Verify with `docker compose ps proxybox-bot`. If it crashed, check
 `docker compose logs --tail=80 proxybox-bot` — most common cause is malformed
-bot token format.
+bot token format. Docker compose automatically supplies
+`PROXYBOX_API_URL=http://proxybox-admin:8080` and the install-scoped
+`PROXYBOX_BOT_INTERNAL_SECRET` from `.env`; do not add host ports for the bot.
 
 ### Step 8 — Hand off to the user
 
@@ -328,8 +335,10 @@ handoff. v0.1.6+ exposes a lot in the panel:
   `.path` helper validates DNS, installs/configures Caddy on the host, writes
   `.proxybox-guard/https-response`, then the container updates
   `server.public_host` and passkey origin fields. The helper refuses to
-  overwrite a non-ProxyBox-managed `/etc/caddy/Caddyfile`; in that case report
-  the conflict instead of editing host Caddy by hand.
+  overwrite a non-ProxyBox-managed `/etc/caddy/Caddyfile`, only trusts the
+  Admin UI port from this install's `.env`, and best-effort opens ufw/firewalld
+  80/443; in that case report the conflict instead of editing host Caddy by
+  hand.
 - **Change username / password (v0.1.11):** `安全` page → `🔐 登录设置`
   card. Password change requires the current password (session-hijack
   defense).

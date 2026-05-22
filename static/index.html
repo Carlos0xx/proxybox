@@ -2226,7 +2226,7 @@ a:hover { color: var(--accent-hover); }
         </div>
         <div style="padding: var(--space-4) var(--space-5); font-size: var(--text-sm); line-height: 1.8; color: var(--text-3);">
           <ul style="padding-left: 20px; margin: 0;">
-            <li>需要 VPS 的 <strong>80 端口</strong>和 <strong>443 端口</strong>没有被其他服务占用 (脚本会自动放行防火墙)</li>
+            <li>需要 VPS 的 <strong>80 端口</strong>和 <strong>443 端口</strong>没有被其他服务占用 (脚本会自动放行 ufw/firewalld; 云厂商安全组仍需自行开放)</li>
             <li>首次申请 Let's Encrypt 证书需要 <strong>~10 秒</strong>,刚切完域名打不开属正常,稍等一下重试</li>
             <li>切换 HTTPS 后,旧的 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;">http://IP:8080/</code> 地址依然可访问 (仅作应急后门)</li>
             <li>如果失败需要撤销,SSH 进 VPS 跑 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;">systemctl stop caddy</code>,改 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;">/etc/proxybox/config.yaml</code> 里的 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;">public_host</code> 即可</li>
@@ -3764,7 +3764,11 @@ async function loadHttpsView() {
     const badge = $('https-status-badge');
     const sub = $('https-status-sub');
     const enableBtn = $('https-enable-btn');
-    if (s.docker_runtime) {
+    if (s.docker_runtime && s.using_https) {
+      badge.innerHTML = '<span class="badge badge-accent" style="font-size:var(--text-sm);"><span class="dot dot-ok dot-pulse"></span> ✓ 已启用</span>';
+      sub.innerHTML = `Docker helper 已为 <code style="background:var(--surface-2);padding:1px 6px;border-radius:3px;color:var(--accent);">https://${escapeHtml(s.configured_domain || s.public_host)}/</code> 配置过宿主机 Caddy；后续由宿主 systemd 管理`;
+      if (enableBtn) enableBtn.disabled = false;
+    } else if (s.docker_runtime) {
       badge.innerHTML = '<span class="badge badge-warn"><span class="dot dot-warn"></span> Docker 模式 · 宿主 helper</span>';
       sub.innerHTML = 'Docker 模式不会在容器内安装 Caddy；点击启用后会调用本次安装创建的宿主机 helper 配置 HTTPS';
       if (enableBtn) enableBtn.disabled = false;
@@ -3799,6 +3803,7 @@ async function _httpsEnableSubmit() {
     body: `会做这几件事:<br><br>
       · 验证 <code>${escapeHtml(domain)}</code> 解析到本机<br>
       · apt 安装 Caddy (Cloudsmith 官方源；Docker 模式由宿主机 helper 执行)<br>
+      · 最佳努力放行 ufw/firewalld 的 80/443 (云安全组仍需你自行开放)<br>
       · 写 /etc/caddy/Caddyfile (反代当前后台端口)<br>
       · 改 /etc/proxybox/config.yaml: public_host + passkey 字段<br>
       · 重启 Caddy → Let's Encrypt 自动签发证书<br><br>
@@ -3825,34 +3830,22 @@ async function _httpsEnableSubmit() {
   } catch (e) {
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> 启用 HTTPS';
-    // Parse structured error from backend, if present
-    let msg = e.message || '未知错误';
+    const detailPayload = e.detail || {};
+    const code = detailPayload.code || '';
+    const detail = detailPayload.message || '';
+    const codeMap = {
+      'invalid_domain': '域名格式不对 (例: proxybox.example.com,需要至少一个点)',
+      'dns_no_answer': '域名解析不到 IP (DNS 还没生效,等 1-10 分钟重试)',
+      'dns_mismatch': '域名解析到的 IP 不是本机 (检查 DNS A 记录)',
+      'docker_helper_unavailable': 'Docker HTTPS helper 不可用,请重新运行安装脚本或检查 systemd helper',
+      'docker_helper_timeout': 'Docker HTTPS helper 超时,请检查宿主机 systemd 和 Caddy 日志',
+      'docker_helper_failed': 'Docker HTTPS helper 执行失败',
+      'caddyfile_conflict': '宿主机已有非 ProxyBox 管理的 Caddyfile,为避免覆盖用户配置已停止',
+      'cmd_failed': 'apt / systemctl / curl 命令失败',
+    };
+    let msg = codeMap[code] || code || e.message || '未知错误';
     let hint = '';
-    if (msg.includes('HTTP 400')) {
-      // Best-effort fetch the detail
-      try {
-        const resp = await fetch(`${API_BASE}/api/https/enable`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ domain }),
-        });
-        const j = await resp.json();
-        const code = j.detail?.code;
-        const detail = j.detail?.message || '';
-        const codeMap = {
-          'invalid_domain': '域名格式不对 (例: proxybox.example.com,需要至少一个点)',
-          'dns_no_answer': '域名解析不到 IP (DNS 还没生效,等 1-10 分钟重试)',
-          'dns_mismatch': '域名解析到的 IP 不是本机 (检查 DNS A 记录)',
-          'docker_helper_unavailable': 'Docker HTTPS helper 不可用,请重新运行安装脚本或检查 systemd helper',
-          'docker_helper_timeout': 'Docker HTTPS helper 超时,请检查宿主机 systemd 和 Caddy 日志',
-          'docker_helper_failed': 'Docker HTTPS helper 执行失败',
-          'caddyfile_conflict': '宿主机已有非 ProxyBox 管理的 Caddyfile,为避免覆盖用户配置已停止',
-          'cmd_failed': 'apt / systemctl / curl 命令失败',
-        };
-        msg = codeMap[code] || code || msg;
-        hint = detail ? `<br><span style="color:var(--text-4); font-size:var(--text-xs);">${escapeHtml(detail.slice(0, 200))}</span>` : '';
-      } catch {}
-    }
+    hint = detail ? `<br><span style="color:var(--text-4); font-size:var(--text-xs);">${escapeHtml(detail.slice(0, 200))}</span>` : '';
     log.innerHTML = `> ❌ 失败<br>> 原因: ${escapeHtml(msg)}${hint}<br>> 修好后再点"启用 HTTPS"重试`;
     toast.error('HTTPS 启用失败', msg);
   }

@@ -9,10 +9,17 @@ import urllib.request
 
 
 class ProxyBoxAPI:
-    def __init__(self, base_url: str, admin_token: str, timeout: int = 10):
+    def __init__(
+        self,
+        base_url: str,
+        admin_token: str,
+        timeout: int = 10,
+        internal_secret: str = "",
+    ):
         self.base_url = base_url.rstrip("/")
         self.token = admin_token
         self.timeout = timeout
+        self.internal_secret = internal_secret
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/admin/{self.token}{path}"
@@ -21,6 +28,8 @@ class ProxyBoxAPI:
         url = self._url(path)
         data = json.dumps(body).encode() if body is not None else None
         headers = {"Content-Type": "application/json"} if data else {}
+        if self.internal_secret:
+            headers["X-ProxyBox-Bot-Secret"] = self.internal_secret
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as r:

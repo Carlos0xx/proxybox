@@ -6,7 +6,7 @@ Trigger in any Claude Code session:
 
 > deploy proxybox on my VPS at 1.2.3.4 using ~/.ssh/id_ed25519
 
-Claude must ask you to choose Docker or native install first. Docker being installed, supported, or recommended is not a choice on your behalf. After your explicit answer, it checks the VPS, clones the repo into a new per-install directory, runs `deploy/install.sh --docker` or `deploy/install.sh --native --fresh`, verifies the services, and hands back the login URL + credentials.
+Claude must ask you to choose Docker or native install first. Docker being installed, supported, or recommended is not a choice on your behalf. After your explicit answer, it checks the VPS, clones the repo into a new per-install directory, runs `deploy/install.sh --docker` or `deploy/install.sh --native --fresh`, verifies the services, and hands back the login URL + credentials. Native `--fresh` refuses existing native state; it does not delete old data.
 
 ---
 
@@ -31,7 +31,7 @@ The next Claude Code session sees the skill. Confirm with `claude /skills` or ju
 | 4 | Requires an explicit Docker/native install-mode choice before running remote install commands; environment checks must not be used as consent. |
 | 5 | Installs bootstrap tools (`git`, `curl`, `ca-certificates`) if missing. |
 | 6 | Clones `https://github.com/carlos0xx/proxybox` into a new `/opt/proxybox-<timestamp>-<suffix>` directory and refuses to touch existing directories. |
-| 7 | Runs `bash deploy/install.sh --docker` or `bash deploy/install.sh --native --fresh`; Docker mode checks/installs Docker + Compose, starts Docker, and scans free host ports. |
+| 7 | Runs `bash deploy/install.sh --docker` or `bash deploy/install.sh --native --fresh`; Docker mode checks/installs Docker + Compose, starts Docker, scans free host ports, and installs project-scoped Docker guard + HTTPS helper units. |
 | 8 | Verifies `sing-box`, `proxybox-admin`, and `proxybox-traffic-worker` are healthy. |
 | 9 | Relays the **login URL + full password + first device status** back to the user. |
 | 10 | *(optional Docker mode)* Writes `bot.env` inside the new install directory + starts `proxybox-bot` profile if Telegram details were supplied. |

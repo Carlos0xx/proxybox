@@ -105,3 +105,12 @@ def test_subscription_view_only_advertises_current_recommended_links() -> None:
     assert "Shadowrocket 分流订阅 (推荐)" in STATIC_HTML
     assert "shadowrocket nodes:" not in STATIC_HTML
     assert "shadowrocket rules:" not in STATIC_HTML
+
+
+def test_https_error_handling_does_not_resubmit_enable_request() -> None:
+    catch_start = STATIC_HTML.index("} catch (e) {", STATIC_HTML.index("_httpsEnableSubmit"))
+    catch_end = STATIC_HTML.index("log.innerHTML = `> ❌ 失败", catch_start)
+    catch_fragment = STATIC_HTML[catch_start:catch_end]
+    assert "e.detail" in catch_fragment
+    assert "fetch(`${API_BASE}/api/https/enable`" not in catch_fragment
+    assert "api/https/enable" not in catch_fragment

@@ -57,6 +57,7 @@ PROXYBOX_VLESS_END=12050
 PROXYBOX_HY2_TEMPLATE_PORT=22000
 PROXYBOX_HY2_START=22001
 PROXYBOX_HY2_END=22050
+PROXYBOX_BOT_INTERNAL_SECRET=<64-hex-chars>
 PROXYBOX_FRESH=0
 ```
 
@@ -68,7 +69,7 @@ PROXYBOX_FRESH=0
 | `sing-box` | 代理核心。 | 只发布 `.env` 里的 TCP/UDP 端口。 |
 | `proxybox-admin` | FastAPI + 静态面板。 | 只发布 Admin UI 端口。 |
 | `proxybox-traffic-worker` | 轮询 Clash API 记账。 | 不发布端口。 |
-| `proxybox-bot` | 可选 Telegram bot。 | 只读项目目录 `bot.env`,不读宿主 `/etc/proxybox/bot.env`。 |
+| `proxybox-bot` | 可选 Telegram bot。 | 只读项目目录 `bot.env`,不读宿主 `/etc/proxybox/bot.env`;通过 `.env` 里的安装级 internal secret 调用 admin API。 |
 
 服务页会显示容器内 `看门狗` 和宿主机 `Docker Guard` 两项。`看门狗`
 负责容器内服务/端口自恢复；`Docker Guard` 是宿主机 timer 的状态回传,
@@ -98,10 +99,26 @@ Docker 默认路径不在容器内安装 Caddy 或 fail2ban。HTTPS 可以在后
 2. 后台点击启用 HTTPS。
 3. admin 容器写 `.proxybox-guard/https-request`。
 4. 宿主机 `proxybox-docker-https-<project>.path` 触发 `deploy/docker-https-apply.sh`。
-5. helper 验证 DNS,安装/启动 Caddy,写 ProxyBox 管理的 `/etc/caddy/Caddyfile`,反代到 `.env` 里的 Admin UI 端口。
+5. helper 验证 DNS,安装/启动 Caddy,最佳努力放行 ufw/firewalld 的 80/443,写 ProxyBox 管理的 `/etc/caddy/Caddyfile`,反代到 `.env` 里的 Admin UI 端口。
 6. helper 写 `.proxybox-guard/https-response`,admin 容器读取成功结果后更新 `server.public_host`、`passkey.rp_id`、`passkey.origin`。
 
-安全边界: helper 只响应本安装目录的 request 文件。如果宿主机已有非 ProxyBox 管理的 `/etc/caddy/Caddyfile`,helper 会返回 `caddyfile_conflict`,不会覆盖用户原有 Caddy 配置。
+安全边界: helper 只响应本安装目录的 request 文件,并且只信任本安装 `.env` 里的 Admin UI 端口,不接受容器请求覆盖端口。如果宿主机已有非 ProxyBox 管理的 `/etc/caddy/Caddyfile`,helper 会返回 `caddyfile_conflict`,不会覆盖用户原有 Caddy 配置。
+
+## Telegram bot
+
+Docker bot 是可选 profile:
+
+```bash
+cat > bot.env <<EOF
+BOT_TOKEN=...
+TG_ALLOWED_USERS=<your-telegram-user-id>
+ADMIN_TOKEN=$(docker compose exec -T proxybox-admin sh -c "grep '^  token:' /etc/proxybox/config.yaml | cut -d'\"' -f2")
+EOF
+chmod 600 bot.env
+docker compose --profile bot up -d proxybox-bot
+```
+
+Compose 会自动给 bot 设置 `PROXYBOX_API_URL=http://proxybox-admin:8080` 和 `PROXYBOX_BOT_INTERNAL_SECRET`,所以 bot 不需要暴露额外宿主端口。
 
 ## 相关文件
 
