@@ -147,7 +147,6 @@ def _gen_singbox_config(sb_dir: Path) -> None:
     priv_key, _ = _reality_keypair()
     sni = secrets.choice(SNI_CANDIDATES)
     short_id = secrets.token_hex(8)
-    hy2_obfs = secrets.token_hex(16)
 
     _hy2_self_signed_cert(sb_dir, sni)
 
@@ -178,7 +177,6 @@ def _gen_singbox_config(sb_dir: Path) -> None:
                 "listen": "::",
                 "listen_port": ports["hy2_template"],
                 "users": [],
-                "obfs": {"type": "salamander", "password": hy2_obfs},
                 "tls": {
                     "enabled": True,
                     "alpn": ["h3"],

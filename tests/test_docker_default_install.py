@@ -100,6 +100,9 @@ def test_bootstrap_uses_docker_env_ports(monkeypatch, tmp_path: Path) -> None:
     assert singbox_cfg["experimental"]["clash_api"]["external_controller"] == "0.0.0.0:19090"
     assert singbox_cfg["inbounds"][0]["listen_port"] == 11100
     assert singbox_cfg["inbounds"][1]["listen_port"] == 22100
+    assert singbox_cfg["inbounds"][1]["type"] == "hysteria2"
+    assert "obfs" not in singbox_cfg["inbounds"][1]
+    assert singbox_cfg["inbounds"][1]["tls"]["alpn"] == ["h3"]
 
     creds = bootstrap._gen_proxybox_config(pb_dir)
     proxybox_cfg = yaml.safe_load((pb_dir / "config.yaml").read_text())

@@ -245,7 +245,6 @@ def build_vless_uri(device: dict[str, Any], sb_cfg: dict[str, Any], vps_host: st
 
 def build_hysteria2_uri(device: dict[str, Any], sb_cfg: dict[str, Any], vps_host: str) -> str:
     hy2_tpl = singbox.find_template_inbound(sb_cfg, "hysteria2")
-    obfs_pw = hy2_tpl.get("obfs", {}).get("password", "")
     sni = (
         hy2_tpl.get("tls", {}).get("server_name")
         or singbox.find_template_inbound(sb_cfg, "vless")["tls"]["server_name"]
@@ -253,7 +252,7 @@ def build_hysteria2_uri(device: dict[str, Any], sb_cfg: dict[str, Any], vps_host
 
     return (
         f"hysteria2://{device['hy2_password']}@{vps_host}:{device['hy2_port']}"
-        f"?sni={sni}&obfs=salamander&obfs-password={obfs_pw}&insecure=1"
+        f"?sni={sni}&insecure=1"
         f"#ProxyBox-{device['name']}-hy2"
     )
 
@@ -269,10 +268,6 @@ def _reality_params(sb_cfg: dict[str, Any]) -> dict[str, Any]:
         "short_id": reality["short_id"][0],
         "flow": (tpl_users[0].get("flow") if tpl_users else None) or "xtls-rprx-vision",
     }
-
-
-def _hy2_obfs_password(sb_cfg: dict[str, Any]) -> str:
-    return singbox.find_template_inbound(sb_cfg, "hysteria2").get("obfs", {}).get("password", "")
 
 
 def _require_public_host() -> str:
@@ -328,11 +323,12 @@ def build_clash_yaml(
                 "type": "hysteria2",
                 "server": vps_host,
                 "port": device["hy2_port"],
+                "auth": device["hy2_password"],
                 "password": device["hy2_password"],
                 "sni": r["sni"],
-                "obfs": "salamander",
-                "obfs-password": _hy2_obfs_password(sb_cfg),
+                "alpn": ["h3"],
                 "skip-cert-verify": True,
+                "fast-open": True,
             },
         ],
         "proxy-groups": [

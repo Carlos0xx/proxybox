@@ -5,7 +5,11 @@ from types import SimpleNamespace
 
 import yaml
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
+from app.routers import subscriptions as subscription_routes
+from app.routers.subscriptions import router as subscription_router
 from app.services import subscriptions
 from app.services.subscriptions import (
     build_clash_yaml,
@@ -56,7 +60,6 @@ def _fake_sb_cfg(priv_b64: str) -> dict:
             {
                 "type": "hysteria2",
                 "tag": "hy2-template",
-                "obfs": {"password": "obfs-pw-hex"},  # pragma: allowlist secret
                 "tls": {"server_name": "www.example.com"},
             },
         ]
@@ -97,9 +100,8 @@ def test_build_hysteria2_uri_shape():
     uri = build_hysteria2_uri(device, _fake_sb_cfg(priv_b64), "1.2.3.4")
     assert uri.startswith("hysteria2://fake-hy2-pw@1.2.3.4:21001?")
     assert "sni=www.example.com" in uri
-    assert "obfs=salamander" in uri
-    assert "obfs-password=obfs-pw-hex" in uri
     assert "insecure=1" in uri
+    assert "obfs" not in uri
     assert uri.endswith("#ProxyBox-test-phone-hy2")
 
 
@@ -114,9 +116,13 @@ def test_clash_yaml_uses_split_rules_without_binance(monkeypatch):
     assert group_names >= {"PROXY", "AUTO", "AI", "Streaming", "China", "Final"}
     hy2_proxy = next(proxy for proxy in cfg["proxies"] if proxy["type"] == "hysteria2")
     auto_group = next(group for group in cfg["proxy-groups"] if group["name"] == "AUTO")
+    assert hy2_proxy["auth"] == _fake_device()["hy2_password"]
     assert hy2_proxy["password"] == _fake_device()["hy2_password"]
-    assert "auth" not in hy2_proxy
-    assert "alpn" not in hy2_proxy
+    assert hy2_proxy["alpn"] == ["h3"]
+    assert hy2_proxy["skip-cert-verify"] is True
+    assert hy2_proxy["fast-open"] is True
+    assert "obfs" not in hy2_proxy
+    assert "obfs-password" not in hy2_proxy
     assert auto_group["url"] == "http://www.gstatic.com/generate_204"
     assert "lazy" not in auto_group
     assert "tolerance" not in auto_group
@@ -142,6 +148,10 @@ def test_merlin_yaml_keeps_tun_and_split_rules(monkeypatch):
     cfg = yaml.safe_load(text)
 
     assert cfg["tun"]["enable"] is True
+    hy2_proxy = next(proxy for proxy in cfg["proxies"] if proxy["type"] == "hysteria2")
+    assert hy2_proxy["auth"] == _fake_device()["hy2_password"]
+    assert hy2_proxy["alpn"] == ["h3"]
+    assert "obfs" not in hy2_proxy
     assert cfg["rules"][-1] == "MATCH,Final"
     assert "DOMAIN-SUFFIX,openai.com,AI" in cfg["rules"]
     assert "binance" not in text.lower()
@@ -174,3 +184,44 @@ def test_shadowrocket_conf_is_rules_only_without_binance(monkeypatch):
     assert "bnbstatic" not in text.lower()
     assert "bsc-dataseed" not in text.lower()
     assert "Binance-SG" not in text
+
+
+def test_subscription_routes_support_head_requests() -> None:
+    expected = {
+        "/api/sub/{sub_token}",
+        "/api/sub/{sub_token}/sub.txt",
+        "/api/sub/{sub_token}/shadowrocket.txt",
+        "/api/sub/{sub_token}/clash.yaml",
+        "/api/sub/{sub_token}/shadowrocket.yaml",
+        "/api/sub/{sub_token}/merlin.yaml",
+        "/api/sub/{sub_token}/shadowrocket.conf",
+    }
+    route_methods = {route.path: route.methods for route in subscription_router.routes}
+
+    for path in expected:
+        assert {"GET", "HEAD"} <= route_methods[path]
+
+
+def test_subscription_head_probe_returns_success_without_body(monkeypatch) -> None:
+    _stub_public_host(monkeypatch)
+    priv_b64, _ = _gen_keypair()
+
+    monkeypatch.setattr(
+        subscription_routes,
+        "_device_by_sub_token",
+        lambda _token: _fake_device(),
+    )
+    monkeypatch.setattr(
+        subscription_routes.singbox,
+        "read_config",
+        lambda: _fake_sb_cfg(priv_b64),
+    )
+
+    app = FastAPI()
+    app.include_router(subscription_routes.router)
+
+    with TestClient(app) as client:
+        res = client.head("/api/sub/token1234/clash.yaml")
+
+    assert res.status_code == 200
+    assert res.text == ""

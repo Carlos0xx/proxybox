@@ -462,7 +462,6 @@ if [ ! -f "$SINGBOX_DIR/config.json" ]; then
     KEYPAIR=$(sing-box generate reality-keypair)
     PRIVATE_KEY=$(printf '%s\n' "$KEYPAIR" | awk '/PrivateKey/{print $2}')
     SHORT_ID=$(openssl rand -hex 8)
-    HY2_OBFS_PW=$(openssl rand -hex 16)
 
     SNI_CANDIDATES=(www.microsoft.com www.apple.com www.cloudflare.com www.amazon.com)
     SNI="${SNI_CANDIDATES[$RANDOM % 4]}"
@@ -502,7 +501,6 @@ if [ ! -f "$SINGBOX_DIR/config.json" ]; then
       "listen": "::",
       "listen_port": 21000,
       "users": [],
-      "obfs": { "type": "salamander", "password": "$HY2_OBFS_PW" },
       "tls": {
         "enabled": true,
         "alpn": ["h3"],

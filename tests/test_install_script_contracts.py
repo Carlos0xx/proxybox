@@ -87,6 +87,12 @@ def test_installer_provisions_python_311_for_runtime_venv() -> None:
     assert "ppa:deadsnakes/ppa" in CHECK_PREREQS_SH
 
 
+def test_native_installer_generates_hysteria2_without_obfs() -> None:
+    assert "HY2_OBFS_PW" not in INSTALL_SH
+    assert '"obfs": { "type": "salamander"' not in INSTALL_SH
+    assert '"alpn": ["h3"]' in INSTALL_SH
+
+
 def test_installer_uses_managed_fail2ban_jail_dropin() -> None:
     assert "/etc/fail2ban/jail.d/proxybox.local" in INSTALL_SH
     assert "[sshd]" in INSTALL_SH

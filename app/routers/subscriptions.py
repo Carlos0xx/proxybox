@@ -1,8 +1,9 @@
 """Public subscription endpoints — sub_token IS the auth, no admin token required.
 
 Clients (Shadowrocket, sing-box, Hiddify, Stash, Clash for iOS, Merlin) fetch
-the appropriate format via HTTP GET. The path validator constrains sub_token
-to hex/base64-safe chars so the URL can never be tricked into traversing the
+the appropriate format via HTTP GET; HEAD is also accepted for clients that
+probe subscription status first. The path validator constrains sub_token to
+hex/base64-safe chars so the URL can never be tricked into traversing the
 filesystem.
 
 Format selection:
@@ -55,7 +56,7 @@ def _device_by_sub_token(sub_token: str) -> dict:
     return dict(row)
 
 
-@router.get("/{sub_token}", response_class=PlainTextResponse)
+@router.api_route("/{sub_token}", methods=["GET", "HEAD"], response_class=PlainTextResponse)
 async def get_subscription(sub_token: SubTokenInPath) -> str:
     # DB lookup first — same revoked / not-found behaviour as every other
     # format. Earlier versions read the file directly, which bypassed
@@ -64,40 +65,48 @@ async def get_subscription(sub_token: SubTokenInPath) -> str:
     return subscriptions.generate_subscription_text(device, singbox.read_config())
 
 
-@router.get("/{sub_token}/sub.txt", response_class=PlainTextResponse)
+@router.api_route("/{sub_token}/sub.txt", methods=["GET", "HEAD"], response_class=PlainTextResponse)
 async def get_subscription_txt(sub_token: SubTokenInPath) -> str:
     device = _device_by_sub_token(sub_token)
     return subscriptions.generate_subscription_text(device, singbox.read_config())
 
 
-@router.get("/{sub_token}/shadowrocket.txt", response_class=PlainTextResponse)
+@router.api_route(
+    "/{sub_token}/shadowrocket.txt",
+    methods=["GET", "HEAD"],
+    response_class=PlainTextResponse,
+)
 async def get_shadowrocket_txt(sub_token: SubTokenInPath) -> str:
     device = _device_by_sub_token(sub_token)
     return subscriptions.generate_subscription_text(device, singbox.read_config())
 
 
-@router.get("/{sub_token}/clash.yaml")
+@router.api_route("/{sub_token}/clash.yaml", methods=["GET", "HEAD"])
 async def get_clash_yaml(sub_token: SubTokenInPath) -> Response:
     device = _device_by_sub_token(sub_token)
     body = subscriptions.build_clash_yaml(device, singbox.read_config(), with_tun=False)
     return Response(content=body, media_type="text/yaml")
 
 
-@router.get("/{sub_token}/shadowrocket.yaml")
+@router.api_route("/{sub_token}/shadowrocket.yaml", methods=["GET", "HEAD"])
 async def get_shadowrocket_yaml(sub_token: SubTokenInPath) -> Response:
     device = _device_by_sub_token(sub_token)
     body = subscriptions.build_clash_yaml(device, singbox.read_config(), with_tun=False)
     return Response(content=body, media_type="text/yaml")
 
 
-@router.get("/{sub_token}/merlin.yaml")
+@router.api_route("/{sub_token}/merlin.yaml", methods=["GET", "HEAD"])
 async def get_merlin_yaml(sub_token: SubTokenInPath) -> Response:
     device = _device_by_sub_token(sub_token)
     body = subscriptions.build_clash_yaml(device, singbox.read_config(), with_tun=True)
     return Response(content=body, media_type="text/yaml")
 
 
-@router.get("/{sub_token}/shadowrocket.conf", response_class=PlainTextResponse)
+@router.api_route(
+    "/{sub_token}/shadowrocket.conf",
+    methods=["GET", "HEAD"],
+    response_class=PlainTextResponse,
+)
 async def get_shadowrocket_conf(sub_token: SubTokenInPath) -> str:
     device = _device_by_sub_token(sub_token)
     return subscriptions.build_shadowrocket_conf(device, singbox.read_config())
