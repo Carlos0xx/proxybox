@@ -1,0 +1,22 @@
+[Unit]
+Description=ProxyBox Telegram bot
+Documentation=https://github.com/carlos0xx/proxybox
+After=network.target proxybox-admin.service
+Wants=proxybox-admin.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/proxybox
+EnvironmentFile=/etc/proxybox/bot.env
+ExecStart=/opt/proxybox/.venv/bin/python -m bot
+Restart=on-failure
+RestartSec=10s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

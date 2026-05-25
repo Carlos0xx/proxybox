@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — run PII check plus gitleaks when available
+#
+# Enable once from the repository root:
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+
+# 1. PII blocklist check (always required locally)
+"$repo_root/scripts/pii-check.sh"
+
+# 2. gitleaks (run when installed, otherwise skip with install hint)
+if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks protect --staged --redact --no-banner || {
+        echo "🛑 gitleaks found staged findings. See redacted output above, fix, then commit again."
+        exit 1
+    }
+else
+    echo "ℹ️  gitleaks not installed (recommended: brew install gitleaks)"
+fi
+
+echo "✅ pre-commit passed"

@@ -1,0 +1,66 @@
+# ─── Local agent / session state (Claude Code, IDE) ────────
+.claude/
+
+# ─── Secrets / config ───────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+secrets/
+config.yaml
+!config.example.yaml
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ─── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Node (frontend build artifacts / package manager) ─────
+node_modules/
+.next/
+dist/
+build/
+
+# ─── OS / IDE ───────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ─── Tests / local dev VM ──────────────────────────────────
+.multipass/
+.vagrant/
+*.iso
+
+# ─── Personal PII blocklist (must NEVER enter the repo) ─────
+.proxybox-pii-blocklist.txt
+pii-blocklist.txt
+
+# ─── Internal decision / onboarding docs (private dev context, not public) ─
+# Public repo should use CONTRIBUTING.md (sanitized) instead
+CONSTRAINTS.md
+SESSION_HANDOFF.md
+NOTES.md
+TODO.md
+dashboard.html
+
+# ─── Backups / temp files ──────────────────────────────────
+*.bak
+*.bak.*
+*.orig
+*.tmp
+*~

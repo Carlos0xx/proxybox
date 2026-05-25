@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest a new capability or improvement.
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ProxyBox is intentionally small — see "What we'll probably say no to" in [CONTRIBUTING.md](https://github.com/carlos0xx/proxybox/blob/main/CONTRIBUTING.md) before filing. Opening a request **before** writing code saves you a round-trip if the idea doesn't fit.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What are you trying to do, and what makes it hard today? (Not "I want X" but "I'm trying to do Y.")
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution
+      description: How would you like ProxyBox to behave?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Where does this live?
+      options:
+        - Admin SPA (web UI)
+        - Admin API (FastAPI)
+        - Traffic worker
+        - sing-box config writer
+        - Telegram bot
+        - Installer / Docker / deploy
+        - Documentation
+        - Other / unsure
+    validations:
+      required: true

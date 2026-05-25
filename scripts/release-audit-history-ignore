@@ -1,0 +1,21 @@
+# Blocklist patterns explicitly allowed in git commit history.
+#
+# release-audit.sh enforces the PII blocklist on file content (where new
+# leaks must be prevented) AND on commit messages (so historical leaks
+# don't slip through review). Sometimes a pattern is appropriate for the
+# first but not the second — list it here, one per line, with a comment
+# explaining why.
+#
+# This is NOT a free pass — every entry should have a written rationale.
+
+# Developer's local SSH alias for the test VPS. Used in dozens of
+# "Verified on proxybox-test: ..." commit-body lines. Doesn't reveal an
+# IP, credential, or any user-facing data — just records that the change
+# was smoke-tested against a real machine.
+proxybox-test
+
+# BWG-era device fallback string that was REMOVED in commit e7ebe30
+# ("fix(spa): remove BWG-personal-data leaks"). Mentions in history are
+# part of the audit trail explaining what was scrubbed. The string itself
+# is no longer anywhere in the running code (pii-check confirms).
+ASUS_old

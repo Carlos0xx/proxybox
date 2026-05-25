@@ -1,0 +1,22 @@
+[Unit]
+Description=ProxyBox traffic accounting worker
+Documentation=https://github.com/carlos0xx/proxybox
+After=network.target sing-box.service
+Wants=sing-box.service
+
+[Service]
+Type=simple
+ExecStart=/opt/proxybox/.venv/bin/python -m app.workers.traffic
+WorkingDirectory=/opt/proxybox
+Environment=PROXYBOX_CONFIG=/etc/proxybox/config.yaml
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/proxybox /var/log/proxybox
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

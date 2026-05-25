@@ -1,0 +1,62 @@
+name: Bug report
+description: Something is broken in ProxyBox.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a clear report. The more concrete the repro, the faster a fix lands.
+
+        **Not a bug but a security issue?** If it could be abused by someone with network access, use the [private advisories page](https://github.com/carlos0xx/proxybox/security/advisories/new) instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: ProxyBox version
+      description: The install tag, or output of `cat /opt/proxybox/.git/HEAD`.
+      placeholder: 0.2.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-path
+    attributes:
+      label: Install path
+      options:
+        - Claude Code / Codex skill
+        - install.sh on Debian / Ubuntu
+        - Docker Compose
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Host OS
+      placeholder: Debian 13 / Ubuntu 24.04 / etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Install with ...
+        2. Open the panel at ...
+        3. Click ...
+        4. Observed: ...
+        5. Expected: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: e.g. `journalctl -u proxybox-admin -n 50`. Redact any secrets.
+      render: shell
+    validations:
+      required: false

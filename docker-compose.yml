@@ -1,0 +1,161 @@
+# ProxyBox docker-compose stack.
+#
+# Default install (Linux host):
+#   bash deploy/docker-install.sh
+#
+# Manual start:
+#   docker compose up -d
+#   docker compose --profile bot up -d
+#
+# Read first-boot credentials:
+#   docker compose logs bootstrap
+#   docker compose exec proxybox-admin sh -c 'cat /etc/proxybox/admin.password; grep -E "username|login_path" /etc/proxybox/config.yaml'
+#
+# Fresh start on reused volumes:
+#   docker compose down
+#   PROXYBOX_FRESH=1 docker compose up -d
+#
+# This stack uses a Docker bridge network and published ports only. It does
+# does not install host Python, fail2ban, Caddy, or SSH trust files. The
+# installer adds one narrow host systemd timer for this install only, so Docker
+# and this Compose project come back after daemon or VPS restarts.
+
+services:
+  bootstrap:
+    build:
+      context: .
+    image: ${PROXYBOX_IMAGE:-proxybox:local}
+    restart: "no"
+    command: ["python", "-m", "app.bootstrap"]
+    environment:
+      - PROXYBOX_FRESH=${PROXYBOX_FRESH:-0}
+      - PROXYBOX_PUBLIC_HOST=${PROXYBOX_PUBLIC_HOST:-}
+      - PROXYBOX_ADMIN_PORT=${PROXYBOX_ADMIN_PORT:-8080}
+      - PROXYBOX_CLASH_PORT=${PROXYBOX_CLASH_PORT:-9090}
+      - PROXYBOX_VLESS_TEMPLATE_PORT=${PROXYBOX_VLESS_TEMPLATE_PORT:-11000}
+      - PROXYBOX_VLESS_START=${PROXYBOX_VLESS_START:-11001}
+      - PROXYBOX_VLESS_END=${PROXYBOX_VLESS_END:-11050}
+      - PROXYBOX_HY2_TEMPLATE_PORT=${PROXYBOX_HY2_TEMPLATE_PORT:-21000}
+      - PROXYBOX_HY2_START=${PROXYBOX_HY2_START:-21001}
+      - PROXYBOX_HY2_END=${PROXYBOX_HY2_END:-21050}
+    volumes:
+      - proxybox-config:/etc/proxybox
+      - proxybox-data:/var/lib/proxybox
+      - proxybox-sub:/var/www/proxybox-sub
+      - singbox-config:/etc/sing-box
+    networks:
+      - proxybox-net
+
+  sing-box:
+    build:
+      context: .
+      dockerfile: deploy/docker/singbox.Dockerfile
+    image: ${PROXYBOX_SINGBOX_IMAGE:-proxybox-sing-box:local}
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      - PROXYBOX_SINGBOX_RELOAD_FILE=/etc/sing-box/reload.flag
+      - SINGBOX_CONFIG=/etc/sing-box/config.json
+      - PROXYBOX_DOCKER_LOG_DIR=/var/lib/proxybox/logs
+    volumes:
+      - singbox-config:/etc/sing-box
+      - proxybox-data:/var/lib/proxybox
+    ports:
+      - "${PROXYBOX_VLESS_TEMPLATE_PORT:-11000}:${PROXYBOX_VLESS_TEMPLATE_PORT:-11000}/tcp"
+      - "${PROXYBOX_VLESS_START:-11001}-${PROXYBOX_VLESS_END:-11050}:${PROXYBOX_VLESS_START:-11001}-${PROXYBOX_VLESS_END:-11050}/tcp"
+      - "${PROXYBOX_HY2_TEMPLATE_PORT:-21000}:${PROXYBOX_HY2_TEMPLATE_PORT:-21000}/udp"
+      - "${PROXYBOX_HY2_START:-21001}-${PROXYBOX_HY2_END:-21050}:${PROXYBOX_HY2_START:-21001}-${PROXYBOX_HY2_END:-21050}/udp"
+    networks:
+      - proxybox-net
+
+  proxybox-admin:
+    image: ${PROXYBOX_IMAGE:-proxybox:local}
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      sing-box:
+        condition: service_started
+    environment:
+      - PROXYBOX_CONFIG=/etc/proxybox/config.yaml
+      - PROXYBOX_RUNTIME=docker
+      - PROXYBOX_SINGBOX_RELOAD_FILE=/etc/sing-box/reload.flag
+      - PROXYBOX_TRAFFIC_HEARTBEAT=/var/lib/proxybox/traffic-worker.heartbeat
+      - PROXYBOX_WATCHDOG_HEARTBEAT=/var/lib/proxybox/watchdog.heartbeat
+      - PROXYBOX_DOCKER_GUARD_STATUS=/var/lib/proxybox-host-guard/status
+      - PROXYBOX_DOCKER_GUARD_DIR=/var/lib/proxybox-host-guard
+      - PROXYBOX_ADMIN_PORT=${PROXYBOX_ADMIN_PORT:-8080}
+      - PROXYBOX_BOT_INTERNAL_SECRET=${PROXYBOX_BOT_INTERNAL_SECRET:-}
+      - PROXYBOX_WORKER_RESTART_FILE=/var/lib/proxybox/traffic-worker.restart
+      - PROXYBOX_DOCKER_LOG_DIR=/var/lib/proxybox/logs
+    volumes:
+      - proxybox-config:/etc/proxybox
+      - proxybox-data:/var/lib/proxybox
+      - proxybox-sub:/var/www/proxybox-sub
+      - singbox-config:/etc/sing-box
+      - ./.proxybox-guard:/var/lib/proxybox-host-guard
+    ports:
+      - "${PROXYBOX_ADMIN_BIND:-0.0.0.0}:${PROXYBOX_ADMIN_PORT:-8080}:8080/tcp"
+    networks:
+      - proxybox-net
+    command: ["/opt/proxybox/deploy/docker/admin-entrypoint.sh"]
+
+  proxybox-traffic-worker:
+    image: ${PROXYBOX_IMAGE:-proxybox:local}
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      proxybox-admin:
+        condition: service_started
+      sing-box:
+        condition: service_started
+    environment:
+      - PROXYBOX_CONFIG=/etc/proxybox/config.yaml
+      - PROXYBOX_RUNTIME=docker
+      - PROXYBOX_API_URL=http://proxybox-admin:8080
+      - PROXYBOX_BOT_INTERNAL_SECRET=${PROXYBOX_BOT_INTERNAL_SECRET:-}
+      - PROXYBOX_TRAFFIC_HEARTBEAT=/var/lib/proxybox/traffic-worker.heartbeat
+      - PROXYBOX_WORKER_RESTART_FILE=/var/lib/proxybox/traffic-worker.restart
+      - PROXYBOX_DOCKER_LOG_DIR=/var/lib/proxybox/logs
+    volumes:
+      - proxybox-config:/etc/proxybox:ro
+      - proxybox-data:/var/lib/proxybox
+      - singbox-config:/etc/sing-box:ro
+    networks:
+      - proxybox-net
+    command: ["/opt/proxybox/deploy/docker/traffic-worker-entrypoint.sh"]
+
+  # Opt-in: enable with `docker compose --profile bot up -d`. Keep bot.env
+  # next to this compose file; it is not read from /etc on the host.
+  proxybox-bot:
+    image: ${PROXYBOX_IMAGE:-proxybox:local}
+    pull_policy: never
+    profiles: ["bot"]
+    restart: unless-stopped
+    depends_on:
+      proxybox-admin:
+        condition: service_started
+    env_file:
+      - ${PROXYBOX_BOT_ENV_FILE:-./bot.env}
+    environment:
+      - PROXYBOX_CONFIG=/etc/proxybox/config.yaml
+      - PROXYBOX_RUNTIME=docker
+    volumes:
+      - proxybox-config:/etc/proxybox:ro
+      - proxybox-data:/var/lib/proxybox
+    networks:
+      - proxybox-net
+    command: ["python", "-m", "bot"]
+
+volumes:
+  proxybox-config:
+  proxybox-data:
+  proxybox-sub:
+  singbox-config:
+
+networks:
+  proxybox-net:
+    driver: bridge
